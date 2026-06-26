@@ -3,6 +3,24 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitAssessment } from './actions'
 
+const RATING_LABEL: Record<number, string> = {
+  1: 'Rough week — let\'s learn from it.',
+  2: 'Rough week — let\'s learn from it.',
+  3: 'Rough week — let\'s learn from it.',
+  4: 'Decent week. Keep pushing.',
+  5: 'Decent week. Keep pushing.',
+  6: 'Decent week. Keep pushing.',
+  7: 'Strong week. Build on it.',
+  8: 'Strong week. Build on it.',
+  9: 'Incredible week. Lock it in.',
+  10: 'Incredible week. Lock it in.',
+}
+
+const RATING_COLOR: Record<number, string> = {
+  1: '#f87171', 2: '#f87171', 3: '#fb923c', 4: '#fbbf24', 5: '#fbbf24',
+  6: '#D4AF37', 7: '#D4AF37', 8: '#4ade80', 9: '#4ade80', 10: '#22c55e',
+}
+
 export function AssessForm({ weekStart }: { weekStart: string }) {
   const [rating, setRating] = useState(0)
   const [isPending, startTransition] = useTransition()
@@ -21,62 +39,44 @@ export function AssessForm({ weekStart }: { weekStart: string }) {
   }
 
   return (
-    <form action={handleSubmit} className="flex flex-col gap-6">
+    <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Rating */}
       <div>
-        <p className="text-[9px] font-black tracking-[0.14em] text-[#555] mb-3">HOW WAS YOUR WEEK? (1–10)</p>
-        <div className="flex gap-2 flex-wrap">
+        <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#555', marginBottom: 14 }}>HOW WAS YOUR WEEK? (1–10)</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[1,2,3,4,5,6,7,8,9,10].map(n => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setRating(n)}
-              className={`w-10 h-10 rounded-xl text-sm font-black transition-all ${
-                rating === n
-                  ? 'bg-[#D4AF37] text-black scale-110'
-                  : 'bg-white/[0.04] border border-white/[0.08] text-[#555] hover:text-[#EFEFEF]'
-              }`}
-            >
+            <button key={n} type="button" onClick={() => setRating(n)} style={{ width: 40, height: 40, borderRadius: 12, fontSize: 14, fontWeight: 900, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: rating === n ? RATING_COLOR[n] : 'rgba(255,255,255,0.04)', color: rating === n ? '#000' : '#555', border: rating === n ? 'none' : '1px solid rgba(255,255,255,0.08)', transform: rating === n ? 'scale(1.1)' : 'scale(1)', boxShadow: rating === n ? `0 4px 16px ${RATING_COLOR[n]}44` : 'none' }}>
               {n}
             </button>
           ))}
         </div>
         {rating > 0 && (
-          <p className="text-xs text-[#555] mt-2">
-            {rating <= 3 ? 'Rough week — let\'s learn from it.' : rating <= 6 ? 'Decent week. Keep pushing.' : rating <= 8 ? 'Strong week. Build on it.' : 'Incredible week. Lock it in.'}
+          <p style={{ fontSize: 12, color: RATING_COLOR[rating], fontWeight: 600, marginTop: 10 }}>
+            {RATING_LABEL[rating]}
           </p>
         )}
       </div>
 
-      <Field name="wins" label="WINS THIS WEEK" placeholder="What went well? What are you proud of?" rows={3} />
-      <Field name="challenges" label="CHALLENGES" placeholder="What got in the way? What was hard?" rows={3} />
-      <Field name="lessons" label="LESSONS LEARNED" placeholder="What will you do differently? What did you discover?" rows={3} />
-      <Field name="intentions" label="INTENTIONS FOR NEXT WEEK" placeholder="What are your top 3 priorities?" rows={3} />
-      <Field name="gratitude" label="GRATITUDE" placeholder="Three things you're grateful for..." rows={2} />
+      <Field name="wins" label="WINS THIS WEEK" placeholder="What went well? What are you proud of?" />
+      <Field name="challenges" label="CHALLENGES" placeholder="What got in the way? What was hard?" />
+      <Field name="lessons" label="LESSONS LEARNED" placeholder="What will you do differently? What did you discover?" />
+      <Field name="intentions" label="INTENTIONS FOR NEXT WEEK" placeholder="What are your top 3 priorities?" />
+      <Field name="gratitude" label="GRATITUDE" placeholder="Three things you're grateful for…" rows={2} />
 
-      {error && <p className="text-sm text-rose-400">{error}</p>}
+      {error && <p style={{ color: '#c0392b', fontSize: 13 }}>{error}</p>}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#9A7010] text-black font-black tracking-wider text-sm disabled:opacity-50"
-      >
-        {isPending ? 'SUBMITTING...' : 'SUBMIT REFLECTION'}
+      <button type="submit" disabled={isPending} className="btn-gold" style={{ fontSize: 13, letterSpacing: '0.06em', padding: 16 }}>
+        {isPending ? 'SUBMITTING…' : 'SUBMIT REFLECTION →'}
       </button>
     </form>
   )
 }
 
-function Field({ name, label, placeholder, rows }: { name: string; label: string; placeholder: string; rows: number }) {
+function Field({ name, label, placeholder, rows = 3 }: { name: string; label: string; placeholder: string; rows?: number }) {
   return (
     <div>
-      <label className="text-[9px] font-black tracking-[0.14em] text-[#555] block mb-1.5">{label}</label>
-      <textarea
-        name={name}
-        rows={rows}
-        placeholder={placeholder}
-        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-[#EFEFEF] placeholder-[#444] focus:outline-none focus:border-[#D4AF37]/50 resize-none"
-      />
+      <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#555', display: 'block', marginBottom: 10 }}>{label}</label>
+      <textarea name={name} rows={rows} placeholder={placeholder} className="cc-input" />
     </div>
   )
 }

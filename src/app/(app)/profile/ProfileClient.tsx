@@ -31,107 +31,104 @@ export function ProfileClient({ profile }: { profile: Profile }) {
   }
 
   const initials = profile.full_name
-    ? profile.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    ? profile.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
     : '?'
 
   return (
-    <div className="max-w-[600px] mx-auto px-5 py-8">
-      {/* Avatar + name */}
-      <div className="flex items-center gap-5 mb-8">
-        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#8A6808] flex items-center justify-center text-2xl font-black text-black flex-shrink-0">
-          {initials}
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px' }} className="view-panel">
+
+      {/* Hero — avatar + name */}
+      <div style={{ position: 'relative', marginBottom: 28 }}>
+        {/* Cover gradient */}
+        <div style={{ height: 100, borderRadius: '20px 20px 0 0', background: 'linear-gradient(135deg,#18140A,#0F0C03)', border: '1px solid rgba(212,175,55,0.15)', borderBottom: 'none', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 120% at 50% -20%, rgba(212,175,55,0.18) 0%, transparent 70%)' }} />
         </div>
-        <div>
-          <h1 className="text-2xl font-black text-[#EFEFEF]">{profile.full_name ?? 'Your Name'}</h1>
-          {profile.username && <p className="text-sm text-[#555]">@{profile.username}</p>}
-          {profile.tagline && <p className="text-sm text-[#EFEFEF]/70 mt-0.5">{profile.tagline}</p>}
+        {/* Card body */}
+        <div style={{ background: 'linear-gradient(160deg,#161616,#111111)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '0 0 20px 20px', padding: '0 20px 20px' }}>
+          {/* Avatar overlapping */}
+          <div style={{ marginTop: -36, marginBottom: 14, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div style={{ width: 72, height: 72, borderRadius: 20, background: 'linear-gradient(135deg,#D4AF37,#8A6808)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#000', border: '3px solid #111', flexShrink: 0 }}>
+              {initials}
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)', marginBottom: 4 }}>
+              <span style={{ fontSize: 14 }}>🔥</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#D4AF37' }}>{profile.streak ?? 0}-week streak</span>
+            </div>
+          </div>
+          <h1 style={{ fontSize: 22, fontWeight: 900, color: '#EFEFEF', marginBottom: 4 }}>{profile.full_name ?? 'Your Name'}</h1>
+          {profile.username && <p style={{ fontSize: 13, color: '#555', marginBottom: profile.tagline ? 4 : 0 }}>@{profile.username}</p>}
+          {profile.tagline && <p style={{ fontSize: 13, color: '#888', fontWeight: 300, fontStyle: 'italic' }}>{profile.tagline}</p>}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard label="STREAK" value={String(profile.streak)} unit="wks" />
-        <StatCard label="GOALS DONE" value={String(profile.goals_complete)} unit="" />
-        <StatCard label="REFLECTIONS" value={String(profile.assessments_submitted)} unit="" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 24 }}>
+        <StatCard label="STREAK" value={String(profile.streak ?? 0)} unit="wks" accent="#D4AF37" />
+        <StatCard label="GOALS DONE" value={String(profile.goals_complete ?? 0)} unit="" accent="#4ade80" />
+        <StatCard label="REFLECTIONS" value={String(profile.assessments_submitted ?? 0)} unit="" accent="#a78bfa" />
       </div>
 
       {profile.bio && (
-        <div className="mb-6 p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-          <p className="text-[9px] font-black tracking-[0.14em] text-[#555] mb-2">ABOUT</p>
-          <p className="text-sm text-[#EFEFEF]/80 leading-relaxed">{profile.bio}</p>
+        <div style={{ marginBottom: 20, padding: '16px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+          <p className="profile-section-label" style={{ marginBottom: 8 }}>ABOUT</p>
+          <p style={{ fontSize: 13, color: '#AAA', fontWeight: 300, lineHeight: 1.7 }}>{profile.bio}</p>
         </div>
       )}
 
       {saved && (
-        <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 font-bold">
-          ✓ Profile saved
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 12, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 13L9.5 18.5L21 5" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>Profile saved</p>
         </div>
       )}
 
       {!editing ? (
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={() => setEditing(true)}
-            className="w-full py-3.5 rounded-xl border border-white/[0.08] text-[#EFEFEF] text-sm font-bold hover:bg-white/[0.03] transition-colors"
-          >
-            Edit Profile
-          </button>
-          <button
-            onClick={handleSignOut}
-            disabled={isPending}
-            className="w-full py-3.5 rounded-xl border border-white/[0.06] text-[#555] text-sm font-bold hover:text-rose-400 hover:border-rose-500/30 transition-colors"
-          >
-            Sign Out
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button onClick={() => setEditing(true)} className="btn-ghost" style={{ width: '100%' }}>Edit Profile</button>
+          <button onClick={handleSignOut} disabled={isPending} style={{ width: '100%', padding: '14px 24px', borderRadius: 12, background: 'transparent', border: '1px solid rgba(248,113,113,0.2)', color: '#f87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s' }}>
+            {isPending ? 'Signing out…' : 'Sign Out'}
           </button>
         </div>
       ) : (
-        <form action={handleSave} className="flex flex-col gap-4">
-          <h2 className="text-lg font-black text-[#EFEFEF] mb-2">Edit Profile</h2>
+        <form action={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p style={{ fontSize: 16, fontWeight: 900, color: '#EFEFEF' }}>Edit Profile</p>
+            <button type="button" onClick={() => setEditing(false)} style={{ fontSize: 13, color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Cancel</button>
+          </div>
 
           <Field name="full_name" label="FULL NAME" defaultValue={profile.full_name ?? ''} placeholder="Your name" />
           <Field name="username" label="USERNAME" defaultValue={profile.username ?? ''} placeholder="yourhandle" />
           <Field name="tagline" label="TAGLINE" defaultValue={profile.tagline ?? ''} placeholder="One sentence about you" />
-          <TextareaField name="bio" label="BIO" defaultValue={profile.bio ?? ''} placeholder="Tell your circle about yourself" />
-
           <div>
-            <label className="text-[9px] font-black tracking-[0.14em] text-[#555] block mb-1.5">REFLECTION DAY</label>
-            <select name="assessment_day" defaultValue={profile.assessment_day} className={inputCls}>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#555', display: 'block', marginBottom: 8 }}>BIO</label>
+            <textarea name="bio" defaultValue={profile.bio ?? ''} placeholder="Tell your circle about yourself" rows={3} className="cc-input" />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#555', display: 'block', marginBottom: 8 }}>REFLECTION DAY</label>
+            <select name="assessment_day" defaultValue={profile.assessment_day} className="cc-input" style={{ fontSize: 14 }}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>
 
-          {error && <p className="text-sm text-rose-400">{error}</p>}
+          {error && <p style={{ color: '#c0392b', fontSize: 13 }}>{error}</p>}
 
-          <div className="flex gap-3 mt-2">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="flex-1 py-3.5 rounded-xl border border-white/[0.08] text-[#555] text-sm font-bold hover:text-[#EFEFEF] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#9A7010] text-black text-sm font-black tracking-wider disabled:opacity-50"
-            >
-              {isPending ? 'Saving...' : 'Save'}
-            </button>
-          </div>
+          <button type="submit" disabled={isPending} className="btn-gold" style={{ marginTop: 8 }}>
+            {isPending ? 'SAVING...' : 'SAVE PROFILE'}
+          </button>
         </form>
       )}
     </div>
   )
 }
 
-function StatCard({ label, value, unit }: { label: string; value: string; unit: string }) {
+function StatCard({ label, value, unit, accent }: { label: string; value: string; unit: string; accent: string }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 text-center">
-      <p className="text-[8px] font-black tracking-wider text-[#555] mb-1">{label}</p>
-      <p className="text-2xl font-black text-[#D4AF37]">{value}</p>
-      {unit && <p className="text-[9px] text-[#555]">{unit}</p>}
+    <div style={{ borderRadius: 16, border: `1px solid ${accent}22`, background: `${accent}0A`, padding: '14px 10px', textAlign: 'center' }}>
+      <p style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', color: '#555', marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 26, fontWeight: 900, color: accent, lineHeight: 1, textShadow: `0 0 16px ${accent}44` }}>{value}</p>
+      {unit && <p style={{ fontSize: 9, color: '#555', marginTop: 4 }}>{unit}</p>}
     </div>
   )
 }
@@ -139,19 +136,8 @@ function StatCard({ label, value, unit }: { label: string; value: string; unit: 
 function Field({ name, label, defaultValue, placeholder }: { name: string; label: string; defaultValue: string; placeholder: string }) {
   return (
     <div>
-      <label className="text-[9px] font-black tracking-[0.14em] text-[#555] block mb-1.5">{label}</label>
-      <input name={name} defaultValue={defaultValue} placeholder={placeholder} className={inputCls} />
+      <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#555', display: 'block', marginBottom: 8 }}>{label}</label>
+      <input name={name} defaultValue={defaultValue} placeholder={placeholder} className="cc-input" style={{ fontSize: 14 }} />
     </div>
   )
 }
-
-function TextareaField({ name, label, defaultValue, placeholder }: { name: string; label: string; defaultValue: string; placeholder: string }) {
-  return (
-    <div>
-      <label className="text-[9px] font-black tracking-[0.14em] text-[#555] block mb-1.5">{label}</label>
-      <textarea name={name} defaultValue={defaultValue} placeholder={placeholder} rows={3} className={`${inputCls} resize-none`} />
-    </div>
-  )
-}
-
-const inputCls = 'w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-[#EFEFEF] placeholder-[#444] focus:outline-none focus:border-[#D4AF37]/50'

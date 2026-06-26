@@ -10,6 +10,14 @@ type JournalEntry = {
   created_at: string
 }
 
+const TYPE_EMOJI: Record<string, string> = { gratitude: '🙏', write: '✍️', cbt: '🧠' }
+const TYPE_LABEL: Record<string, string> = { gratitude: 'Gratitude', write: 'Free Write', cbt: 'Reframe' }
+const TYPE_COLOR: Record<string, { bg: string; border: string; text: string }> = {
+  gratitude: { bg: 'rgba(34,197,94,0.08)',  border: 'rgba(34,197,94,0.18)',  text: '#4ade80' },
+  write:     { bg: 'rgba(212,175,55,0.08)', border: 'rgba(212,175,55,0.18)', text: '#D4AF37' },
+  cbt:       { bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.18)', text: '#a78bfa' },
+}
+
 export function JournalClient({ entries }: { entries: JournalEntry[] }) {
   const [showForm, setShowForm] = useState(false)
   const [entryType, setEntryType] = useState<'gratitude' | 'write' | 'cbt'>('gratitude')
@@ -30,120 +38,112 @@ export function JournalClient({ entries }: { entries: JournalEntry[] }) {
   }
 
   return (
-    <div className="max-w-[600px] mx-auto px-5 py-8">
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px' }} className="view-panel">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h1 className="text-3xl font-black text-[#EFEFEF] tracking-tight">Journal</h1>
-          <p className="text-sm text-[#555] mt-0.5">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</p>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>YOUR JOURNAL</p>
+          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
+            The work<br />within.
+          </h1>
+          <p style={{ fontSize: 12, color: '#555', fontWeight: 300, marginTop: 6 }}>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#9A7010] text-black text-xs font-black tracking-wider"
-        >
-          + WRITE
-        </button>
+        <button onClick={() => setShowForm(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ WRITE</button>
       </div>
 
       {entries.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-4xl mb-3">📖</p>
-          <p className="font-bold text-[#EFEFEF] mb-1">Nothing written yet</p>
-          <p className="text-sm text-[#555] mb-5">Take a moment to reflect. It compounds.</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#9A7010] text-black text-xs font-black tracking-wider"
-          >
-            WRITE YOUR FIRST ENTRY
-          </button>
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <p style={{ fontSize: 40, marginBottom: 14 }}>📖</p>
+          <p style={{ fontSize: 18, fontWeight: 700, color: '#EFEFEF', marginBottom: 8 }}>Nothing written yet</p>
+          <p style={{ fontSize: 13, color: '#555', fontWeight: 300, marginBottom: 24 }}>Take a moment to reflect. It compounds.</p>
+          <button onClick={() => setShowForm(true)} className="btn-gold" style={{ width: 'auto', padding: '12px 24px' }}>WRITE YOUR FIRST ENTRY</button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {entries.map(entry => (
-            <div
-              key={entry.id}
-              onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
-              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 cursor-pointer hover:border-white/[0.1] transition-colors"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{typeEmoji[entry.type ?? 'write']}</span>
-                  <span className="text-[9px] font-black tracking-wider text-[#555]">{typeLabel[entry.type ?? 'write']}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {entries.map(entry => {
+            const c = TYPE_COLOR[entry.type ?? 'write']
+            const isOpen = expanded === entry.id
+            return (
+              <div key={entry.id} className="journal-entry" style={{ cursor: 'pointer', overflow: 'hidden', transition: 'border-color 0.18s', borderLeft: `3px solid ${c.border}` }} onClick={() => setExpanded(isOpen ? null : entry.id)}>
+                <div style={{ padding: '16px 18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{TYPE_EMOJI[entry.type ?? 'write']}</span>
+                      <div>
+                        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: c.text }}>{(TYPE_LABEL[entry.type ?? 'write']).toUpperCase()}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 10, color: '#444' }}>{formatDate(entry.created_at)}</span>
+                      <span style={{ fontSize: 14, color: '#444', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#888', fontWeight: 300, lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: isOpen ? undefined : 2, WebkitBoxOrient: 'vertical' }}>
+                    {entryPreview(entry)}
+                  </p>
+                  {isOpen && (
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <EntryDetail entry={entry} />
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs text-[#444]">{formatDate(entry.created_at)}</span>
               </div>
-
-              <p className="text-sm text-[#EFEFEF]/70 leading-relaxed truncate">{entryPreview(entry)}</p>
-
-              {expanded === entry.id && (
-                <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                  <EntryDetail entry={entry} />
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {/* New Entry Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm p-0 md:p-4">
-          <div className="w-full md:max-w-lg rounded-t-3xl md:rounded-3xl bg-[#111] border border-white/[0.08] p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-black text-[#EFEFEF]">New Entry</h2>
-              <button onClick={() => setShowForm(false)} className="text-[#555] hover:text-[#EFEFEF] text-2xl leading-none">×</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} className="md:items-center md:p-4" onClick={() => setShowForm(false)}>
+          <div style={{ width: '100%', maxWidth: 520, borderRadius: '24px 24px 0 0', background: '#111', border: '1px solid rgba(255,255,255,0.08)', padding: 24, maxHeight: '90vh', overflowY: 'auto' }} className="md:rounded-3xl" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 4 }}>NEW ENTRY</p>
+                <h2 style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF' }}>Reflect & write</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} style={{ fontSize: 24, color: '#555', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
             {/* Type picker */}
-            <div className="flex gap-2 mb-5">
-              {(['gratitude', 'write', 'cbt'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setEntryType(t)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-black tracking-wide transition-all ${
-                    entryType === t
-                      ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30'
-                      : 'bg-white/[0.04] text-[#555] border border-white/[0.06] hover:text-[#EFEFEF]'
-                  }`}
-                >
-                  {typeEmoji[t]} {typeLabel[t]}
-                </button>
-              ))}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {(['gratitude', 'write', 'cbt'] as const).map(t => {
+                const tc = TYPE_COLOR[t]
+                return (
+                  <button key={t} type="button" onClick={() => setEntryType(t)} style={{ flex: 1, padding: '10px 4px', borderRadius: 12, fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: entryType === t ? tc.bg : 'rgba(255,255,255,0.04)', color: entryType === t ? tc.text : '#555', border: entryType === t ? `1px solid ${tc.border}` : '1px solid rgba(255,255,255,0.07)' }}>
+                    {TYPE_EMOJI[t]}<br />{TYPE_LABEL[t]}
+                  </button>
+                )
+              })}
             </div>
 
-            <form action={handleSubmit} className="flex flex-col gap-4">
+            <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {entryType === 'gratitude' && (
                 <>
-                  <p className="text-xs text-[#555]">Name three things you&apos;re grateful for today.</p>
-                  <Textarea name="one" placeholder="I'm grateful for..." />
-                  <Textarea name="two" placeholder="I'm grateful for..." />
-                  <Textarea name="three" placeholder="I'm grateful for..." />
+                  <p style={{ fontSize: 12, color: '#555', fontWeight: 300 }}>Name three things you&apos;re grateful for today.</p>
+                  <textarea name="one" rows={2} placeholder="I'm grateful for…" className="cc-input" />
+                  <textarea name="two" rows={2} placeholder="I'm grateful for…" className="cc-input" />
+                  <textarea name="three" rows={2} placeholder="I'm grateful for…" className="cc-input" />
                 </>
               )}
               {entryType === 'write' && (
                 <>
-                  <p className="text-xs text-[#555]">Free write. No rules.</p>
-                  <Textarea name="body" placeholder="Start writing..." rows={8} />
+                  <p style={{ fontSize: 12, color: '#555', fontWeight: 300 }}>Free write. No rules.</p>
+                  <textarea name="body" rows={8} placeholder="Start writing…" className="cc-input" />
                 </>
               )}
               {entryType === 'cbt' && (
                 <>
-                  <p className="text-xs text-[#555]">Examine a thought that&apos;s bothering you.</p>
+                  <p style={{ fontSize: 12, color: '#555', fontWeight: 300 }}>Examine a thought that&apos;s bothering you.</p>
                   <LabeledField name="thought" label="THE THOUGHT" placeholder="e.g. I'll never be good enough" />
                   <LabeledField name="evidence_for" label="EVIDENCE FOR IT" placeholder="What supports this belief?" />
                   <LabeledField name="evidence_against" label="EVIDENCE AGAINST IT" placeholder="What contradicts this belief?" />
-                  <LabeledField name="balanced" label="A MORE BALANCED VIEW" placeholder="What's a fairer, more realistic way to see this?" />
+                  <LabeledField name="balanced" label="A MORE BALANCED VIEW" placeholder="What's a fairer way to see this?" />
                 </>
               )}
 
-              {error && <p className="text-sm text-rose-400">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={isPending}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#9A7010] text-black text-xs font-black tracking-wider disabled:opacity-50 mt-2"
-              >
+              {error && <p style={{ color: '#c0392b', fontSize: 13 }}>{error}</p>}
+              <button type="submit" disabled={isPending} className="btn-gold" style={{ marginTop: 8 }}>
                 {isPending ? 'SAVING...' : 'SAVE ENTRY'}
               </button>
             </form>
@@ -158,23 +158,25 @@ function EntryDetail({ entry }: { entry: JournalEntry }) {
   const c = entry.content
   if (entry.type === 'gratitude') {
     return (
-      <div className="flex flex-col gap-2">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {['one', 'two', 'three'].filter(k => c[k]).map((k, i) => (
-          <p key={k} className="text-sm text-[#EFEFEF]/80"><span className="text-[#D4AF37] font-bold">{i + 1}.</span> {c[k]}</p>
+          <p key={k} style={{ fontSize: 13, color: '#EFEFEF', fontWeight: 300, lineHeight: 1.6 }}>
+            <span style={{ color: '#D4AF37', fontWeight: 700 }}>{i + 1}.</span> {c[k]}
+          </p>
         ))}
       </div>
     )
   }
   if (entry.type === 'write') {
-    return <p className="text-sm text-[#EFEFEF]/80 leading-relaxed whitespace-pre-wrap">{c.body}</p>
+    return <p style={{ fontSize: 13, color: '#AAA', fontWeight: 300, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{c.body}</p>
   }
   if (entry.type === 'cbt') {
     return (
-      <div className="flex flex-col gap-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {[['THOUGHT', 'thought'], ['EVIDENCE FOR', 'evidence_for'], ['EVIDENCE AGAINST', 'evidence_against'], ['BALANCED VIEW', 'balanced']].filter(([, k]) => c[k]).map(([label, k]) => (
           <div key={k}>
-            <p className="text-[9px] font-black tracking-[0.14em] text-[#555] mb-1">{label}</p>
-            <p className="text-sm text-[#EFEFEF]/80">{c[k]}</p>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#555', marginBottom: 6 }}>{label}</p>
+            <p style={{ fontSize: 13, color: '#AAA', fontWeight: 300, lineHeight: 1.6 }}>{c[k]}</p>
           </div>
         ))}
       </div>
@@ -183,28 +185,14 @@ function EntryDetail({ entry }: { entry: JournalEntry }) {
   return null
 }
 
-function Textarea({ name, placeholder, rows = 2 }: { name: string; placeholder: string; rows?: number }) {
-  return (
-    <textarea
-      name={name}
-      rows={rows}
-      placeholder={placeholder}
-      className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-[#EFEFEF] placeholder-[#444] focus:outline-none focus:border-[#D4AF37]/50 resize-none"
-    />
-  )
-}
-
 function LabeledField({ name, label, placeholder }: { name: string; label: string; placeholder: string }) {
   return (
     <div>
-      <label className="text-[9px] font-black tracking-[0.14em] text-[#555] block mb-1.5">{label}</label>
-      <Textarea name={name} placeholder={placeholder} rows={3} />
+      <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#555', display: 'block', marginBottom: 8 }}>{label}</label>
+      <textarea name={name} rows={3} placeholder={placeholder} className="cc-input" />
     </div>
   )
 }
-
-const typeEmoji: Record<string, string> = { gratitude: '🙏', write: '✍️', cbt: '🧠' }
-const typeLabel: Record<string, string> = { gratitude: 'Gratitude', write: 'Free Write', cbt: 'Reframe' }
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
