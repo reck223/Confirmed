@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userName={profile?.full_name ?? user.email?.split('@')[0]}
         userStreak={profile?.streak ?? 0}
       />
-      <main className="pb-20 min-h-screen" style={{ paddingTop: 150 }}>
+      <main className="pb-20 min-h-screen" style={{ paddingTop: 175 }}>
         {children}
       </main>
     </div>

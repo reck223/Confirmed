@@ -1,16 +1,31 @@
+'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export function TopBar({ unreadCount }: { unreadCount: number }) {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 48)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <header style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-      height: 170,
-      background: 'linear-gradient(to bottom, rgba(8,8,8,0.97) 0%, rgba(8,8,8,0) 100%)',
+      height: scrolled ? 60 : 170,
+      background: scrolled ? 'rgba(8,8,8,0.96)' : 'linear-gradient(to bottom, rgba(8,8,8,0.97) 0%, rgba(8,8,8,0) 100%)',
+      backdropFilter: scrolled ? 'blur(24px)' : 'none',
+      WebkitBackdropFilter: scrolled ? 'blur(24px)' : 'none',
+      borderBottom: scrolled ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 20px',
+      transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1), background 0.3s ease, backdrop-filter 0.3s ease, border-color 0.3s ease',
+      willChange: 'height',
     }}>
-      {/* Brand logo — transparent PNG, gold glow */}
+      {/* Brand logo */}
       <Image
         src="/brandlogo.png"
         alt="Confirmed Creations"
@@ -18,22 +33,21 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
         height={1024}
         priority
         style={{
-          width: 'min(55%, 260px)',
+          width: scrolled ? 'min(38%, 160px)' : 'min(55%, 260px)',
           height: 'auto',
-          filter: 'drop-shadow(0 0 12px rgba(212,175,55,0.4))',
+          filter: 'drop-shadow(0 0 10px rgba(212,175,55,0.35))',
+          transition: 'width 0.35s cubic-bezier(0.4,0,0.2,1)',
         }}
       />
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-
-        {/* Settings icon */}
         <Link href="/settings" style={{
           width: 38, height: 38, borderRadius: 10,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.07)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          textDecoration: 'none',
+          textDecoration: 'none', transition: 'background 0.15s, border-color 0.15s',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/>
@@ -41,15 +55,13 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
           </svg>
         </Link>
 
-        {/* Inbox icon */}
         <Link href="/inbox" style={{
           position: 'relative', width: 38, height: 38, borderRadius: 10,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.07)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          textDecoration: 'none',
+          textDecoration: 'none', transition: 'background 0.15s, border-color 0.15s',
           boxShadow: unreadCount > 0 ? '0 0 0 1px rgba(212,175,55,0.2)' : 'none',
-          transition: 'all 0.15s',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={unreadCount > 0 ? '#D4AF37' : '#666'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
@@ -69,7 +81,6 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
             </span>
           )}
         </Link>
-
       </div>
     </header>
   )

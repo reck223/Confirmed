@@ -194,19 +194,31 @@ select.cc-input { cursor: pointer; }
 }
 .mob-nav-btn {
   position: relative; display: flex; flex-direction: column; align-items: center;
-  gap: 4px; padding: 6px 8px; background: none; border: none;
-  cursor: pointer; transition: color 0.15s; color: #555;
+  gap: 4px; padding: 6px 12px; background: none; border: none;
+  cursor: pointer; color: #555;
   font-family: 'Satoshi', sans-serif;
   text-decoration: none;
+  transition: color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 .mob-nav-btn .nav-pip {
   position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
-  width: 4px; height: 4px; border-radius: 2px; background: transparent; transition: all 0.2s;
+  width: 4px; height: 4px; border-radius: 2px; background: transparent;
+  transition: width 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s ease, box-shadow 0.2s ease;
 }
 .mob-nav-btn.nav-active { color: #D4AF37; }
-.mob-nav-btn.nav-active .nav-pip { background: #D4AF37; width: 16px; box-shadow: 0 0 8px rgba(212,175,55,0.6); }
-.mob-nav-btn svg { transition: filter 0.2s; }
-.mob-nav-btn.nav-active svg { filter: drop-shadow(0 0 6px rgba(212,175,55,0.5)); }
+.mob-nav-btn.nav-active .nav-pip {
+  background: #D4AF37; width: 20px;
+  box-shadow: 0 0 10px rgba(212,175,55,0.7);
+}
+.mob-nav-btn svg {
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), filter 0.2s ease;
+}
+.mob-nav-btn.nav-active svg {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 6px rgba(212,175,55,0.5));
+}
+.mob-nav-btn:active svg { transform: scale(0.88); }
 
 /* Post cards */
 .post-card { border-radius: 18px; border: 1px solid rgba(255,255,255,0.07); border-top-width: 0; position: relative; overflow: hidden; transition: box-shadow 0.2s, transform 0.18s; }
@@ -338,9 +350,24 @@ details[open] .reflect-chevron { transform: rotate(180deg); }
 .chapter-card:hover { box-shadow: 0 4px 32px rgba(0,0,0,0.6); }
 details[open].chapter-card .reflect-chevron { transform: rotate(180deg); }
 
-/* View transition */
+/* Page enter transition — fires on every navigation via template.tsx */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: pageEnter 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* View transition (individual panels) */
 @keyframes viewIn {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .view-panel { animation: viewIn 0.25s cubic-bezier(0.34,1.1,0.64,1) forwards; }
+
+/* Native View Transitions API — supported in Chrome/Safari */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: 180ms ease both fade-out; }
+  ::view-transition-new(root) { animation: 220ms ease both fade-in; }
+  @keyframes fade-out { to   { opacity: 0; } }
+  @keyframes fade-in  { from { opacity: 0; } }
+}
