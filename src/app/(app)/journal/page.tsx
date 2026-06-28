@@ -14,7 +14,7 @@ export default async function JournalPage() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  type Row = { id: string; type: 'gratitude' | 'cbt' | 'write' | null; content: unknown; created_at: string }
+  type Row = { id: string; type: 'gratitude' | 'cbt' | 'write' | 'checkin' | null; content: unknown; created_at: string }
   const entries = ((data ?? []) as Row[]).map(e => ({
     id: e.id,
     type: e.type,

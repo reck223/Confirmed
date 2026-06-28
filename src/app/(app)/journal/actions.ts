@@ -11,23 +11,65 @@ export async function createJournalEntry(formData: FormData) {
   let content: Record<string, string> = {}
 
   if (type === 'gratitude') {
+    const g1 = (formData.get('g1') as string)?.trim() || ''
+    if (!g1) return { error: 'Add at least one thing you\'re grateful for' }
     content = {
-      one: (formData.get('one') as string)?.trim() || '',
-      two: (formData.get('two') as string)?.trim() || '',
-      three: (formData.get('three') as string)?.trim() || '',
+      g1,
+      g2: (formData.get('g2') as string)?.trim() || '',
+      g3: (formData.get('g3') as string)?.trim() || '',
+      win: (formData.get('win') as string)?.trim() || '',
+      lookForward: (formData.get('lookForward') as string)?.trim() || '',
     }
-    if (!content.one) return { error: 'Add at least one thing you\'re grateful for' }
   } else if (type === 'write') {
-    content = { body: (formData.get('body') as string)?.trim() || '' }
-    if (!content.body) return { error: 'Write something before saving' }
-  } else if (type === 'cbt') {
+    const body = (formData.get('body') as string)?.trim() || ''
+    if (!body) return { error: 'Write something before saving' }
     content = {
-      thought: (formData.get('thought') as string)?.trim() || '',
-      evidence_for: (formData.get('evidence_for') as string)?.trim() || '',
-      evidence_against: (formData.get('evidence_against') as string)?.trim() || '',
-      balanced: (formData.get('balanced') as string)?.trim() || '',
+      body,
+      mood: (formData.get('mood') as string) || '',
     }
-    if (!content.thought) return { error: 'Describe the thought to examine' }
+  } else if (type === 'cbt') {
+    const thought = (formData.get('thought') as string)?.trim() || ''
+    if (!thought) return { error: 'Describe the thought to examine' }
+    content = {
+      situation: (formData.get('situation') as string)?.trim() || '',
+      thought,
+      distortions: (formData.get('distortions') as string) || '',
+      emotion: (formData.get('emotion') as string)?.trim() || '',
+      intensity: (formData.get('intensity') as string) || '5',
+      evidenceFor: (formData.get('evidenceFor') as string)?.trim() || '',
+      evidenceAgainst: (formData.get('evidenceAgainst') as string)?.trim() || '',
+      balanced: (formData.get('balanced') as string)?.trim() || '',
+      outcome: (formData.get('outcome') as string) || '5',
+    }
+  } else if (type === 'checkin') {
+    const checkin_type = (formData.get('checkin_type') as string) || 'morning'
+    if (checkin_type === 'morning') {
+      const intention = (formData.get('intention') as string)?.trim() || ''
+      const qod_answer = (formData.get('qod_answer') as string)?.trim() || ''
+      if (!intention && !qod_answer) return { error: 'Answer the question or add your intention to save.' }
+      content = {
+        checkin_type: 'morning',
+        mood: (formData.get('mood') as string) || '',
+        intention,
+        task1: (formData.get('task1') as string)?.trim() || '',
+        task2: (formData.get('task2') as string)?.trim() || '',
+        task3: (formData.get('task3') as string)?.trim() || '',
+        excited: (formData.get('excited') as string)?.trim() || '',
+        qod_question: (formData.get('qod_question') as string)?.trim() || '',
+        qod_answer,
+      }
+    } else {
+      const win = (formData.get('win') as string)?.trim() || ''
+      if (!win) return { error: 'Add at least one win from today' }
+      content = {
+        checkin_type: 'evening',
+        mood: (formData.get('mood') as string) || '',
+        win,
+        challenge: (formData.get('challenge') as string)?.trim() || '',
+        lesson: (formData.get('lesson') as string)?.trim() || '',
+        energy: (formData.get('energy') as string) || '5',
+      }
+    }
   } else {
     return { error: 'Invalid entry type' }
   }
@@ -35,7 +77,7 @@ export async function createJournalEntry(formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('journal_entries') as any).insert({
     user_id: user.id,
-    type: type as 'gratitude' | 'write' | 'cbt',
+    type: type as 'gratitude' | 'write' | 'cbt' | 'checkin',
     content,
   })
 

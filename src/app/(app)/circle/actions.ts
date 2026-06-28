@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { randomUUID } from 'crypto'
 
 function randomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -15,18 +16,17 @@ export async function createCircle(formData: FormData) {
   if (!name) return { error: 'Circle name is required' }
 
   const code = randomCode()
+  const circleId = randomUUID()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: circle, error: circleErr } = await (supabase.from('circles') as any)
-    .insert({ name, code, created_by: user.id })
-    .select()
-    .single()
+  const { error: circleErr } = await (supabase.from('circles') as any)
+    .insert({ id: circleId, name, code, created_by: user.id })
 
-  if (circleErr || !circle) return { error: circleErr?.message ?? 'Failed to create circle' }
+  if (circleErr) return { error: circleErr.message }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: memberErr } = await (supabase.from('circle_members') as any)
-    .insert({ circle_id: (circle as { id: string }).id, user_id: user.id })
+    .insert({ circle_id: circleId, user_id: user.id })
 
   if (memberErr) return { error: memberErr.message }
 
@@ -78,6 +78,26 @@ export async function createPost(circleId: string, formData: FormData) {
   })
 
   if (error) return { error: error.message }
+  revalidatePath('/circle')
+  return { success: true }
+}
+
+export async function followUser(targetId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('follows') as any).insert({ follower_id: user.id, following_id: targetId })
+  revalidatePath('/circle')
+  return { success: true }
+}
+
+export async function unfollowUser(targetId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('follows') as any).delete().eq('follower_id', user.id).eq('following_id', targetId)
   revalidatePath('/circle')
   return { success: true }
 }

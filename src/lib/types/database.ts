@@ -171,6 +171,7 @@ export type Database = {
           lessons: string | null
           intentions: string | null
           gratitude: string | null
+          week_title: string | null
           submitted_at: string
         }
         Insert: {
@@ -183,6 +184,7 @@ export type Database = {
           lessons?: string | null
           intentions?: string | null
           gratitude?: string | null
+          week_title?: string | null
         }
         Update: {
           rating?: number | null
@@ -191,6 +193,7 @@ export type Database = {
           lessons?: string | null
           intentions?: string | null
           gratitude?: string | null
+          week_title?: string | null
         }
       }
       check_ins: {
@@ -308,9 +311,23 @@ export type Database = {
 // Convenience aliases
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Goal = Database['public']['Tables']['goals']['Row']
+export type GoalMilestone = Database['public']['Tables']['goal_milestones']['Row']
 export type Assessment = Database['public']['Tables']['assessments']['Row']
 export type CheckIn = Database['public']['Tables']['check_ins']['Row']
 export type Post = Database['public']['Tables']['posts']['Row']
 export type JournalEntry = Database['public']['Tables']['journal_entries']['Row']
 export type Circle = Database['public']['Tables']['circles']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
+
+export type GoalBook = {
+  id: string
+  goal_id: string
+  user_id: string
+  title: string
+  author: string | null
+  cover_url: string | null
+  status: 'reading' | 'read' | 'queue'
+  rating: number | null
+  date_finished: string | null
+  created_at: string
+}

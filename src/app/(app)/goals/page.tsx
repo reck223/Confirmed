@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { GoalsClient } from './GoalsClient'
-import type { Goal } from '@/lib/types/database'
+import type { Goal, GoalMilestone, GoalBook } from '@/lib/types/database'
 
 export default async function GoalsPage() {
   const supabase = await createClient()
@@ -16,5 +16,26 @@ export default async function GoalsPage() {
 
   const goals = (data as Goal[] | null) ?? []
 
-  return <GoalsClient goals={goals} />
+  let milestones: GoalMilestone[] = []
+  let books: GoalBook[] = []
+
+  if (goals.length > 0) {
+    const goalIds = goals.map(g => g.id)
+
+    const { data: msData } = await supabase
+      .from('goal_milestones')
+      .select('*')
+      .in('goal_id', goalIds)
+      .order('created_at', { ascending: true })
+    milestones = (msData as GoalMilestone[] | null) ?? []
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: booksData } = await (supabase.from('goal_books') as any)
+      .select('*')
+      .in('goal_id', goalIds)
+      .order('created_at', { ascending: true })
+    books = (booksData as GoalBook[] | null) ?? []
+  }
+
+  return <GoalsClient goals={goals} milestones={milestones} books={books} />
 }

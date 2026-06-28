@@ -90,7 +90,7 @@ export function ProfileClient({ profile }: { profile: Profile }) {
           </button>
         </div>
       ) : (
-        <form action={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form autoComplete="off" action={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <p style={{ fontSize: 16, fontWeight: 900, color: '#EFEFEF' }}>Edit Profile</p>
             <button type="button" onClick={() => setEditing(false)} style={{ fontSize: 13, color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Cancel</button>

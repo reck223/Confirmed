@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@font-face { font-family: 'Satoshi'; src: url('/fonts/satoshi-300.woff2') format('woff2'); font-weight: 300; font-display: swap; font-style: normal; }
+@font-face { font-family: 'Satoshi'; src: url('/fonts/satoshi-400.woff2') format('woff2'); font-weight: 400; font-display: swap; font-style: normal; }
+@font-face { font-family: 'Satoshi'; src: url('/fonts/satoshi-500.woff2') format('woff2'); font-weight: 500; font-display: swap; font-style: normal; }
+@font-face { font-family: 'Satoshi'; src: url('/fonts/satoshi-700.woff2') format('woff2'); font-weight: 700; font-display: swap; font-style: normal; }
+@font-face { font-family: 'Satoshi'; src: url('/fonts/satoshi-900.woff2') format('woff2'); font-weight: 900; font-display: swap; font-style: normal; }
+
 *, body { font-family: 'Satoshi', sans-serif; -webkit-font-smoothing: antialiased; }
 html { scroll-behavior: smooth; background: #080808; }
 body { background: #080808; color: #EFEFEF; min-height: 100vh; }
@@ -237,6 +243,7 @@ select.cc-input { cursor: pointer; }
 .focus-pill.selected { border-color: rgba(212,175,55,0.55); color: #D4AF37; background: rgba(212,175,55,0.07); box-shadow: 0 0 0 1px rgba(212,175,55,0.12), 0 4px 20px rgba(212,175,55,0.07); }
 
 /* Visibility badges */
+.vis-badge    { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
 .vis-private  { background: rgba(248,113,113,0.10); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
 .vis-circle   { background: rgba(212,175,55,0.10);  color: #D4AF37; border: 1px solid rgba(212,175,55,0.2); }
 .vis-public   { background: rgba(34,197,94,0.10);   color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
@@ -249,14 +256,87 @@ select.cc-input { cursor: pointer; }
 /* Divider */
 .divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0; }
 
+/* Avatar circle */
+.av { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #FFF; flex-shrink: 0; }
+
+/* Journal tab pills */
+.comm-tab { padding: 11px 14px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 12px; font-weight: 700; font-family: 'Satoshi',sans-serif; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; color: #555; border-radius: 0; }
+.comm-tab.active { color: #EFEFEF; border-bottom-color: #D4AF37; }
+.comm-tab:hover:not(.active) { color: #888; }
+
+/* Calendar grid */
+.gcal-outer { border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); overflow: hidden; background: rgba(255,255,255,0.01); }
+.gcal-dow-row { display: grid; grid-template-columns: repeat(7,1fr); background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.gcal-dow-cell { padding: 8px 0; text-align: center; font-size: 9px; font-weight: 800; color: #333; letter-spacing: 0.08em; }
+.gcal-month-grid { display: grid; grid-template-columns: repeat(7,1fr); }
+.gcal-cell { min-height: 64px; padding: 5px 4px; border-right: 1px solid rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.12s; }
+.gcal-cell:nth-child(7n) { border-right: 0; }
+.gcal-cell:nth-last-child(-n+7) { border-bottom: 0; }
+.gcal-cell:hover { background: rgba(255,255,255,0.02); }
+.cell-out { background: rgba(0,0,0,0.15); }
+.cell-today { background: rgba(212,175,55,0.04); }
+.gcal-dn { font-size: 10px; font-weight: 700; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 3px; }
+.dn-today { background: linear-gradient(135deg,#D4AF37,#A07010); color: #000; box-shadow: 0 0 8px rgba(212,175,55,0.4); }
+.dn-out { color: #222; }
+.dn-past { color: #444; }
+.dn-cur { color: #EFEFEF; }
+.gcal-chip { display: block; font-size: 8.5px; font-weight: 700; padding: 2px 4px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: none; text-align: left; width: 100%; line-height: 1.4; cursor: pointer; }
+.gcal-more { font-size: 8px; font-weight: 700; color: #444; background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: Satoshi,sans-serif; }
+
+/* Discover cards */
+.disc-card { border-radius: 16px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.01); overflow: hidden; transition: border-color 0.15s; }
+.disc-card:hover { border-color: rgba(255,255,255,0.12); }
+.disc-band { height: 58px; position: relative; }
+.disc-av-float { position: absolute; bottom: -20px; left: 16px; border: 3px solid #111; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; color: #FFF; flex-shrink: 0; }
+.disc-stat { flex: 1; text-align: center; padding: 10px 6px; }
+.disc-stat-n { font-size: 15px; font-weight: 900; color: #EFEFEF; line-height: 1.1; }
+.disc-stat-l { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #444; margin-top: 2px; }
+
+/* CBT accordion */
+.cbt-section { border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; transition: border-color 0.2s; }
+.cbt-section.open { border-color: rgba(139,92,246,0.3); }
+.cbt-section-header { padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; background: none; border: none; width: 100%; text-align: left; font-family: 'Satoshi',sans-serif; }
+.cbt-section-header:hover { background: rgba(255,255,255,0.02); }
+
+/* Free write entry card */
+.jfree-card { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px; }
+
+/* Mood button */
+.mood-btn { font-size: 26px; background: none; border: 2px solid transparent; cursor: pointer; padding: 8px; border-radius: 12px; transition: all 0.18s; line-height: 1; }
+.mood-btn:hover { background: rgba(255,255,255,0.04); }
+.mood-btn.sel { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); transform: scale(1.2); }
+
 /* Journal */
 .journal-entry { background: #0E0E0E; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }
 
 /* Profile */
 .profile-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #555; margin-bottom: 12px; }
 
+/* Letter to Self card */
+.letter-card { background: linear-gradient(135deg,#0D0810 0%,#110A14 100%); border: 1px solid rgba(217,70,239,0.2); border-radius: 20px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+.letter-card:hover { border-color: rgba(217,70,239,0.38); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(217,70,239,0.08); }
+.letter-sealed { display: flex; flex-direction: column; align-items: center; padding: 28px 24px; text-align: center; }
+.letter-wax { width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 35%,#c026d3,#7c3aed); border: 2px solid rgba(217,70,239,0.35); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 4px 20px rgba(217,70,239,0.2); }
+
+/* Visibility toggle buttons */
+.vis-btn { padding: 10px 6px; border-radius: 10px; font-size: 11px; font-weight: 700; font-family: 'Satoshi', sans-serif; cursor: pointer; transition: all 0.15s; border: 1px solid rgba(255,255,255,0.08); color: #666; background: none; text-align: center; width: 100%; }
+.vis-btn.active-private { border-color: #f87171; color: #f87171; background: rgba(248,113,113,0.08); }
+.vis-btn.active-circle  { border-color: #D4AF37; color: #D4AF37; background: rgba(212,175,55,0.08); }
+.vis-btn.active-public  { border-color: #4ade80; color: #4ade80; background: rgba(34,197,94,0.08); }
+
 /* Clamp */
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Past reflections accordion */
+.reflect-summary { list-style: none; }
+.reflect-summary::-webkit-details-marker { display: none; }
+details[open] .reflect-chevron { transform: rotate(180deg); }
+.reflect-chevron { transition: transform 0.2s ease; display: inline-block; }
+
+/* Chapter cards (archive) */
+.chapter-card { background: #0d0d0d; transition: box-shadow 0.2s; }
+.chapter-card:hover { box-shadow: 0 4px 32px rgba(0,0,0,0.6); }
+details[open].chapter-card .reflect-chevron { transform: rotate(180deg); }
 
 /* View transition */
 @keyframes viewIn {
