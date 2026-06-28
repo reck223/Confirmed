@@ -1,6 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { updateProfile, signOut } from './actions'
+import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types/database'
 
 const FOCUS_AREAS = ['health', 'career', 'finance', 'learning', 'creative', 'relationships']
@@ -21,6 +22,30 @@ export function SettingsClient({ profile }: { profile: Profile }) {
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
   const [signingOut, startSignOut] = useTransition()
+
+  // Password change state
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSaved, setPwSaved] = useState(false)
+  const [pwPending, setPwPending] = useState(false)
+
+  async function handlePasswordChange() {
+    setPwError('')
+    if (newPassword.length < 8) { setPwError('Password must be at least 8 characters.'); return }
+    if (newPassword !== confirmPassword) { setPwError('Passwords do not match.'); return }
+    setPwPending(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setPwPending(false)
+    if (error) { setPwError(error.message); return }
+    setPwSaved(true)
+    setNewPassword('')
+    setConfirmPassword('')
+    setTimeout(() => setPwSaved(false), 2500)
+  }
 
   function toggleFocus(area: string) {
     setFocusAreas(prev =>
@@ -136,8 +161,105 @@ export function SettingsClient({ profile }: { profile: Profile }) {
 
       </form>
 
-      {/* ── Danger zone ── */}
+      {/* ── Change Password ── */}
       <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#555', marginBottom: 6 }}>SECURITY</p>
+        <p style={{ fontSize: 11, color: '#444', fontWeight: 300, marginBottom: 14 }}>Change your password.</p>
+        <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* New password */}
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#777', marginBottom: 6 }}>NEW PASSWORD</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showNew ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="cc-input"
+                style={{ fontSize: 14, paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#555' }}
+              >
+                {showNew ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm password */}
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#777', marginBottom: 6 }}>CONFIRM PASSWORD</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                placeholder="Repeat new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className="cc-input"
+                style={{ fontSize: 14, paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#555' }}
+              >
+                {showConfirm ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {pwError && (
+            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p style={{ color: '#f87171', fontSize: 13, fontWeight: 600 }}>{pwError}</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handlePasswordChange}
+            disabled={pwPending || !newPassword}
+            style={{
+              padding: '12px', borderRadius: 12, fontSize: 12, fontWeight: 800,
+              letterSpacing: '0.08em', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+              background: pwSaved ? 'rgba(34,197,94,0.1)' : 'rgba(212,175,55,0.08)',
+              color: pwSaved ? '#4ade80' : '#D4AF37',
+              border: pwSaved ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(212,175,55,0.2)',
+              transition: 'all 0.15s',
+              opacity: !newPassword ? 0.4 : 1,
+            }}
+          >
+            {pwSaved ? '✓ PASSWORD UPDATED' : pwPending ? 'UPDATING…' : 'UPDATE PASSWORD'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sign Out ── */}
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#555', marginBottom: 16 }}>ACCOUNT</p>
         <button
           onClick={handleSignOut}
