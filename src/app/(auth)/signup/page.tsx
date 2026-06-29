@@ -27,12 +27,25 @@ export default function SignUpPage() {
       options: { data: { full_name: name.trim() } },
     })
     if (error) { setError(error.message); setLoading(false); return }
+
+    // Session exists immediately (email confirmation disabled) — go straight in
     if (data.session) {
       router.push('/home')
       router.refresh()
-    } else {
-      setCheckEmail(true)
+      return
     }
+
+    // No session yet — try signing in directly in case confirmation is off but session wasn't returned
+    const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInData.session) {
+      router.push('/home')
+      router.refresh()
+      return
+    }
+
+    // Email confirmation is required — show the check email screen
+    setLoading(false)
+    setCheckEmail(true)
   }
 
   async function handleGoogle() {
