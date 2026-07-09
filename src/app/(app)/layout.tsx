@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userName={profile?.full_name ?? user.email?.split('@')[0]}
         userStreak={profile?.streak ?? 0}
       />
-      <main className="min-h-screen" style={{ paddingTop: 160, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <main className="min-h-screen" style={{ paddingTop: 210, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <SwipeNavigator>
           {children}
         </SwipeNavigator>
