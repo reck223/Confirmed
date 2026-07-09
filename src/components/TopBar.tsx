@@ -15,7 +15,7 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
   return (
     <header style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-      height: 210,
+      height: 160,
       background: 'linear-gradient(to bottom, rgba(8,8,8,0.97) 0%, rgba(8,8,8,0.82) 52%, rgba(8,8,8,0.18) 82%, rgba(8,8,8,0) 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 16px',
@@ -31,8 +31,8 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
           priority
           className="logo-shimmer"
           style={{
-            width: 'min(88%, 520px)',
-            maxHeight: 180,
+            width: 'min(78%, 400px)',
+            maxHeight: 130,
             height: 'auto',
             marginLeft: -8,
             opacity: scrolled ? 0 : 1,
