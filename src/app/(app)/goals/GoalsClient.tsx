@@ -314,7 +314,7 @@ function GoalCalendar({ goals }: { goals: CalGoal[] }) {
                 width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 12, fontWeight: cell.isToday ? 900 : cell.inCurrentMonth ? 600 : 400,
                 background: cell.isToday ? '#D4AF37' : 'transparent',
-                color: cell.isToday ? '#000' : cell.inCurrentMonth ? (cell.isPast ? '#444' : '#EFEFEF') : '#2a2a2a',
+                color: cell.isToday ? '#000' : cell.inCurrentMonth ? (cell.isPast ? 'rgba(255,255,255,0.35)' : '#EFEFEF') : 'rgba(255,255,255,0.18)',
                 boxShadow: cell.isToday ? '0 0 12px rgba(212,175,55,0.5)' : 'none', flexShrink: 0,
               }}>
                 {cell.dayNum}
@@ -474,12 +474,12 @@ function GoalTemplatePicker({ onSelect, onSkip }: { onSelect: (t: GoalTemplateIt
         Start from a proven template or build your own.
       </p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button type="button" onClick={() => setSelectedCat(null)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', background: !selectedCat ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: !selectedCat ? '#D4AF37' : '#555', border: !selectedCat ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>All</button>
+        <button type="button" onClick={() => setSelectedCat(null)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', background: !selectedCat ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: !selectedCat ? '#D4AF37' : 'rgba(255,255,255,0.42)', border: !selectedCat ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>All</button>
         {cats.map(cat => {
           const color = cc(cat).accent
           const active = selectedCat === cat
           return (
-            <button key={cat} type="button" onClick={() => setSelectedCat(active ? null : cat)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : '#555', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.08)' }}>{cat}</button>
+            <button key={cat} type="button" onClick={() => setSelectedCat(active ? null : cat)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : 'rgba(255,255,255,0.42)', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.08)' }}>{cat}</button>
           )
         })}
       </div>
@@ -806,7 +806,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
               width: 38, height: 38, borderRadius: 10, cursor: 'pointer',
               background: view === 'calendar' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
               border: view === 'calendar' ? '1px solid rgba(212,175,55,0.35)' : '1px solid rgba(255,255,255,0.08)',
-              color: view === 'calendar' ? '#D4AF37' : '#555',
+              color: view === 'calendar' ? '#D4AF37' : 'rgba(255,255,255,0.42)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -837,11 +837,11 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
       {/* Category filter pills */}
       {activeCategories.length > 1 && (
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 20, paddingBottom: 2 }}>
-          <button onClick={() => setCatFilter(null)} style={{ padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : '#555' }}>All</button>
+          <button onClick={() => setCatFilter(null)} style={{ padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>All</button>
           {activeCategories.map(cat => {
             const c = cc(cat); const sel = catFilter === cat
             return (
-              <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c.accent}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c.accent}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c.accent : '#555' }}>{cat}</button>
+              <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '6px 14px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c.accent}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c.accent}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c.accent : 'rgba(255,255,255,0.42)' }}>{cat}</button>
             )
           })}
         </div>
@@ -868,7 +868,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                 if (g.goal_type === 'habit')   return <HabitCard   key={g.id} goal={g} entries={entriesByGoal[g.id] ?? []} onLog={openModal} />
                 if (g.goal_type === 'savings') return <SavingsCard key={g.id} goal={g} entries={entriesByGoal[g.id] ?? []} onLog={openModal} onAdd={() => { setLogGoalId(g.id); setLogTab('milestones'); setEditingMs(false); setAddingEntry(true); setEntryDraft({}); setEntryError(null) }} />
                 if (g.goal_type === 'travel')  return <TravelCard  key={g.id} goal={g} entries={entriesByGoal[g.id] ?? []} onLog={openModal} />
-                return <GoalCard key={g.id} goal={g} onLog={() => { setLogGoalId(g.id); setLogTab('milestones'); setEditingMs(false) }} onDelete={() => setConfirmDeleteId(g.id)} />
+                return <GoalCard key={g.id} goal={g} milestones={milestonesByGoal[g.id] ?? []} onLog={() => { setLogGoalId(g.id); setLogTab('milestones'); setEditingMs(false) }} onDelete={() => setConfirmDeleteId(g.id)} />
               })}
             </div>
           )}
@@ -1003,7 +1003,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                       <button key={tab} type="button" onClick={() => { setLogTab(tab); setEditingNotes(false) }}
                         style={{ flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', border: 'none',
                           background: logTab === tab ? `${accent}18` : 'transparent',
-                          color: logTab === tab ? accent : '#555' }}>
+                          color: logTab === tab ? accent : 'rgba(255,255,255,0.42)' }}>
                         {label}
                       </button>
                     )
@@ -1039,7 +1039,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                                       <div style={{ display: 'flex', gap: 2, marginBottom: 10 }}>
                                         {[1,2,3,4,5].map(s => (
                                           <button key={s} type="button" onClick={() => setMarkDoneRating(s)}
-                                            style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', color: s <= markDoneRating ? '#D4AF37' : '#2a2a2a', padding: '0 1px', lineHeight: 1 }}>★</button>
+                                            style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', color: s <= markDoneRating ? '#D4AF37' : 'rgba(255,255,255,0.18)', padding: '0 1px', lineHeight: 1 }}>★</button>
                                         ))}
                                       </div>
                                       <input type="date" value={markDoneDate} onChange={e => setMarkDoneDate(e.target.value)} className="cc-input" style={{ fontSize: 12, colorScheme: 'dark', marginBottom: 10 }} />
@@ -1100,14 +1100,14 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                                   </div>
                                   <div style={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                                     {[1,2,3,4,5].map(s => (
-                                      <span key={s} style={{ fontSize: 11, color: s <= (book.rating ?? 0) ? '#D4AF37' : '#222' }}>★</span>
+                                      <span key={s} style={{ fontSize: 11, color: s <= (book.rating ?? 0) ? '#D4AF37' : 'rgba(255,255,255,0.18)' }}>★</span>
                                     ))}
                                   </div>
                                   {book.date_finished && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{book.date_finished}</span>}
                                   <button type="button" onClick={() => handleUnmarkBookDone(book.id, logGoal.id)} disabled={isPending} title="Undo — move back to queue"
                                     style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0, transition: 'color 0.15s' }}
                                     onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-                                    onMouseLeave={e => (e.currentTarget.style.color = '#2a2a2a')}>
+                                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.18)')}>
                                     ↩
                                   </button>
                                 </div>
@@ -1153,7 +1153,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                                 Cancel
                               </button>
                               <button type="button" onClick={() => pendingBook && handleAddBook(logGoal.id, pendingBook)} disabled={!pendingBook || isPending}
-                                style={{ flex: 2, padding: '9px 0', borderRadius: 10, background: pendingBook ? 'rgba(56,189,248,0.09)' : 'rgba(255,255,255,0.03)', border: pendingBook ? '1px solid rgba(56,189,248,0.2)' : '1px solid rgba(255,255,255,0.06)', color: pendingBook ? '#38bdf8' : '#444', fontSize: 12, fontWeight: 700, cursor: pendingBook ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif' }}>
+                                style={{ flex: 2, padding: '9px 0', borderRadius: 10, background: pendingBook ? 'rgba(56,189,248,0.09)' : 'rgba(255,255,255,0.03)', border: pendingBook ? '1px solid rgba(56,189,248,0.2)' : '1px solid rgba(255,255,255,0.06)', color: pendingBook ? '#38bdf8' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 700, cursor: pendingBook ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif' }}>
                                 {isPending ? 'Adding…' : 'Add to List'}
                               </button>
                             </div>
@@ -1230,7 +1230,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                                 <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: m.done ? '2px solid #22c55e' : '2px solid rgba(255,255,255,0.12)', background: m.done ? 'rgba(34,197,94,0.15)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
                                   {m.done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M4 13L9.5 18.5L21 5" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                                 </div>
-                                <span style={{ fontSize: 13, color: m.done ? '#555' : '#EFEFEF', textDecoration: m.done ? 'line-through' : 'none', flex: 1, lineHeight: 1.4 }}>{m.text}</span>
+                                <span style={{ fontSize: 13, color: m.done ? 'rgba(255,255,255,0.42)' : '#EFEFEF', textDecoration: m.done ? 'line-through' : 'none', flex: 1, lineHeight: 1.4 }}>{m.text}</span>
                               </button>
                             ))}
                           </div>
@@ -1249,7 +1249,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
                           {[10,25,50,75,100].map(p => (
                             <button key={p} onClick={() => handleProgress(logGoal.id, p)} disabled={isPending}
-                              style={{ padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', background: progress===p ? c.bg : 'rgba(255,255,255,0.04)', color: progress===p ? c.text : '#555', border: progress===p ? `1px solid ${c.border}` : '1px solid rgba(255,255,255,0.08)', transition: 'all 0.15s' }}>
+                              style={{ padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', background: progress===p ? c.bg : 'rgba(255,255,255,0.04)', color: progress===p ? c.text : 'rgba(255,255,255,0.42)', border: progress===p ? `1px solid ${c.border}` : '1px solid rgba(255,255,255,0.08)', transition: 'all 0.15s' }}>
                               {p}%
                             </button>
                           ))}
@@ -1418,7 +1418,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                             <button key={v} type="button" onClick={() => handleUpdateVisibility(logGoal.id, v)} disabled={isPending}
                               style={{ padding: '9px 4px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s',
                                 background: active ? `${accent}18` : 'rgba(255,255,255,0.03)',
-                                color: active ? accent : '#555',
+                                color: active ? accent : 'rgba(255,255,255,0.42)',
                                 border: active ? `1px solid ${accent}44` : '1px solid rgba(255,255,255,0.07)' }}>
                               {VIS_LABEL[v]}
                             </button>
@@ -1528,7 +1528,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                   const cfg = { standard: { e: '🎯', l: 'Standard', c: '#D4AF37' }, reading: { e: '📚', l: 'Reading', c: '#38bdf8' }, letter: { e: '✉️', l: 'Letter', c: '#d946ef' } }[t]
                   return (
                     <button key={t} type="button" onClick={() => { setGoalType(t); setError('') }}
-                      style={{ flex: 1, padding: '8px 4px', borderRadius: 9, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontSize: 11, fontWeight: 700, border: 'none', background: sel ? `${cfg.c}18` : 'transparent', color: sel ? cfg.c : '#555' }}>
+                      style={{ flex: 1, padding: '8px 4px', borderRadius: 9, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontSize: 11, fontWeight: 700, border: 'none', background: sel ? `${cfg.c}18` : 'transparent', color: sel ? cfg.c : 'rgba(255,255,255,0.42)' }}>
                       {cfg.e} {cfg.l}
                     </button>
                   )
@@ -1540,7 +1540,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                   const cfg = { habit: { e: '🔄', l: 'Habit', c: '#4ade80' }, savings: { e: '💰', l: 'Savings', c: '#D4AF37' }, travel: { e: '✈️', l: 'Travel', c: '#84cc16' } }[t]
                   return (
                     <button key={t} type="button" onClick={() => { setGoalType(t); setError('') }}
-                      style={{ flex: 1, padding: '8px 4px', borderRadius: 9, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontSize: 11, fontWeight: 700, border: 'none', background: sel ? `${cfg.c}18` : 'transparent', color: sel ? cfg.c : '#555' }}>
+                      style={{ flex: 1, padding: '8px 4px', borderRadius: 9, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center', fontSize: 11, fontWeight: 700, border: 'none', background: sel ? `${cfg.c}18` : 'transparent', color: sel ? cfg.c : 'rgba(255,255,255,0.42)' }}>
                       {cfg.e} {cfg.l}
                     </button>
                   )
@@ -1876,11 +1876,13 @@ function DeadlinePill({ deadline }: { deadline: string | null }) {
 }
 
 /* ── STANDARD GOAL CARD ── */
-function GoalCard({ goal, onLog, onDelete }: { goal: Goal; onLog: () => void; onDelete: () => void }) {
+function GoalCard({ goal, milestones = [], onLog, onDelete }: { goal: Goal; milestones?: GoalMilestone[]; onLog: () => void; onDelete: () => void }) {
   const [hovered, setHovered] = useState(false)
   const c = cc(goal.category)
   const progress = goal.progress ?? 0
   const dotsFilled = Math.round(progress / 10)
+  const msDone = milestones.filter(m => m.done).length
+  const msTotal = milestones.length
 
   return (
     <div className="card lift" style={{ padding: 20, overflow: 'hidden', position: 'relative', cursor: 'pointer', borderLeft: `3px solid ${c.accent}`, background: `linear-gradient(120deg,${c.bg} 0%,#111111 40%)` }} onClick={onLog} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
@@ -1890,9 +1892,14 @@ function GoalCard({ goal, onLog, onDelete }: { goal: Goal; onLog: () => void; on
         <ProgressRing progress={progress} accent={c.accent} text={c.text} label={`${progress}%`} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', lineHeight: 1.3, marginBottom: 8 }}>{goal.title}</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {goal.category && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', padding: '3px 9px', borderRadius: 6, color: c.text, background: c.bg, border: `1px solid ${c.border}` }}>{categoryLabel(goal.category)}</span>}
             {goal.visibility && <span className={`vis-badge vis-${goal.visibility}`}>{VIS_LABEL[goal.visibility]}</span>}
+            {msTotal > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 6, color: msDone === msTotal ? '#4ade80' : 'rgba(255,255,255,0.55)', background: msDone === msTotal ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.05)', border: msDone === msTotal ? '1px solid rgba(74,222,128,0.25)' : '1px solid rgba(255,255,255,0.08)', whiteSpace: 'nowrap' }}>
+                {msDone}/{msTotal} milestones
+              </span>
+            )}
             <DeadlinePill deadline={goal.deadline} />
           </div>
           {goal.next_action && (
@@ -1902,14 +1909,12 @@ function GoalCard({ goal, onLog, onDelete }: { goal: Goal; onLog: () => void; on
           )}
         </div>
       </div>
-      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'relative', zIndex: 1 }}>
-        <div style={{ display: 'flex', gap: 5, alignItems: 'center', flex: 1, minWidth: 0 }}>
-          {Array.from({ length: 10 }, (_, i) => (
-            <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, transition: 'background 0.3s', background: i < dotsFilled ? c.accent : 'rgba(255,255,255,0.07)', boxShadow: i < dotsFilled ? `0 0 6px ${c.accent}` : 'none' }} />
-          ))}
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300, marginLeft: 6, whiteSpace: 'nowrap' }}>{progress}%</span>
+      <div style={{ marginTop: 16, position: 'relative', zIndex: 1 }}>
+        <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg, ${c.accent}, ${c.accent}99)`, borderRadius: 4, transition: 'width 0.6s ease', boxShadow: progress > 0 ? `0 0 8px ${c.accent}60` : 'none' }} />
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 600 }}>{progress}% complete</span>
           <button type="button" onClick={e => { e.stopPropagation(); onLog() }} style={{ fontSize: 11, fontWeight: 700, padding: '6px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', background: c.bg, color: c.accent, border: `1px solid ${c.border}`, transition: 'all 0.15s' }}>
             Log Progress
           </button>
@@ -2341,7 +2346,7 @@ function HabitCard({ goal, entries, onLog }: { goal: Goal; entries: GoalEntry[];
       </div>
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{progress}% consistency · {entries.length} total logs</p>
-        <button type="button" onClick={e => { e.stopPropagation(); onLog() }} style={{ fontSize: 11, fontWeight: 700, padding: '6px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', background: loggedToday ? 'rgba(74,222,128,0.05)' : 'rgba(74,222,128,0.15)', color: loggedToday ? '#444' : '#4ade80', border: loggedToday ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(74,222,128,0.3)', transition: 'all 0.15s' }}>
+        <button type="button" onClick={e => { e.stopPropagation(); onLog() }} style={{ fontSize: 11, fontWeight: 700, padding: '6px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', background: loggedToday ? 'rgba(74,222,128,0.05)' : 'rgba(74,222,128,0.15)', color: loggedToday ? 'rgba(255,255,255,0.35)' : '#4ade80', border: loggedToday ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(74,222,128,0.3)', transition: 'all 0.15s' }}>
           {loggedToday ? '✓ Logged' : 'Log Today'}
         </button>
       </div>
@@ -2557,7 +2562,7 @@ function HabitTrackerPanel({ goal, entries, onAddEntry, onRemoveEntry, addingEnt
                   </div>
                   <button onClick={() => onRemoveEntry(e.id, goal.id)} disabled={isPending} style={{ fontSize: 14, color: 'rgba(255,255,255,0.22)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0, transition: 'color 0.15s' }}
                     onMouseEnter={el => (el.currentTarget.style.color = '#f87171')}
-                    onMouseLeave={el => (el.currentTarget.style.color = '#2a2a2a')}>×</button>
+                    onMouseLeave={el => (el.currentTarget.style.color = 'rgba(255,255,255,0.18)')}>×</button>
                 </div>
               )
             })}
@@ -2654,7 +2659,7 @@ function SavingsPanelModal({ goal, entries, onAddEntry, onRemoveEntry, addingEnt
                   </div>
                   <button onClick={() => onRemoveEntry(e.id, goal.id)} disabled={isPending} style={{ fontSize: 14, color: 'rgba(255,255,255,0.22)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0, transition: 'color 0.15s' }}
                     onMouseEnter={el => (el.currentTarget.style.color = '#f87171')}
-                    onMouseLeave={el => (el.currentTarget.style.color = '#2a2a2a')}>×</button>
+                    onMouseLeave={el => (el.currentTarget.style.color = 'rgba(255,255,255,0.18)')}>×</button>
                 </div>
               )
             })}
@@ -2730,7 +2735,7 @@ function TravelPanelModal({ goal, entries, onAddEntry, onRemoveEntry, onUpdateEn
           <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
             {DEST_STATUSES.map(s => (
               <button key={s.key} type="button" onClick={() => setEntryDraft({ ...entryDraft, status: s.key })}
-                style={{ flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: entryDraft.status === s.key ? `${s.color}18` : 'rgba(255,255,255,0.03)', color: entryDraft.status === s.key ? s.color : '#555', border: entryDraft.status === s.key ? `1px solid ${s.color}44` : '1px solid rgba(255,255,255,0.07)' }}>
+                style={{ flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: entryDraft.status === s.key ? `${s.color}18` : 'rgba(255,255,255,0.03)', color: entryDraft.status === s.key ? s.color : 'rgba(255,255,255,0.42)', border: entryDraft.status === s.key ? `1px solid ${s.color}44` : '1px solid rgba(255,255,255,0.07)' }}>
                 {s.emoji} {s.label}
               </button>
             ))}
@@ -2781,7 +2786,7 @@ function TravelPanelModal({ goal, entries, onAddEntry, onRemoveEntry, onUpdateEn
                           <button onClick={() => onRemoveEntry(e.id, goal.id)} disabled={isPending}
                             style={{ fontSize: 14, color: 'rgba(255,255,255,0.22)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0, transition: 'color 0.15s' }}
                             onMouseEnter={el => (el.currentTarget.style.color = '#f87171')}
-                            onMouseLeave={el => (el.currentTarget.style.color = '#2a2a2a')}>×</button>
+                            onMouseLeave={el => (el.currentTarget.style.color = 'rgba(255,255,255,0.18)')}>×</button>
                         </div>
                       </div>
                     </div>

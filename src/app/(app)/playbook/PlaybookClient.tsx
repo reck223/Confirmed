@@ -92,14 +92,14 @@ export function PlaybookClient({ modules, completedLessonIds, totalLessons, comp
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{module.emoji}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: isUnlocked ? module.color : '#444', marginBottom: 3 }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: isUnlocked ? module.color : 'rgba(255,255,255,0.35)', marginBottom: 3 }}>
                       MODULE {mIdx + 1}
                     </p>
                     <p style={{ fontSize: 17, fontWeight: 900, color: '#EFEFEF', marginBottom: 4, letterSpacing: '-0.01em' }}>{module.title}</p>
                     <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.5 }}>{module.tagline}</p>
                   </div>
                   <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                    <p style={{ fontSize: 18, fontWeight: 900, color: isUnlocked ? module.color : '#333' }}>{doneLessons}/{module.lessons.length}</p>
+                    <p style={{ fontSize: 18, fontWeight: 900, color: isUnlocked ? module.color : 'rgba(255,255,255,0.28)' }}>{doneLessons}/{module.lessons.length}</p>
                     <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.06em' }}>DONE</p>
                   </div>
                 </div>
@@ -148,7 +148,7 @@ export function PlaybookClient({ modules, completedLessonIds, totalLessons, comp
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 14, fontWeight: 700, color: isDone ? '#666' : '#EFEFEF', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 2 }}>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: isDone ? 'rgba(255,255,255,0.48)' : '#EFEFEF', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 2 }}>
                             {lesson.title}
                           </p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

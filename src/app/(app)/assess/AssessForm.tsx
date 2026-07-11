@@ -150,7 +150,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
     return (
       <div>
         <button onClick={() => setPhase('intro')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 28, fontFamily: 'Satoshi,sans-serif' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.48)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)' }}>Back</span>
         </button>
 
@@ -166,7 +166,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
               padding: '14px 0', borderRadius: 12, border: '1px solid', fontSize: 18, fontWeight: 900,
               cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s',
               background: rating === n ? `linear-gradient(135deg,${RATING_COLOR[n]},${RATING_COLOR[n]}88)` : 'rgba(255,255,255,0.04)',
-              color: rating === n ? '#000' : '#777',
+              color: rating === n ? '#000' : 'rgba(255,255,255,0.52)',
               borderColor: rating === n ? 'transparent' : 'rgba(255,255,255,0.08)',
               transform: rating === n ? 'scale(1.08)' : 'scale(1)',
             }}>

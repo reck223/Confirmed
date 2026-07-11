@@ -277,10 +277,10 @@ function GoalStrip({ goals }: { goals: Goal[] }) {
       {/* Category filter pills */}
       {categories.length > 1 && (
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', padding: '0 20px 10px', WebkitOverflowScrolling: 'touch' }}>
-          <button onClick={() => setCatFilter(null)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : '#555' }}>All</button>
+          <button onClick={() => setCatFilter(null)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>All</button>
           {categories.map(cat => {
             const c = homeCatColor(cat); const sel = catFilter === cat
-            return <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c : '#555' }}>{cat}</button>
+            return <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c : 'rgba(255,255,255,0.42)' }}>{cat}</button>
           })}
         </div>
       )}
@@ -498,7 +498,7 @@ function MilestoneRow({ item, isDone, accent, glow, onTap, animDelay, mode = 'wo
       }}>
         {lit && <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M4 13L9.5 18.5L21 5" stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
       </div>
-      <span style={{ flex: 1, fontSize: 13, fontWeight: lit && mode === 'work' ? 400 : 500, lineHeight: 1.45, color: lit && mode === 'work' ? '#444' : '#ccc', textDecoration: lit && mode === 'work' ? 'line-through' : 'none', transition: 'all 0.3s' }}>{item.text}</span>
+      <span style={{ flex: 1, fontSize: 13, fontWeight: lit && mode === 'work' ? 400 : 500, lineHeight: 1.45, color: lit && mode === 'work' ? 'rgba(255,255,255,0.35)' : '#ccc', textDecoration: lit && mode === 'work' ? 'line-through' : 'none', transition: 'all 0.3s' }}>{item.text}</span>
       {!(lit && mode === 'work') && badge && (
         <span style={{ fontSize: 9, fontWeight: 800, color: badge.color, letterSpacing: '0.04em', flexShrink: 0, padding: '2px 6px', borderRadius: 4, background: `${badge.color}14`, border: `1px solid ${badge.color}30` }}>
           {badge.label.toUpperCase()}
@@ -538,10 +538,10 @@ function GoalGroupCard({ group, doneIds, onToggle, cardDelay, mode = 'work', sel
             <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 9, fontWeight: 800, color: accent, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 2 }}>{group.category ?? 'goal'}</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: allDone ? '#555' : '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: allDone ? 'line-through' : 'none', transition: 'all 0.3s' }}>{group.goalTitle}</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: allDone ? 'rgba(255,255,255,0.42)' : '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: allDone ? 'line-through' : 'none', transition: 'all 0.3s' }}>{group.goalTitle}</p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, background: countLit ? `${accent}22` : 'rgba(255,255,255,0.05)', border: `1px solid ${countLit ? accent + '44' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.3s', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: countLit ? accent : '#666', transition: 'color 0.3s' }}>{countVal}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: countLit ? accent : 'rgba(255,255,255,0.48)', transition: 'color 0.3s' }}>{countVal}</span>
             </div>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0, opacity: 0.5, transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.25s ease' }}>
               <path d="M6 9l6 6 6-6"/>
@@ -638,7 +638,7 @@ function TodaysFocus({ pool }: { pool: FocusItem[] }) {
         </div>
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 2 }}>TODAY&apos;S FOCUS</p>
-          <p style={{ fontSize: 11, fontWeight: 500, color: allDone ? '#4ade80' : doneCount > 0 ? '#D4AF37' : '#666' }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: allDone ? '#4ade80' : doneCount > 0 ? '#D4AF37' : 'rgba(255,255,255,0.48)' }}>
             {allDone ? '✓ All done today'
               : mode === 'work' && doneCount > 0 ? `${doneCount} of ${totalFocus} done`
               : mode === 'work' ? `${totalFocus} task${totalFocus !== 1 ? 's' : ''} in focus`
@@ -656,10 +656,10 @@ function TodaysFocus({ pool }: { pool: FocusItem[] }) {
           {/* Category filter */}
           {categories.length > 1 && (
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
-              <button onClick={() => setCatFilter(null)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : '#555' }}>All</button>
+              <button onClick={() => setCatFilter(null)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', background: catFilter === null ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: catFilter === null ? '1px solid rgba(212,175,55,0.4)' : '1px solid rgba(255,255,255,0.08)', color: catFilter === null ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>All</button>
               {categories.map(cat => {
                 const c = homeCatColor(cat); const sel = catFilter === cat
-                return <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c : '#555' }}>{cat}</button>
+                return <button key={cat} onClick={() => setCatFilter(sel ? null : cat)} style={{ padding: '5px 12px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', textTransform: 'capitalize', background: sel ? `${c}18` : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${c}44` : '1px solid rgba(255,255,255,0.08)', color: sel ? c : 'rgba(255,255,255,0.42)' }}>{cat}</button>
               })}
             </div>
           )}
@@ -674,7 +674,7 @@ function TodaysFocus({ pool }: { pool: FocusItem[] }) {
                 <button onClick={selectAll} style={{ padding: '11px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap' }}>
                   Select all
                 </button>
-                <button onClick={startFocus} disabled={selectedCount === 0} style={{ flex: 1, padding: '11px 16px', borderRadius: 12, border: 'none', cursor: selectedCount > 0 ? 'pointer' : 'default', fontSize: 12, fontWeight: 800, fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em', transition: 'all 0.2s', background: selectedCount > 0 ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.04)', color: selectedCount > 0 ? '#000' : '#333' }}>
+                <button onClick={startFocus} disabled={selectedCount === 0} style={{ flex: 1, padding: '11px 16px', borderRadius: 12, border: 'none', cursor: selectedCount > 0 ? 'pointer' : 'default', fontSize: 12, fontWeight: 800, fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em', transition: 'all 0.2s', background: selectedCount > 0 ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.04)', color: selectedCount > 0 ? '#000' : 'rgba(255,255,255,0.28)' }}>
                   {selectedCount > 0 ? `Start Focus · ${selectedCount} task${selectedCount !== 1 ? 's' : ''}` : 'Pick tasks above'}
                 </button>
               </div>
@@ -808,7 +808,7 @@ function CreatePostModal({ onClose, userId }: { onClose: () => void; userId: str
           </button>
           <p style={{ fontSize: 14, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.01em' }}>New Post</p>
           <button onClick={handlePost} disabled={!canPost}
-            style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', padding: '8px 18px', borderRadius: 20, cursor: canPost ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s', border: 'none', background: canPost ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.06)', color: canPost ? '#000' : '#333' }}>
+            style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', padding: '8px 18px', borderRadius: 20, cursor: canPost ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s', border: 'none', background: canPost ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.06)', color: canPost ? '#000' : 'rgba(255,255,255,0.28)' }}>
             {uploading ? '…' : 'POST'}
           </button>
         </div>
@@ -851,7 +851,7 @@ function CreatePostModal({ onClose, userId }: { onClose: () => void; userId: str
               const active = postType === t.key
               return (
                 <button key={t.key} onClick={() => setPostType(t.key)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', border: `1px solid ${active ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, background: active ? t.color + '18' : 'rgba(255,255,255,0.03)', color: active ? t.color : '#555' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', border: `1px solid ${active ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, background: active ? t.color + '18' : 'rgba(255,255,255,0.03)', color: active ? t.color : 'rgba(255,255,255,0.42)' }}>
                   {t.emoji} {t.label}
                 </button>
               )
@@ -865,7 +865,7 @@ function CreatePostModal({ onClose, userId }: { onClose: () => void; userId: str
               const active = visibility === v
               return (
                 <button key={v} onClick={() => setVisibility(v)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', border: `1px solid ${active ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: active ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: active ? '#D4AF37' : '#555' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', border: `1px solid ${active ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: active ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: active ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>
                   {emoji} {label}
                 </button>
               )
@@ -1097,7 +1097,7 @@ function CheckinWidget({ todayCheckin, checkinHistory }: {
                   flex: 1, height: 36, borderRadius: 8,
                   border: active ? `1.5px solid ${c}` : '1.5px solid rgba(255,255,255,0.07)',
                   background: active ? `${c}1e` : 'rgba(255,255,255,0.03)',
-                  color: active ? c : '#444',
+                  color: active ? c : 'rgba(255,255,255,0.35)',
                   fontSize: 11, fontWeight: active ? 900 : 600, cursor: 'pointer',
                   transition: 'all 0.1s', fontFamily: 'Satoshi,sans-serif',
                   transform: active ? 'translateY(-2px)' : 'none',
@@ -1236,12 +1236,12 @@ function ReflectionNudge({ done, streak, assessmentDay }: { done: boolean; strea
     <Link href="/assess" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 16, background: isDueToday ? 'rgba(212,175,55,0.08)' : 'rgba(255,255,255,0.02)', border: isDueToday ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.06)' }}>
       <span style={{ fontSize: 18 }}>📋</span>
       <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: isDueToday ? '#D4AF37' : '#888' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: isDueToday ? '#D4AF37' : 'rgba(255,255,255,0.55)' }}>
           {isDueToday ? 'Reflection due today' : isDueSoon ? `Reflection in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}` : `Next reflection: ${assessmentDay}`}
         </p>
         <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', marginTop: 1 }}>5 questions · ~10 min</p>
       </div>
-      <span style={{ fontSize: 13, color: isDueToday ? '#D4AF37' : '#444' }}>→</span>
+      <span style={{ fontSize: 13, color: isDueToday ? '#D4AF37' : 'rgba(255,255,255,0.35)' }}>→</span>
     </Link>
   )
 }

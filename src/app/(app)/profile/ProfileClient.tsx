@@ -392,36 +392,39 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
       {/* ── Stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '0 20px', marginBottom: 20 }}>
         {[
-          { label: 'STREAK', value: profile.streak ?? 0, unit: 'wks', color: '#D4AF37' },
-          { label: 'GOALS DONE', value: profile.goals_complete ?? 0, unit: '', color: '#4ade80' },
-          { label: 'CONSISTENCY', value: accountabilityScore, unit: '%', color: '#a78bfa' },
+          { label: 'STREAK', value: profile.streak ?? 0, unit: 'wks', color: '#D4AF37', emoji: '🔥' },
+          { label: 'GOALS DONE', value: profile.goals_complete ?? 0, unit: '', color: '#4ade80', emoji: '🎯' },
+          { label: 'CONSISTENCY', value: accountabilityScore, unit: '%', color: '#a78bfa', emoji: '⚡' },
         ].map(s => (
-          <div key={s.label} style={{ borderRadius: 16, border: `1px solid ${s.color}22`, background: `${s.color}0A`, padding: '14px 10px', textAlign: 'center' }}>
-            <p style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)', marginBottom: 6 }}>{s.label}</p>
-            <p style={{ fontSize: 26, fontWeight: 900, color: s.color, lineHeight: 1, textShadow: `0 0 16px ${s.color}44` }}>{s.value}</p>
-            {s.unit && <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.42)', marginTop: 4 }}>{s.unit}</p>}
+          <div key={s.label} style={{ borderRadius: 18, border: `1px solid ${s.color}28`, background: `linear-gradient(145deg, ${s.color}10 0%, ${s.color}04 100%)`, padding: '16px 10px 14px', textAlign: 'center', boxShadow: `inset 0 1px 0 ${s.color}15` }}>
+            <p style={{ fontSize: 16, marginBottom: 8, lineHeight: 1 }}>{s.emoji}</p>
+            <p style={{ fontSize: 28, fontWeight: 900, color: s.color, lineHeight: 1, textShadow: `0 0 20px ${s.color}55`, marginBottom: s.unit ? 0 : 6 }}>{s.value}{s.unit}</p>
+            <p style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.38)', marginTop: 6 }}>{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* ── XP + Level ── */}
       <div style={{ padding: '0 20px', marginBottom: 20 }}>
-        <div style={{ borderRadius: 18, padding: '16px 18px', background: `${levelInfo.color}0a`, border: `1px solid ${levelInfo.color}25` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ borderRadius: 20, padding: '18px 20px', background: `linear-gradient(135deg, ${levelInfo.color}12 0%, ${levelInfo.color}06 100%)`, border: `1px solid ${levelInfo.color}30`, boxShadow: `0 0 32px ${levelInfo.color}10, inset 0 1px 0 ${levelInfo.color}20` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>LEVEL {levelInfo.level}</p>
-              <p style={{ fontSize: 18, fontWeight: 900, color: levelInfo.color, letterSpacing: '-0.01em' }}>{levelInfo.title}</p>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 4 }}>LEVEL {levelInfo.level}</p>
+              <p style={{ fontSize: 20, fontWeight: 900, color: levelInfo.color, letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 20px ${levelInfo.color}60` }}>{levelInfo.title}</p>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: 24, fontWeight: 900, color: levelInfo.color, lineHeight: 1 }}>{levelInfo.xp}</p>
-              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.06em' }}>XP TOTAL</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: levelInfo.color, lineHeight: 1, textShadow: `0 0 20px ${levelInfo.color}60` }}>{levelInfo.xp.toLocaleString()}</p>
+              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.42)', fontWeight: 700, letterSpacing: '0.08em', marginTop: 3 }}>XP TOTAL</p>
             </div>
           </div>
-          <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${levelInfo.progressToNext}%`, background: `linear-gradient(90deg,${levelInfo.color},${levelInfo.color}99)`, borderRadius: 3, transition: 'width 0.5s', boxShadow: `0 0 8px ${levelInfo.color}60` }} />
+          <div style={{ height: 7, background: 'rgba(255,255,255,0.07)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ height: '100%', width: `${levelInfo.progressToNext}%`, background: `linear-gradient(90deg,${levelInfo.color},${levelInfo.color}bb)`, borderRadius: 4, transition: 'width 0.8s ease', boxShadow: `0 0 12px ${levelInfo.color}80` }} />
           </div>
           {levelInfo.level < LEVELS.length && (
-            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>{levelInfo.xpToNext} XP to Level {levelInfo.level + 1}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)' }}>{levelInfo.progressToNext}% to next level</p>
+              <p style={{ fontSize: 10, color: levelInfo.color, fontWeight: 700 }}>{levelInfo.xpToNext} XP to go</p>
+            </div>
           )}
         </div>
       </div>
@@ -554,7 +557,7 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
       {showPinPicker && (
         <div onClick={() => setShowPinPicker(false)} className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(255,255,255,0.08)', padding: '24px', maxHeight: '85dvh', overflowY: 'auto', animation: 'scaleIn 0.2s ease both' }}>
-            <div style={{ width: 32, height: 3, borderRadius: 2, background: '#222', margin: '0 auto 20px' }} />
+            <div style={{ width: 32, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.12)', margin: '0 auto 20px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <p style={{ fontSize: 16, fontWeight: 900, color: '#EFEFEF' }}>Pin a Goal</p>
               <button onClick={() => setShowPinPicker(false)} style={{ fontSize: 22, color: 'rgba(255,255,255,0.42)', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
@@ -756,7 +759,7 @@ function Field({ name, label, defaultValue, placeholder }: { name: string; label
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
         <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)' }}>{label}</label>
         {isUsername && val.length > 0 && (
-          <span style={{ fontSize: 10, color: remaining! < 0 ? '#f87171' : remaining! <= 5 ? '#fb923c' : '#444' }}>
+          <span style={{ fontSize: 10, color: remaining! < 0 ? '#f87171' : remaining! <= 5 ? '#fb923c' : 'rgba(255,255,255,0.35)' }}>
             {remaining! < 0 ? `${Math.abs(remaining!)} over limit` : `${remaining} left`}
           </span>
         )}
@@ -989,17 +992,17 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
       <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 6px' }}>
         <button onClick={handleFire} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px 4px 0' }}>
           <span style={{ fontSize: 22, lineHeight: 1, filter: fireActive ? 'drop-shadow(0 0 8px rgba(212,175,55,1)) drop-shadow(0 0 16px rgba(212,175,55,0.7))' : 'grayscale(1) opacity(0.35)', transition: 'filter 0.2s' }}>🤝</span>
-          {fireCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: fireActive ? '#D4AF37' : '#888', fontFamily: 'Satoshi,sans-serif', transition: 'color 0.2s' }}>{fireCount}</span>}
+          {fireCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: fireActive ? '#D4AF37' : 'rgba(255,255,255,0.55)', fontFamily: 'Satoshi,sans-serif', transition: 'color 0.2s' }}>{fireCount}</span>}
         </button>
         <button onClick={() => { setShowComments(o => !o); setTimeout(() => inputRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           {commentCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>{commentCount}</span>}
         </button>
         <button onClick={openShare} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
         <button style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 4px 8px', marginLeft: 'auto' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>
       </div>
 
@@ -1031,7 +1034,7 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
                     {isMyComment && <button onClick={() => handleDelete(comment.id)} style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Delete</button>}
                   </div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 4 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 4 }}>
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                 </svg>
               </div>
@@ -1042,7 +1045,7 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
               {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : pInitials(displayName)}
             </div>
             <input ref={inputRef} value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Add a comment…" maxLength={500} style={{ flex: 1, padding: '0 0 6px', fontSize: 13, background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#EFEFEF', fontFamily: 'Satoshi,sans-serif', outline: 'none' }} />
-            <button type="submit" disabled={!commentText.trim() || submitting} style={{ fontSize: 13, fontWeight: 800, cursor: commentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', background: 'none', border: 'none', color: commentText.trim() ? '#38bdf8' : '#333', transition: 'color 0.15s', padding: 0 }}>{submitting ? '…' : 'Post'}</button>
+            <button type="submit" disabled={!commentText.trim() || submitting} style={{ fontSize: 13, fontWeight: 800, cursor: commentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', background: 'none', border: 'none', color: commentText.trim() ? '#38bdf8' : 'rgba(255,255,255,0.28)', transition: 'color 0.15s', padding: 0 }}>{submitting ? '…' : 'Post'}</button>
           </form>
         </div>
       )}
@@ -1051,7 +1054,7 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
       {showShare && (
         <div className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', padding: '20px 16px' }} onClick={() => { setShowShare(false); setSelected(new Set()); setShareSent(false) }}>
           <div style={{ width: '100%', maxWidth: 520, background: '#111', borderRadius: 24, border: '1px solid rgba(255,255,255,0.08)', maxHeight: '85dvh', display: 'flex', flexDirection: 'column', animation: 'scaleIn 0.2s ease both', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333', margin: '16px auto 16px' }} />
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)', margin: '16px auto 16px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
               <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF' }}>Send to…</p>
               {selected.size > 0 && (

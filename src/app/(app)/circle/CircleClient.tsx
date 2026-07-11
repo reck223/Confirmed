@@ -188,7 +188,7 @@ function NewBuilderCard({ builder, isFollowing: init, circleCode }: { builder: N
               flex: 1, padding: '11px 0', borderRadius: 14,
               border: following ? '1px solid rgba(255,255,255,0.1)' : 'none',
               background: following ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#D4AF37,#9A7010)',
-              color: following ? '#555' : '#000',
+              color: following ? 'rgba(255,255,255,0.42)' : '#000',
               fontSize: 13, fontWeight: 800, cursor: 'pointer',
               fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em',
               opacity: pending ? 0.5 : 1, transition: 'all 0.2s',
@@ -229,7 +229,7 @@ function BuilderSpotlight({ builders, followingIds, circleCode }: { builders: Ne
     <div style={{ paddingBottom: 40 }}>
       {/* Search bar */}
       <div style={{ position: 'relative', padding: '0 20px', marginBottom: 20 }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" style={{ position: 'absolute', left: 34, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round" style={{ position: 'absolute', left: 34, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
         <input
@@ -339,12 +339,12 @@ function CircleUnlockCard({ eligibility, requested }: { eligibility: CircleEligi
               }
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: r.done ? '#EFEFEF' : '#555', margin: 0 }}>{r.label}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: r.done ? '#EFEFEF' : 'rgba(255,255,255,0.42)', margin: 0 }}>{r.label}</p>
             </div>
             {r.link ? (
               <Link href={r.link} style={{ fontSize: 11, color: '#D4AF37', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>{r.sub}</Link>
             ) : (
-              <span style={{ fontSize: 11, color: r.done ? '#4ade80' : '#333', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.sub}</span>
+              <span style={{ fontSize: 11, color: r.done ? '#4ade80' : 'rgba(255,255,255,0.28)', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.sub}</span>
             )}
           </div>
         ))}
@@ -359,7 +359,7 @@ function CircleUnlockCard({ eligibility, requested }: { eligibility: CircleEligi
         <button
           onClick={handleRequest}
           disabled={sending}
-          style={{ width: '100%', padding: '13px 0', borderRadius: 13, background: sending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#f97316)', border: 'none', fontSize: 13, fontWeight: 800, color: sending ? '#888' : '#0A0A0A', cursor: sending ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
+          style={{ width: '100%', padding: '13px 0', borderRadius: 13, background: sending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#f97316)', border: 'none', fontSize: 13, fontWeight: 800, color: sending ? 'rgba(255,255,255,0.55)' : '#0A0A0A', cursor: sending ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
         >
           {sending ? 'SENDING...' : 'REQUEST CIRCLE ACCESS →'}
         </button>
@@ -532,7 +532,7 @@ export function CircleClient({
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(212,175,55,0.2)', maxHeight: '85dvh', overflow: 'hidden', animation: 'scaleIn 0.2s ease both' }}>
             {/* Gold header */}
             <div style={{ background: 'linear-gradient(135deg,#18120A,#0F0C03)', borderBottom: '1px solid rgba(212,175,55,0.15)', padding: '28px 24px 24px', position: 'relative' }}>
-              <div style={{ width: 36, height: 4, background: '#333', borderRadius: 2, margin: '0 auto 20px' }} />
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, margin: '0 auto 20px' }} />
               <button onClick={() => setShowInvite(false)} style={{ position: 'absolute', top: 20, right: 20, width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.50)', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
               <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>INVITE TO {primaryCircle.name.toUpperCase()}</p>
               <p style={{ fontSize: 22, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
@@ -563,7 +563,7 @@ export function CircleClient({
               {/* Link display */}
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{inviteLink}</p>
-                <button onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: copied ? '#4ade80' : '#888', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
+                <button onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
@@ -691,7 +691,7 @@ export function CircleClient({
                               <p style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#fbbf24' : '#EFEFEF' }}>{p.full_name ?? 'Member'}</p>
                               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{monthName} {p.day}</p>
                             </div>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: isToday ? '#fbbf24' : isSoon ? '#f97316' : '#333', flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, color: isToday ? '#fbbf24' : isSoon ? '#f97316' : 'rgba(255,255,255,0.28)', flexShrink: 0 }}>
                               {isToday ? '🎉 Today!' : `${p.daysAway}d`}
                             </span>
                           </div>
@@ -743,7 +743,7 @@ export function CircleClient({
                     flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
                     fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13,
                     background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    color: feedFilter === k ? '#EFEFEF' : '#444',
+                    color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)',
                     transition: 'all 0.2s',
                     boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
                   }}>{l}</button>
@@ -756,7 +756,7 @@ export function CircleClient({
                   <div style={{ margin: '0 -20px', marginBottom: 18 }}>
                     <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', padding: '0 20px 4px' }}>
                       {FILTER_TABS.map(t => (
-                        <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : '#888', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
+                        <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.55)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
                           {t.l}
                         </button>
                       ))}
@@ -855,7 +855,7 @@ export function CircleClient({
                   return (
                     <button key={k} type="button" onClick={() => setPostType(k)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 4px', borderRadius: 14, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: active ? m.bg : 'rgba(255,255,255,0.03)', border: active ? `1px solid ${m.border}` : '1px solid rgba(255,255,255,0.07)', transform: active ? 'scale(1.04)' : 'scale(1)' }}>
                       <span style={{ fontSize: 22, lineHeight: 1 }}>{m.emoji}</span>
-                      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: active ? m.color : '#555' }}>{m.label.toUpperCase()}</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: active ? m.color : 'rgba(255,255,255,0.42)' }}>{m.label.toUpperCase()}</span>
                     </button>
                   )
                 })}
@@ -866,7 +866,7 @@ export function CircleClient({
               <p style={{ fontSize: 12, color: selectedMeta.color, fontWeight: 500, lineHeight: 1.5 }}>{selectedMeta.prompt}</p>
             </div>
             <textarea value={postContent} onChange={e => setPostContent(e.target.value)} placeholder="Be specific. Be honest." rows={4} maxLength={500} autoFocus className="cc-input" style={{ marginBottom: 6, fontSize: 14, lineHeight: 1.65, resize: 'none' }} />
-            <p style={{ fontSize: 10, color: postContent.length > 450 ? '#f87171' : '#444', textAlign: 'right', marginBottom: 14 }}>{postContent.length}/500</p>
+            <p style={{ fontSize: 10, color: postContent.length > 450 ? '#f87171' : 'rgba(255,255,255,0.35)', textAlign: 'right', marginBottom: 14 }}>{postContent.length}/500</p>
 
             {/* Media preview */}
             {postPreview && (
@@ -890,7 +890,7 @@ export function CircleClient({
             {error && <p style={{ color: '#f87171', fontSize: 13, marginBottom: 12 }}>{error}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" className="btn-ghost" style={{ width: 'auto', padding: '13px 20px' }} onClick={() => { setShowPost(false); setPostContent(''); setPostFile(null); setPostPreview(null) }}>Cancel</button>
-              <button type="button" disabled={isPending || (!postContent.trim() && !postFile)} onClick={handlePost} style={{ flex: 1, padding: '13px 20px', borderRadius: 14, cursor: (postContent.trim() || postFile) ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', transition: 'all 0.2s', border: `1px solid ${selectedMeta.border}`, background: (postContent.trim() || postFile) ? selectedMeta.bg : 'rgba(255,255,255,0.03)', color: (postContent.trim() || postFile) ? selectedMeta.color : '#444', opacity: isPending ? 0.6 : 1, boxShadow: (postContent.trim() || postFile) ? `0 0 20px ${selectedMeta.border}` : 'none' }}>
+              <button type="button" disabled={isPending || (!postContent.trim() && !postFile)} onClick={handlePost} style={{ flex: 1, padding: '13px 20px', borderRadius: 14, cursor: (postContent.trim() || postFile) ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', transition: 'all 0.2s', border: `1px solid ${selectedMeta.border}`, background: (postContent.trim() || postFile) ? selectedMeta.bg : 'rgba(255,255,255,0.03)', color: (postContent.trim() || postFile) ? selectedMeta.color : 'rgba(255,255,255,0.35)', opacity: isPending ? 0.6 : 1, boxShadow: (postContent.trim() || postFile) ? `0 0 20px ${selectedMeta.border}` : 'none' }}>
                 {isPending ? 'POSTING…' : `POST ${selectedMeta.emoji}`}
               </button>
             </div>
@@ -1220,7 +1220,7 @@ function SessionCard({ session: s, rsvps, profileMap, userId, onRsvp, onDelete, 
                 flex: 1, padding: '8px 0', borderRadius: 10, border: '1px solid',
                 borderColor: myRsvp === opt.k ? `${opt.color}55` : 'rgba(255,255,255,0.07)',
                 background: myRsvp === opt.k ? opt.bg : 'transparent',
-                color: myRsvp === opt.k ? opt.color : '#444',
+                color: myRsvp === opt.k ? opt.color : 'rgba(255,255,255,0.35)',
                 fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
                 transition: 'all 0.18s',
               }}>
@@ -1449,7 +1449,7 @@ function CalendarTab({ goals }: { goals: CalGoal[] }) {
                 width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 12, fontWeight: cell.isToday ? 900 : cell.inCurrentMonth ? 600 : 400,
                 background: cell.isToday ? '#D4AF37' : 'transparent',
-                color: cell.isToday ? '#000' : cell.inCurrentMonth ? (cell.isPast ? '#444' : '#EFEFEF') : '#2a2a2a',
+                color: cell.isToday ? '#000' : cell.inCurrentMonth ? (cell.isPast ? 'rgba(255,255,255,0.35)' : '#EFEFEF') : 'rgba(255,255,255,0.18)',
                 boxShadow: cell.isToday ? '0 0 12px rgba(212,175,55,0.5)' : 'none',
                 flexShrink: 0,
               }}>
@@ -1592,7 +1592,7 @@ function DiscoverTab({ profiles, followingIds, userId, isPending, onFollow, onUn
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
         <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, gap: 2, border: '1px solid rgba(255,255,255,0.06)' }}>
           {(['all', 'following'] as const).map(f => (
-            <button key={f} onClick={() => setDiscFilter(f)} style={{ padding: '5px 13px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', border: 'none', transition: 'all 0.15s', background: discFilter === f ? 'rgba(212,175,55,0.15)' : 'transparent', color: discFilter === f ? '#D4AF37' : '#555' }}>
+            <button key={f} onClick={() => setDiscFilter(f)} style={{ padding: '5px 13px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', border: 'none', transition: 'all 0.15s', background: discFilter === f ? 'rgba(212,175,55,0.15)' : 'transparent', color: discFilter === f ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>
               {f === 'all' ? 'All' : 'Following'}
             </button>
           ))}
@@ -1636,7 +1636,7 @@ function DiscoverTab({ profiles, followingIds, userId, isPending, onFollow, onUn
               <div style={{ display: 'flex', gap: 8 }}>
                 <FollowBtn id={spotlight.id} userId={userId} followingIds={followingIds} isPending={isPending} onFollow={onFollow} onUnfollow={onUnfollow} large />
                 <a href={`/inbox/${spotlight.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '13px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.48)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 </a>
               </div>
             </div>
@@ -1868,20 +1868,20 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
         {/* Handshake reaction */}
         <button onClick={handleFire} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px 4px 0' }}>
           <span style={{ fontSize: 22, lineHeight: 1, filter: fireActive ? 'drop-shadow(0 0 8px rgba(212,175,55,1)) drop-shadow(0 0 16px rgba(212,175,55,0.7))' : 'grayscale(1) opacity(0.35)', transition: 'filter 0.2s' }}>🤝</span>
-          {fireCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: fireActive ? '#D4AF37' : '#888', fontFamily: 'Satoshi,sans-serif', transition: 'color 0.2s' }}>{fireCount}</span>}
+          {fireCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: fireActive ? '#D4AF37' : 'rgba(255,255,255,0.55)', fontFamily: 'Satoshi,sans-serif', transition: 'color 0.2s' }}>{fireCount}</span>}
         </button>
         {/* Comment */}
         <button onClick={() => { setShowComments(o => !o); setTimeout(() => inputRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           {commentCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.58)', fontFamily: 'Satoshi,sans-serif' }}>{commentCount}</span>}
         </button>
         {/* Share / paper plane */}
         <button onClick={() => setShowShare(true)} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
         {/* Bookmark — flush right */}
         <button style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 4px 8px', marginLeft: 'auto' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>
       </div>
 
@@ -1925,7 +1925,7 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
                       </div>
                     </div>
                     {/* Heart placeholder */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 4 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 4 }}>
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
                   </div>
@@ -1949,7 +1949,7 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
             <button type="submit" disabled={!commentText.trim() || submitting} style={{
               fontSize: 13, fontWeight: 800, cursor: commentText.trim() ? 'pointer' : 'default',
               fontFamily: 'Satoshi,sans-serif', background: 'none', border: 'none',
-              color: commentText.trim() ? '#38bdf8' : '#333', transition: 'color 0.15s', padding: 0,
+              color: commentText.trim() ? '#38bdf8' : 'rgba(255,255,255,0.28)', transition: 'color 0.15s', padding: 0,
             }}>{submitting ? '…' : 'Post'}</button>
           </form>
         </div>
@@ -1964,7 +1964,7 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
 
             {/* Search */}
             <div style={{ padding: '0 16px 16px', position: 'relative' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 30, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 30, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
               <input
@@ -2034,7 +2034,7 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
 
 function Reaction({ emoji, count, active, activeColor, activeBg, activeBorder, onClick }: { emoji: string; count: number; active: boolean; activeColor: string; activeBg: string; activeBorder: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'Satoshi,sans-serif', background: active ? activeBg : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${activeBorder}` : '1px solid rgba(255,255,255,0.07)', color: active ? activeColor : '#777' }}>
+    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'Satoshi,sans-serif', background: active ? activeBg : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${activeBorder}` : '1px solid rgba(255,255,255,0.07)', color: active ? activeColor : 'rgba(255,255,255,0.52)' }}>
       {emoji} <span style={{ fontWeight: 700 }}>{count}</span>
     </button>
   )
@@ -2092,14 +2092,14 @@ function GoalsTab({ circleGoals, userId }: { circleGoals: CircleGoal[]; userId: 
       {activeCats.length > 1 && (
         <div style={{ margin: '0 -20px', marginBottom: 18 }}>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', padding: '0 20px 4px' }}>
-            <button onClick={() => setCatFilter('all')} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', background: catFilter === 'all' ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: catFilter === 'all' ? '#D4AF37' : '#888', border: catFilter === 'all' ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
+            <button onClick={() => setCatFilter('all')} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', background: catFilter === 'all' ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: catFilter === 'all' ? '#D4AF37' : 'rgba(255,255,255,0.55)', border: catFilter === 'all' ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
               All
             </button>
             {GOAL_CAT_KEYS.filter(k => activeCats.includes(k)).map(cat => {
               const color = catColor(cat)
               const active = catFilter === cat
               return (
-                <button key={cat} onClick={() => setCatFilter(cat)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : '#888', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.09)' }}>
+                <button key={cat} onClick={() => setCatFilter(cat)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : 'rgba(255,255,255,0.55)', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.09)' }}>
                   {cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </button>
               )
@@ -2199,7 +2199,7 @@ function GoalFeedCard({ goal, userId }: { goal: CircleGoal; userId: string }) {
               )}
             </div>
             {daysLeft !== null && (
-              <p style={{ fontSize: 10, color: daysLeft < 7 ? '#f87171' : '#555' }}>
+              <p style={{ fontSize: 10, color: daysLeft < 7 ? '#f87171' : 'rgba(255,255,255,0.42)' }}>
                 {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Due today' : 'Overdue'}
               </p>
             )}
@@ -2231,7 +2231,7 @@ function GoalFeedCard({ goal, userId }: { goal: CircleGoal; userId: string }) {
             fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s',
             background: showComments ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
             border: showComments ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.07)',
-            color: showComments ? '#EFEFEF' : '#555',
+            color: showComments ? '#EFEFEF' : 'rgba(255,255,255,0.42)',
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -2282,7 +2282,7 @@ function GoalFeedCard({ goal, userId }: { goal: CircleGoal; userId: string }) {
                 cursor: commentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif',
                 background: commentText.trim() ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
                 border: commentText.trim() ? '1px solid rgba(212,175,55,0.3)' : '1px solid rgba(255,255,255,0.07)',
-                color: commentText.trim() ? '#D4AF37' : '#444', transition: 'all 0.15s',
+                color: commentText.trim() ? '#D4AF37' : 'rgba(255,255,255,0.35)', transition: 'all 0.15s',
               }}>
                 {submitting ? '…' : '→'}
               </button>

@@ -76,10 +76,10 @@ export function FieldComments({
         onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textAlign: 'left' }}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={count > 0 ? accent : '#444'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={count > 0 ? accent : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        <span style={{ fontSize: 11, fontWeight: 700, color: count > 0 ? accent : '#444' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: count > 0 ? accent : 'rgba(255,255,255,0.35)' }}>
           {count > 0 ? `${count} comment${count !== 1 ? 's' : ''}` : 'Add a comment'}
         </span>
         {count > 0 && (
@@ -135,7 +135,7 @@ export function FieldComments({
                 disabled={isPending || !text.trim()}
                 style={{ position: 'absolute', right: 8, bottom: 8, width: 24, height: 24, borderRadius: 7, border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', background: text.trim() ? accent : 'rgba(255,255,255,0.05)', opacity: isPending ? 0.5 : 1 }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : '#444'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : 'rgba(255,255,255,0.35)'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 2L11 13M22 2l-7 19-4-8-8-4 19-7z"/>
                 </svg>
               </button>
@@ -167,7 +167,7 @@ export function FieldComments({
                 disabled={isPending || !text.trim()}
                 style={{ position: 'absolute', right: 8, bottom: 8, width: 24, height: 24, borderRadius: 7, border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', background: text.trim() ? accent : 'rgba(255,255,255,0.05)', opacity: isPending ? 0.5 : 1 }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : '#444'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : 'rgba(255,255,255,0.35)'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 2L11 13M22 2l-7 19-4-8-8-4 19-7z"/>
                 </svg>
               </button>

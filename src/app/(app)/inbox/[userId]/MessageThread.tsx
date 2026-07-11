@@ -298,7 +298,7 @@ export function MessageThread({
               boxShadow: text.trim() ? '0 0 18px rgba(212,175,55,0.35)' : 'none',
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : '#333'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={text.trim() ? '#000' : 'rgba(255,255,255,0.28)'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 2L11 13M22 2l-7 19-4-8-8-4 19-7z"/>
             </svg>
           </button>

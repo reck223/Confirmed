@@ -513,7 +513,7 @@ function TrendLine({ data }: { data: { maxW: number; date: string }[] }) {
           <g key={i}>
             <circle cx={xs[i]} cy={ys[i]} r={i === data.length - 1 ? 5 : 3} fill="#ef4444" />
             {(i === 0 || i === data.length - 1) && (
-              <text x={xs[i]} y={ys[i] - 10} textAnchor={i === 0 ? 'start' : 'end'} fill="#555" fontSize="10" fontFamily="Satoshi,sans-serif">
+              <text x={xs[i]} y={ys[i] - 10} textAnchor={i === 0 ? 'start' : 'end'} fill="rgba(255,255,255,0.42)" fontSize="10" fontFamily="Satoshi,sans-serif">
                 {d.maxW}lbs
               </text>
             )}
@@ -1019,7 +1019,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
                 cursor: 'pointer', padding: '10px 0', transition: 'all 0.15s',
               }}>
-                <span style={{ fontSize: 8, fontWeight: 900, color: isToday ? '#EFEFEF' : ts ? '#555' : '#222', letterSpacing: '0.1em' }}>{day.short}</span>
+                <span style={{ fontSize: 8, fontWeight: 900, color: isToday ? '#EFEFEF' : ts ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.18)', letterSpacing: '0.1em' }}>{day.short}</span>
                 <span style={{ fontSize: p ? 18 : 13, lineHeight: 1, marginBottom: 2 }}>
                   {p ? (p.restDay ? '😴' : ts!.icon) : '·'}
                 </span>
@@ -1040,7 +1040,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
             animation: 'fadeUp 0.4s 0.05s ease both',
           }}>
             {todayTs && <div style={{ position: 'absolute', right: -50, top: -50, width: 210, height: 210, borderRadius: '50%', background: `radial-gradient(circle, ${todayTs.from}18 0%, transparent 70%)`, pointerEvents: 'none' }} />}
-            <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: todayTs?.text ?? '#555', marginBottom: 8 }}>TODAY</p>
+            <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: todayTs?.text ?? 'rgba(255,255,255,0.42)', marginBottom: 8 }}>TODAY</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.05, marginBottom: 8 }}>
@@ -1049,7 +1049,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                   {todayPlan.types.map(t => {
                     const ts2 = TYPE_STYLE[t]
-                    return <span key={t} style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: ts2?.bg ?? 'rgba(255,255,255,0.06)', border: `1px solid ${ts2?.border ?? 'rgba(255,255,255,0.1)'}`, color: ts2?.text ?? '#888' }}>{t}</span>
+                    return <span key={t} style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 99, background: ts2?.bg ?? 'rgba(255,255,255,0.06)', border: `1px solid ${ts2?.border ?? 'rgba(255,255,255,0.1)'}`, color: ts2?.text ?? 'rgba(255,255,255,0.55)' }}>{t}</span>
                   })}
                 </div>
               </div>
@@ -1145,7 +1145,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
               <div key={i} style={{ borderRadius: 16, padding: '14px 16px', background: `linear-gradient(135deg, ${ts!.from}10, ${ts!.to}06)`, border: `1px solid ${ts!.border}`, display: 'flex', alignItems: 'center', gap: 12, opacity: isPast ? 0.5 : 1, animation: `fadeUp 0.3s ${i*0.04}s ease both` }}>
                 <div style={{ width: 42, height: 42, borderRadius: 13, background: `linear-gradient(135deg, ${ts!.from}24, ${ts!.to}15)`, border: `1px solid ${ts!.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{ts!.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 800, color: isPast ? '#555' : '#EFEFEF', marginBottom: 2 }}>{p.name || p.types.join(' + ')}</p>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: isPast ? 'rgba(255,255,255,0.42)' : '#EFEFEF', marginBottom: 2 }}>{p.name || p.types.join(' + ')}</p>
                   <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {day.full} · {p.exercises.length} ex · {p.exercises.reduce((t, e) => t + e.setCount, 0)} sets
                   </p>
@@ -1218,7 +1218,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           {Object.keys(PRESET_EXERCISES).map(p => {
             const on = selectedTypes.includes(p)
             return (
-              <button key={p} onClick={() => toggleType(p)} style={{ padding: '9px 16px', borderRadius: 99, background: on ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${on ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: on ? '#ef4444' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <button key={p} onClick={() => toggleType(p)} style={{ padding: '9px 16px', borderRadius: 99, background: on ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${on ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: on ? '#ef4444' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5 }}>
                 {on && <span style={{ fontSize: 10, fontWeight: 900 }}>✓</span>}{p}
               </button>
             )
@@ -1244,7 +1244,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           {EQUIPMENT_OPTIONS.map(({ id, label, icon }) => {
             const on = equipment.has(id)
             return (
-              <button key={id} onClick={() => toggleEquipment(id)} style={{ padding: '9px 16px', borderRadius: 99, background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${on ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: on ? '#ef4444' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button key={id} onClick={() => toggleEquipment(id)} style={{ padding: '9px 16px', borderRadius: 99, background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${on ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: on ? '#ef4444' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>{icon}</span>{label}
               </button>
             )
@@ -1267,7 +1267,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
               width: '100%', padding: '15px 0', borderRadius: 16,
               background: aiGenerating ? 'rgba(99,102,241,0.06)' : 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.08))',
               border: `1px solid ${aiGenerating ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.35)'}`,
-              fontSize: 14, fontWeight: 800, color: aiGenerating ? '#555' : '#a78bfa',
+              fontSize: 14, fontWeight: 800, color: aiGenerating ? 'rgba(255,255,255,0.42)' : '#a78bfa',
               cursor: aiGenerating ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               transition: 'all 0.2s', boxShadow: aiGenerating ? 'none' : '0 4px 20px rgba(99,102,241,0.15)',
@@ -1300,7 +1300,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
               const added = exercises.some(e => e.name === name)
               return (
                 <button key={name} onClick={() => added ? setExercises(prev => prev.filter(e => e.name !== name)) : addExerciseByName(name)}
-                  style={{ padding: '9px 15px', borderRadius: 99, background: added ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${added ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: added ? '#ef4444' : '#555', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  style={{ padding: '9px 15px', borderRadius: 99, background: added ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${added ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 700, color: added ? '#ef4444' : 'rgba(255,255,255,0.42)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
                   {added && <span style={{ fontSize: 10, fontWeight: 900 }}>✓</span>}
                   {name}
                 </button>
@@ -1334,7 +1334,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {info ? (
-                      <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 800, color: '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: '#333', textAlign: 'left', display: 'block', marginBottom: 5 }}>{ex.name}</button>
+                      <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 800, color: '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)', textAlign: 'left', display: 'block', marginBottom: 5 }}>{ex.name}</button>
                     ) : (
                       <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF', marginBottom: 5 }}>{ex.name}</p>
                     )}
@@ -1345,7 +1345,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                   </div>
                   {/* Set count stepper */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => adjustSetCount(ex.id, -1)} disabled={ex.sets.length <= 1} style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: ex.sets.length <= 1 ? '#1a1a1a' : '#555', cursor: ex.sets.length <= 1 ? 'not-allowed' : 'pointer', fontSize: 16, lineHeight: 1 }}>−</button>
+                    <button onClick={() => adjustSetCount(ex.id, -1)} disabled={ex.sets.length <= 1} style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: ex.sets.length <= 1 ? '#1a1a1a' : 'rgba(255,255,255,0.42)', cursor: ex.sets.length <= 1 ? 'not-allowed' : 'pointer', fontSize: 16, lineHeight: 1 }}>−</button>
                     <div style={{ textAlign: 'center', minWidth: 32 }}>
                       <div style={{ fontSize: 17, fontWeight: 900, color: '#EFEFEF', lineHeight: 1 }}>{ex.sets.length}</div>
                       <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.07em', marginTop: 2 }}>SETS</div>
@@ -1399,7 +1399,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>LINK TO A FITNESS GOAL (OPTIONAL)</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {fitnessGoals.map(g => (
-              <button key={g.id} onClick={() => setSelectedGoalId(selectedGoalId === g.id ? null : g.id)} style={{ padding: '7px 13px', borderRadius: 99, background: selectedGoalId === g.id ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedGoalId === g.id ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.06)'}`, fontSize: 12, fontWeight: 700, color: selectedGoalId === g.id ? '#ef4444' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>{g.title}</button>
+              <button key={g.id} onClick={() => setSelectedGoalId(selectedGoalId === g.id ? null : g.id)} style={{ padding: '7px 13px', borderRadius: 99, background: selectedGoalId === g.id ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selectedGoalId === g.id ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.06)'}`, fontSize: 12, fontWeight: 700, color: selectedGoalId === g.id ? '#ef4444' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>{g.title}</button>
             ))}
           </div>
         </div>
@@ -1408,16 +1408,16 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
       {/* ── CTA: context-aware ── */}
       {planningDay !== null ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button onClick={saveDayPlan} disabled={!sessionName.trim()} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: sessionName.trim() ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: sessionName.trim() ? '#fff' : '#333', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: sessionName.trim() ? '0 8px 32px rgba(99,102,241,0.35)' : 'none', transition: 'all 0.2s' }}>
+          <button onClick={saveDayPlan} disabled={!sessionName.trim()} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: sessionName.trim() ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: sessionName.trim() ? '#fff' : 'rgba(255,255,255,0.28)', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: sessionName.trim() ? '0 8px 32px rgba(99,102,241,0.35)' : 'none', transition: 'all 0.2s' }}>
             {exercises.length > 0 ? `💾 Save to Week Plan · ${exercises.length} ex` : '💾 Save to Week Plan'}
           </button>
-          <button onClick={saveDayPlanAndStart} disabled={!sessionName.trim()} style={{ width: '100%', padding: '14px 0', borderRadius: 18, background: sessionName.trim() ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${sessionName.trim() ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.05)'}`, fontSize: 14, fontWeight: 800, color: sessionName.trim() ? '#ef4444' : '#333', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.03em', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
+          <button onClick={saveDayPlanAndStart} disabled={!sessionName.trim()} style={{ width: '100%', padding: '14px 0', borderRadius: 18, background: sessionName.trim() ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${sessionName.trim() ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.05)'}`, fontSize: 14, fontWeight: 800, color: sessionName.trim() ? '#ef4444' : 'rgba(255,255,255,0.28)', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.03em', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
             ▶ Save &amp; Start Now
           </button>
         </div>
       ) : (
         <>
-          <button onClick={startWorkout} disabled={!sessionName.trim()} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: sessionName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: sessionName.trim() ? '#fff' : '#333', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: sessionName.trim() && exercises.length > 0 ? '0 8px 32px rgba(239,68,68,0.4)' : sessionName.trim() ? '0 4px 20px rgba(239,68,68,0.2)' : 'none', transition: 'all 0.2s' }}>
+          <button onClick={startWorkout} disabled={!sessionName.trim()} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: sessionName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: sessionName.trim() ? '#fff' : 'rgba(255,255,255,0.28)', cursor: sessionName.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: sessionName.trim() && exercises.length > 0 ? '0 8px 32px rgba(239,68,68,0.4)' : sessionName.trim() ? '0 4px 20px rgba(239,68,68,0.2)' : 'none', transition: 'all 0.2s' }}>
             {exercises.length > 0 ? `START · ${exercises.length} exercise${exercises.length !== 1 ? 's' : ''} · ${exercises.reduce((t, e) => t + e.sets.length, 0)} sets →` : 'START WORKOUT →'}
           </button>
           {exercises.length > 0 && sessionName.trim() && (
@@ -1436,7 +1436,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               {([false, true] as boolean[]).map(c => (
-                <button key={String(c)} onClick={() => setIsCardio(c)} style={{ flex: 1, padding: '8px 0', borderRadius: 11, background: isCardio === c ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isCardio === c ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: isCardio === c ? '#ef4444' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                <button key={String(c)} onClick={() => setIsCardio(c)} style={{ flex: 1, padding: '8px 0', borderRadius: 11, background: isCardio === c ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isCardio === c ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: isCardio === c ? '#ef4444' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
                   {c ? '🏃 Cardio' : '💪 Weights'}
                 </button>
               ))}
@@ -1457,7 +1457,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                 📖 How to: {exName} →
               </button>
             )}
-            <button onClick={addExercise} disabled={!exName.trim()} style={{ width: '100%', padding: '13px 0', borderRadius: 15, background: exName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: exName.trim() ? '#fff' : '#333', cursor: exName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
+            <button onClick={addExercise} disabled={!exName.trim()} style={{ width: '100%', padding: '13px 0', borderRadius: 15, background: exName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: exName.trim() ? '#fff' : 'rgba(255,255,255,0.28)', cursor: exName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
               ADD →
             </button>
           </div>
@@ -1522,7 +1522,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 {[60, 90, 120].map(t => (
-                  <button key={t} onClick={() => { setRestTarget(t); setRestSecs(t) }} style={{ padding: '4px 8px', borderRadius: 8, background: restTarget === t ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${restTarget === t ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 10, fontWeight: 700, color: restTarget === t ? '#4ade80' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                  <button key={t} onClick={() => { setRestTarget(t); setRestSecs(t) }} style={{ padding: '4px 8px', borderRadius: 8, background: restTarget === t ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${restTarget === t ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 10, fontWeight: 700, color: restTarget === t ? '#4ade80' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
                     {t === 120 ? '2m' : `${t}s`}
                   </button>
                 ))}
@@ -1538,7 +1538,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.22)' }}>REST</p>
             {[60, 90, 120].map(t => (
-              <button key={t} onClick={() => setRestTarget(t)} style={{ padding: '4px 8px', borderRadius: 8, background: restTarget === t ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${restTarget === t ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}`, fontSize: 10, fontWeight: 700, color: restTarget === t ? '#EFEFEF' : '#2a2a2a', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+              <button key={t} onClick={() => setRestTarget(t)} style={{ padding: '4px 8px', borderRadius: 8, background: restTarget === t ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${restTarget === t ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}`, fontSize: 10, fontWeight: 700, color: restTarget === t ? '#EFEFEF' : 'rgba(255,255,255,0.18)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
                 {t === 120 ? '2m' : `${t}s`}
               </button>
             ))}
@@ -1579,7 +1579,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {EXERCISE_INFO[ex.name] ? (
-                        <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: '#333' }}>{ex.name}</button>
+                        <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)' }}>{ex.name}</button>
                       ) : (
                         <span style={{ fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF' }}>{ex.name}</span>
                       )}
@@ -1606,14 +1606,14 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                   {ex.sets.map((s, j) => (
                     <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '28px 1fr 14px 1fr 36px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                       <div style={{ width: 28, height: 28, borderRadius: '50%', background: s.done ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.done ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.07)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }}>
-                        <span style={{ fontSize: 10, fontWeight: 900, color: s.done ? '#4ade80' : '#333' }}>{j+1}</span>
+                        <span style={{ fontSize: 10, fontWeight: 900, color: s.done ? '#4ade80' : 'rgba(255,255,255,0.28)' }}>{j+1}</span>
                       </div>
                       <input type="number" inputMode="decimal" value={ex.isCardio ? s.duration : s.weight} onChange={e => updateSet(ex.id, s.id, ex.isCardio ? 'duration' : 'weight', e.target.value)} placeholder={ex.isCardio ? '30' : '0'} disabled={s.done} style={{ ...INP, opacity: s.done ? 0.35 : 1 }} />
                       <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', textAlign: 'center' }}>×</span>
                       {ex.isCardio ? <span /> : (
                         <input type="number" inputMode="numeric" value={s.reps} onChange={e => updateSet(ex.id, s.id, 'reps', e.target.value)} placeholder="0" disabled={s.done} style={{ ...INP, opacity: s.done ? 0.35 : 1 }} />
                       )}
-                      <button onClick={() => toggleDone(ex.id, s.id)} style={{ width: 36, height: 36, borderRadius: '50%', background: s.done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${s.done ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.1)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: s.done ? '#4ade80' : '#222', transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)' }}>
+                      <button onClick={() => toggleDone(ex.id, s.id)} style={{ width: 36, height: 36, borderRadius: '50%', background: s.done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${s.done ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.1)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: s.done ? '#4ade80' : 'rgba(255,255,255,0.18)', transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)' }}>
                         {s.done ? '✓' : '○'}
                       </button>
                     </div>
@@ -1636,7 +1636,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
         + Add Exercise
       </button>
 
-      <button onClick={finishWorkout} disabled={saving || exercises.length === 0} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: exercises.length > 0 && !saving ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: exercises.length > 0 && !saving ? '#fff' : '#333', cursor: exercises.length > 0 && !saving ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: exercises.length > 0 && !saving ? '0 8px 32px rgba(239,68,68,0.3)' : 'none', marginBottom: 10 }}>
+      <button onClick={finishWorkout} disabled={saving || exercises.length === 0} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: exercises.length > 0 && !saving ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 15, fontWeight: 900, color: exercises.length > 0 && !saving ? '#fff' : 'rgba(255,255,255,0.28)', cursor: exercises.length > 0 && !saving ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif', boxShadow: exercises.length > 0 && !saving ? '0 8px 32px rgba(239,68,68,0.3)' : 'none', marginBottom: 10 }}>
         {saving ? 'SAVING…' : 'FINISH WORKOUT ✓'}
       </button>
 
@@ -1674,7 +1674,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                   <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: pct === 100 ? '#4ade80' : 'linear-gradient(90deg,#ef4444,#f97316)', transition: 'width 0.4s ease' }} />
                   </div>
-                  <p style={{ fontSize: 10, fontWeight: 800, color: pct === 100 ? '#4ade80' : '#333', marginTop: 6 }}>{pct}% complete</p>
+                  <p style={{ fontSize: 10, fontWeight: 800, color: pct === 100 ? '#4ade80' : 'rgba(255,255,255,0.28)', marginTop: 6 }}>{pct}% complete</p>
                 </div>
               )
             })()}
@@ -1691,7 +1691,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                     <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: allDone ? 'rgba(74,222,128,0.15)' : next ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)', border: `2px solid ${allDone ? '#4ade80' : next ? '#ef4444' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 1 }}>
                       {allDone
                         ? <span style={{ fontSize: 15, color: '#4ade80' }}>✓</span>
-                        : <span style={{ fontSize: 11, fontWeight: 900, color: next ? '#ef4444' : '#333' }}>{i + 1}</span>
+                        : <span style={{ fontSize: 11, fontWeight: 900, color: next ? '#ef4444' : 'rgba(255,255,255,0.28)' }}>{i + 1}</span>
                       }
                     </div>
 
@@ -1701,7 +1701,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {ex.sets.map((s, j) => (
                           <div key={s.id} style={{ width: 20, height: 20, borderRadius: 6, background: s.done ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.done ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ fontSize: 9, fontWeight: 900, color: s.done ? '#4ade80' : '#333' }}>{j + 1}</span>
+                            <span style={{ fontSize: 9, fontWeight: 900, color: s.done ? '#4ade80' : 'rgba(255,255,255,0.28)' }}>{j + 1}</span>
                           </div>
                         ))}
                       </div>
@@ -1709,7 +1709,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
 
                     {/* Set count + next label */}
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <p style={{ fontSize: 11, fontWeight: 800, color: allDone ? '#4ade80' : '#333' }}>{doneCt}/{ex.sets.length}</p>
+                      <p style={{ fontSize: 11, fontWeight: 800, color: allDone ? '#4ade80' : 'rgba(255,255,255,0.28)' }}>{doneCt}/{ex.sets.length}</p>
                       {next && <p style={{ fontSize: 9, fontWeight: 800, color: '#ef4444', letterSpacing: '0.08em' }}>NEXT</p>}
                     </div>
                   </div>
@@ -1737,7 +1737,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               {([false, true] as boolean[]).map(c => (
-                <button key={String(c)} onClick={() => setIsCardio(c)} style={{ flex: 1, padding: '9px 0', borderRadius: 12, background: isCardio === c ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isCardio === c ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: isCardio === c ? '#ef4444' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                <button key={String(c)} onClick={() => setIsCardio(c)} style={{ flex: 1, padding: '9px 0', borderRadius: 12, background: isCardio === c ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isCardio === c ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: isCardio === c ? '#ef4444' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
                   {c ? '🏃 Cardio' : '💪 Weights'}
                 </button>
               ))}
@@ -1761,7 +1761,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                 📖 How to do {exName} →
               </button>
             )}
-            <button onClick={addExercise} disabled={!exName.trim()} style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: exName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: exName.trim() ? '#fff' : '#333', cursor: exName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
+            <button onClick={addExercise} disabled={!exName.trim()} style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: exName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: exName.trim() ? '#fff' : 'rgba(255,255,255,0.28)', cursor: exName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
               ADD TO WORKOUT →
             </button>
           </div>
@@ -1781,7 +1781,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginBottom: 20 }}>
               Saves: {exercises.map(e => e.name).join(', ')}
             </p>
-            <button onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate} style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: templateName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: templateName.trim() ? '#fff' : '#333', cursor: templateName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
+            <button onClick={handleSaveTemplate} disabled={!templateName.trim() || savingTemplate} style={{ width: '100%', padding: '14px 0', borderRadius: 16, background: templateName.trim() ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: templateName.trim() ? '#fff' : 'rgba(255,255,255,0.28)', cursor: templateName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
               {savingTemplate ? 'SAVING…' : 'SAVE TEMPLATE'}
             </button>
           </div>
@@ -1836,7 +1836,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input type="number" inputMode="decimal" value={bwInput} onChange={e => setBwInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogBw()} placeholder="Log today's weight (lbs)" style={{ flex: 1, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(56,189,248,0.2)', color: '#EFEFEF', fontSize: 14, boxSizing: 'border-box', fontFamily: 'Satoshi,sans-serif', outline: 'none' }} />
-            <button onClick={handleLogBw} disabled={!bwInput || savingBw} style={{ padding: '10px 18px', borderRadius: 12, background: bwInput ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bwInput ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 800, color: bwInput ? '#38bdf8' : '#333', cursor: bwInput ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif', flexShrink: 0 }}>
+            <button onClick={handleLogBw} disabled={!bwInput || savingBw} style={{ padding: '10px 18px', borderRadius: 12, background: bwInput ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bwInput ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 800, color: bwInput ? '#38bdf8' : 'rgba(255,255,255,0.28)', cursor: bwInput ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif', flexShrink: 0 }}>
               {savingBw ? '…' : 'Log'}
             </button>
           </div>

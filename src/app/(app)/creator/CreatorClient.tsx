@@ -272,7 +272,7 @@ export function CreatorClient({ stats, topBuilders, signupChart, categoryBreakdo
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
         {topBuilders.map((b, i) => (
           <Link key={b.id} href={`/profile/${b.id}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: i === 0 ? 'rgba(212,175,55,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${i === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-            <span style={{ fontSize: 11, fontWeight: 900, color: i === 0 ? '#D4AF37' : i === 1 ? '#aaa' : i === 2 ? '#fb923c' : '#444', minWidth: 18, textAlign: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 900, color: i === 0 ? '#D4AF37' : i === 1 ? '#aaa' : i === 2 ? '#fb923c' : 'rgba(255,255,255,0.35)', minWidth: 18, textAlign: 'center' }}>
               {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
             </span>
             <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarGrad(b.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>

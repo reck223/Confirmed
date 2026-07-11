@@ -156,7 +156,7 @@ export function ExploreClient({
             {featuredBuilders.map((b, idx) => {
               const li = getLevelInfo(b.xp)
               const rank = idx + 1
-              const rankColor = rank === 1 ? '#D4AF37' : rank === 2 ? '#a8a8a8' : rank === 3 ? '#cd7f32' : '#444'
+              const rankColor = rank === 1 ? '#D4AF37' : rank === 2 ? '#a8a8a8' : rank === 3 ? '#cd7f32' : 'rgba(255,255,255,0.35)'
               return (
                 <Link key={b.id} href={`/profile/${b.id}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
                   <div style={{
@@ -195,7 +195,7 @@ export function ExploreClient({
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 16 }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
           style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
@@ -229,7 +229,7 @@ export function ExploreClient({
             flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
             fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 12,
             background: tab === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-            color: tab === k ? '#EFEFEF' : '#444',
+            color: tab === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)',
             transition: 'all 0.2s',
             boxShadow: tab === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
           }}>
@@ -245,7 +245,7 @@ export function ExploreClient({
             flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: '1px solid',
             borderColor: catFilter === null ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)',
             background: catFilter === null ? 'rgba(212,175,55,0.12)' : 'transparent',
-            color: catFilter === null ? '#D4AF37' : '#555',
+            color: catFilter === null ? '#D4AF37' : 'rgba(255,255,255,0.42)',
             fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
             transition: 'all 0.2s',
           }}>All</button>
@@ -257,7 +257,7 @@ export function ExploreClient({
                 padding: '6px 12px', borderRadius: 20, border: '1px solid',
                 borderColor: active ? m.border : 'rgba(255,255,255,0.08)',
                 background: active ? m.bg : 'transparent',
-                color: active ? m.text : '#555',
+                color: active ? m.text : 'rgba(255,255,255,0.42)',
                 fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
                 transition: 'all 0.2s',
               }}>
@@ -467,7 +467,7 @@ function BuilderCard({ builder: b, isFollowing, onFollow, circleCode }: { builde
                 padding: '7px 14px', borderRadius: 10, border: '1px solid',
                 borderColor: isFollowing ? 'rgba(255,255,255,0.12)' : 'rgba(212,175,55,0.45)',
                 background: isFollowing ? 'rgba(255,255,255,0.05)' : 'rgba(212,175,55,0.12)',
-                color: isFollowing ? '#555' : '#D4AF37',
+                color: isFollowing ? 'rgba(255,255,255,0.42)' : '#D4AF37',
                 fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
                 transition: 'all 0.2s',
                 transform: pressed ? 'scale(0.94)' : 'scale(1)',
@@ -568,7 +568,7 @@ function GoalCard({ goal: g, isFollowing, onFollow }: { goal: PublicGoal; isFoll
               padding: '6px 14px', borderRadius: 9, border: '1px solid',
               borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : `${m.accent}55`,
               background: isFollowing ? 'transparent' : m.bg,
-              color: isFollowing ? '#444' : m.text,
+              color: isFollowing ? 'rgba(255,255,255,0.35)' : m.text,
               fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
               transition: 'all 0.2s',
               transform: pressed ? 'scale(0.92)' : 'scale(1)',

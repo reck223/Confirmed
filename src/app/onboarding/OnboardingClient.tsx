@@ -82,7 +82,7 @@ export function OnboardingClient({ fullName }: { fullName: string }) {
   // ── Step 1: Welcome ──────────────────────────────────────────
   if (step === 1) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative', zIndex: 1 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative', zIndex: 1, background: 'radial-gradient(ellipse 90% 420px at 50% 35%, rgba(212,175,55,0.09) 0%, transparent 70%)' }}>
         <StepDots step={step} />
         <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 52 }}>
@@ -135,7 +135,7 @@ export function OnboardingClient({ fullName }: { fullName: string }) {
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#EFEFEF', padding: '15px 10px', fontSize: 16, fontFamily: 'Satoshi,sans-serif', fontWeight: 500 }}
           />
           {username.length > 0 && (
-            <span style={{ padding: '0 16px 0 0', fontSize: 13, fontWeight: 700, color: usernameValid ? '#22c55e' : '#888', flexShrink: 0 }}>
+            <span style={{ padding: '0 16px 0 0', fontSize: 13, fontWeight: 700, color: usernameValid ? '#22c55e' : 'rgba(255,255,255,0.55)', flexShrink: 0 }}>
               {usernameValid ? '✓' : username.length < 3 ? `${3 - username.length} more` : '✗'}
             </span>
           )}

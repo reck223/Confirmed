@@ -138,7 +138,7 @@ export default function FocusTimerPage() {
               background: mode === m ? `${MODE_COLORS[m]}18` : 'rgba(255,255,255,0.03)',
               border: `1px solid ${mode === m ? MODE_COLORS[m] + '40' : 'rgba(255,255,255,0.07)'}`,
               fontSize: 10, fontWeight: 800, letterSpacing: '0.07em',
-              color: mode === m ? MODE_COLORS[m] : '#333',
+              color: mode === m ? MODE_COLORS[m] : 'rgba(255,255,255,0.28)',
               cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
               transition: 'all 0.2s ease',
             }}

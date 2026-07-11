@@ -78,7 +78,7 @@ export default async function ViewAssessPage({ params }: { params: Promise<{ use
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px 40px' }} className="view-panel">
       {/* Back */}
       <a href="/circle" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 24, textDecoration: 'none' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)' }}>Back to Circle</span>
       </a>
 

@@ -115,7 +115,7 @@ export function HabitsClient({ habits: initHabits, days, today, doneSet: initDon
           <div />
           {days.map(d => (
             <div key={d} style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: d === today ? '#D4AF37' : '#2a2a2a' }}>
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', color: d === today ? '#D4AF37' : 'rgba(255,255,255,0.18)' }}>
                 {dayLabel(d, today).toUpperCase()}
               </span>
             </div>
@@ -312,7 +312,7 @@ export function HabitsClient({ habits: initHabits, days, today, doneSet: initDon
             <button
               onClick={handleAdd}
               disabled={!name.trim() || saving}
-              style={{ width: '100%', padding: '15px 0', borderRadius: 16, background: name.trim() ? `linear-gradient(135deg, ${color}, ${color}aa)` : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: name.trim() ? '#0A0A0A' : '#333', cursor: name.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
+              style={{ width: '100%', padding: '15px 0', borderRadius: 16, background: name.trim() ? `linear-gradient(135deg, ${color}, ${color}aa)` : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: name.trim() ? '#0A0A0A' : 'rgba(255,255,255,0.28)', cursor: name.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
             >
               {saving ? 'SAVING…' : 'ADD HABIT'}
             </button>

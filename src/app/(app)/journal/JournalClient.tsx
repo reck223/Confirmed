@@ -88,7 +88,7 @@ function MoodPicker({ value, onChange }: { value: number | null; onChange: (v: n
               boxShadow: sel ? `0 4px 16px ${c}30` : 'none',
             }}>
               <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
-              <span style={{ fontSize: 8, color: sel ? c : '#444', fontWeight: 700, letterSpacing: '0.03em' }}>{MOOD_LABELS[i].toUpperCase()}</span>
+              <span style={{ fontSize: 8, color: sel ? c : 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.03em' }}>{MOOD_LABELS[i].toUpperCase()}</span>
             </button>
           )
         })}
@@ -131,21 +131,22 @@ export function JournalClient({ entries, letters = [] }: { entries: JournalEntry
       </div>
 
       {/* ── TAB BAR ── */}
-      <div style={{ padding: '0 20px', marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 6, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 5 }}>
+      <div style={{ padding: '0 16px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 5 }}>
           {TABS.map(t => {
             const sel = tab === t.id
             return (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
-                flex: 1, borderRadius: 11, padding: '8px 4px 7px', border: 'none', cursor: 'pointer',
-                background: sel ? `${t.color}18` : 'transparent',
-                outline: sel ? `1px solid ${t.color}44` : '1px solid transparent',
-                transition: 'all 0.2s', fontFamily: 'Satoshi,sans-serif',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                boxShadow: sel ? `0 0 12px ${t.color}20` : 'none',
+                flex: 1, borderRadius: 13, padding: '10px 4px 9px', border: 'none', cursor: 'pointer',
+                background: sel ? `${t.color}20` : 'transparent',
+                outline: sel ? `1.5px solid ${t.color}50` : '1.5px solid transparent',
+                transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)', fontFamily: 'Satoshi,sans-serif',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                boxShadow: sel ? `0 0 20px ${t.color}25, inset 0 1px 0 ${t.color}20` : 'none',
+                transform: sel ? 'translateY(-1px)' : 'none',
               }}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>{t.icon}</span>
-                <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.04em', color: sel ? t.color : '#444', lineHeight: 1 }}>{t.label.toUpperCase()}</span>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{t.icon}</span>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.04em', color: sel ? t.color : 'rgba(255,255,255,0.38)', lineHeight: 1 }}>{t.label.toUpperCase()}</span>
               </button>
             )
           })}
@@ -262,7 +263,7 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
                 <div style={{ width: 36, height: 36, borderRadius: 11, background: s.done ? `${s.color}18` : 'rgba(255,255,255,0.04)', border: `1.5px solid ${s.done ? s.color + '55' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
                   {s.done ? '✓' : (s.label === 'Morning' ? '🌅' : '🌙')}
                 </div>
-                <span style={{ fontSize: 8, fontWeight: 700, color: s.done ? s.color : '#444', letterSpacing: '0.04em' }}>{s.label.toUpperCase()}</span>
+                <span style={{ fontSize: 8, fontWeight: 700, color: s.done ? s.color : 'rgba(255,255,255,0.35)', letterSpacing: '0.04em' }}>{s.label.toUpperCase()}</span>
               </div>
             ))}
           </div>
@@ -274,7 +275,7 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
         {(['morning', 'evening'] as const).map(s => {
           const sel = section === s; const c = s === 'morning' ? '#38bdf8' : '#a78bfa'
           return (
-            <button key={s} onClick={() => setSection(s)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', transition: 'all 0.18s', background: sel ? `${c}18` : 'transparent', color: sel ? c : '#555', boxShadow: sel ? `0 0 12px ${c}20` : 'none', outline: sel ? `1px solid ${c}44` : '1px solid transparent' }}>
+            <button key={s} onClick={() => setSection(s)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontSize: 12, fontWeight: 800, letterSpacing: '0.04em', transition: 'all 0.18s', background: sel ? `${c}18` : 'transparent', color: sel ? c : 'rgba(255,255,255,0.42)', boxShadow: sel ? `0 0 12px ${c}20` : 'none', outline: sel ? `1px solid ${c}44` : '1px solid transparent' }}>
               {s === 'morning' ? '🌅 MORNING' : '🌙 EVENING'}
             </button>
           )
@@ -473,9 +474,9 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
             {archivedDates.length > 0 && (
               <div>
                 <button onClick={() => setArchiveOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: archiveOpen ? 16 : 0 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                   <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'left', letterSpacing: '0.04em' }}>Archive · {archivedDates.length} {archivedDates.length === 1 ? 'day' : 'days'}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {archiveOpen && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -619,9 +620,9 @@ function GratitudeTab({ entries }: { entries: JournalEntry[] }) {
             {archived.length > 0 && (
               <div>
                 <button onClick={() => setArchiveOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: archiveOpen ? 12 : 0 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                   <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'left', letterSpacing: '0.04em' }}>Archive · {archived.length} {archived.length === 1 ? 'entry' : 'entries'}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {archiveOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{archived.map(renderGratEntry)}</div>}
               </div>
@@ -731,7 +732,7 @@ function CBTTab({ entries }: { entries: JournalEntry[] }) {
                       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>{s.sub}</p>
                     </div>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: open ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={open ? '#a78bfa' : '#555'} strokeWidth="2.5" strokeLinecap="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={open ? '#a78bfa' : 'rgba(255,255,255,0.42)'} strokeWidth="2.5" strokeLinecap="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
                   </button>
                   {open && (
@@ -745,7 +746,7 @@ function CBTTab({ entries }: { entries: JournalEntry[] }) {
                               const sel = selectedDistortions.includes(d.name)
                               return (
                                 <button key={d.name} type="button" onClick={() => toggleDistortion(d.name)}
-                                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: sel ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)', color: sel ? '#a78bfa' : '#666', border: sel ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.07)' }}>
+                                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', background: sel ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)', color: sel ? '#a78bfa' : 'rgba(255,255,255,0.48)', border: sel ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.07)' }}>
                                   {d.name}
                                 </button>
                               )
@@ -842,9 +843,9 @@ function CBTTab({ entries }: { entries: JournalEntry[] }) {
             {archived.length > 0 && (
               <div>
                 <button onClick={() => setArchiveOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: archiveOpen ? 12 : 0 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                   <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'left', letterSpacing: '0.04em' }}>Archive · {archived.length} {archived.length === 1 ? 'entry' : 'entries'}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {archiveOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{archived.map(renderCbtEntry)}</div>}
               </div>
@@ -914,7 +915,7 @@ function WriteTab({ entries }: { entries: JournalEntry[] }) {
         <div style={{ height: 2, background: focused ? 'linear-gradient(90deg,#38bdf8,#38bdf844)' : 'rgba(255,255,255,0.06)', transition: 'background 0.3s' }} />
         <div style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: focused ? '#38bdf8' : '#555' }}>FREE WRITE</p>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: focused ? '#38bdf8' : 'rgba(255,255,255,0.42)' }}>FREE WRITE</p>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
           <textarea ref={textareaRef} autoComplete="off" value={text} onChange={e => setText(e.target.value)} onFocus={() => setFocused(true)}
@@ -981,9 +982,9 @@ function WriteTab({ entries }: { entries: JournalEntry[] }) {
             {archived.length > 0 && (
               <div>
                 <button onClick={() => setArchiveOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: archiveOpen ? 12 : 0 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
                   <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.42)', textAlign: 'left', letterSpacing: '0.04em' }}>Archive · {archived.length} {archived.length === 1 ? 'entry' : 'entries'}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" style={{ transform: archiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {archiveOpen && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{archived.map(renderWriteEntry)}</div>}
               </div>
@@ -1022,7 +1023,7 @@ function LettersTab({ letters }: { letters: Letter[] }) {
       {openLetter && (
         <div onClick={() => setOpenId(null)} className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: '#0d0d0d', borderRadius: 24, border: '1px solid rgba(217,70,239,0.2)', padding: '28px 24px', maxHeight: '85dvh', overflowY: 'auto', animation: 'scaleIn 0.2s ease both' }}>
-            <div style={{ width: 36, height: 4, background: '#333', borderRadius: 2, margin: '0 auto 24px' }} />
+            <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, margin: '0 auto 24px' }} />
             <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#d946ef', marginBottom: 6 }}>LETTER TO SELF</p>
             {openLetter.deadline && (
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>

@@ -164,9 +164,9 @@ export function PublicProfileClient({ profile, goals, allGoals, isFollowing: ini
           </div>
           <div style={{ display: 'flex', gap: 8, paddingBottom: 4 }}>
             <Link href={`/inbox/${profile.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', textDecoration: 'none' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </Link>
-            <button onClick={handleFollow} style={{ padding: '8px 20px', borderRadius: 12, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, transition: 'all 0.15s', background: following ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: following ? '#888' : '#000', border: following ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent' }}>
+            <button onClick={handleFollow} style={{ padding: '8px 20px', borderRadius: 12, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, transition: 'all 0.15s', background: following ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: following ? 'rgba(255,255,255,0.55)' : '#000', border: following ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent' }}>
               {following ? 'Following' : 'Follow'}
             </button>
           </div>

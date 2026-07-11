@@ -236,7 +236,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
   const dayMeals     = meals.filter(m => m.plan_date === activeDay)
   const dayCalories  = dayMeals.reduce((s, m) => s + (m.calories ?? 0), 0)
   const mt           = MEAL_TYPES.find(t => t.key === addModal?.mealType)
-  const dietColor    = DIETS.find(d => d.key === selectedDiet)?.color ?? '#888'
+  const dietColor    = DIETS.find(d => d.key === selectedDiet)?.color ?? 'rgba(255,255,255,0.55)'
   const quickPicks   = DIET_MEALS[selectedDiet] ?? DIET_MEALS.all
   const recipes      = DIET_RECIPES[selectedDiet] ?? DIET_RECIPES.all
   const currentWater = waterMap[activeDay] ?? 0
@@ -444,7 +444,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
           <button onClick={() => setShowSummary(true)} style={{ flexShrink: 0, padding: '10px 16px', borderRadius: 12, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', fontSize: 12, fontWeight: 800, color: '#a78bfa', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', minHeight: 40 }}>
             📊 Summary
           </button>
-          <button onClick={handleCopyLastWeek} disabled={copying} style={{ flexShrink: 0, padding: '10px 16px', borderRadius: 12, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', fontSize: 12, fontWeight: 800, color: copying ? '#333' : '#f97316', cursor: copying ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', minHeight: 40 }}>
+          <button onClick={handleCopyLastWeek} disabled={copying} style={{ flexShrink: 0, padding: '10px 16px', borderRadius: 12, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', fontSize: 12, fontWeight: 800, color: copying ? 'rgba(255,255,255,0.28)' : '#f97316', cursor: copying ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap', minHeight: 40 }}>
             {copying ? '…' : '↺ Copy Last Week'}
           </button>
         </div>
@@ -457,7 +457,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
           {DIETS.map(d => {
             const active = selectedDiet === d.key
             return (
-              <button key={d.key} className="diet-chip" onClick={() => setDiet(d.key)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 12, background: active ? `${d.color}18` : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? d.color + '50' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: active ? d.color : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', display: 'flex', alignItems: 'center', gap: 5, boxShadow: active ? `0 0 16px ${d.color}25` : 'none' }}>
+              <button key={d.key} className="diet-chip" onClick={() => setDiet(d.key)} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 12, background: active ? `${d.color}18` : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? d.color + '50' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: active ? d.color : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', display: 'flex', alignItems: 'center', gap: 5, boxShadow: active ? `0 0 16px ${d.color}25` : 'none' }}>
                 <span>{d.emoji}</span>
                 <span>{d.label}</span>
               </button>
@@ -494,7 +494,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
           const hasMeals = meals.some(m => m.plan_date === d)
           return (
             <button key={d} onClick={() => setActiveDay(d)} style={{ flex: 1, padding: '10px 0', borderRadius: 14, cursor: 'pointer', border: 'none', background: isActive ? 'linear-gradient(135deg,#f97316,#fbbf24)' : 'rgba(255,255,255,0.03)', outline: isToday && !isActive ? '2px solid rgba(249,115,22,0.4)' : 'none', outlineOffset: 2 }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: isActive ? '#0A0A0A' : '#444', marginBottom: 3 }}>{dayShort(d).toUpperCase()}</p>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: isActive ? '#0A0A0A' : 'rgba(255,255,255,0.35)', marginBottom: 3 }}>{dayShort(d).toUpperCase()}</p>
               <p style={{ fontSize: 16, fontWeight: 900, color: isActive ? '#0A0A0A' : '#EFEFEF' }}>{dayNum(d)}</p>
               {hasMeals && <div style={{ width: 4, height: 4, borderRadius: '50%', background: isActive ? '#0A0A0A' : '#f97316', margin: '4px auto 0' }} />}
             </button>
@@ -630,7 +630,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 20, padding: '4px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               {(['quick', 'recipes'] as const).map(tab => (
-                <button key={tab} onClick={() => setAddTab(tab)} style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: addTab === tab ? 'rgba(255,255,255,0.08)' : 'none', border: 'none', fontSize: 12, fontWeight: 800, color: addTab === tab ? '#EFEFEF' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                <button key={tab} onClick={() => setAddTab(tab)} style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: addTab === tab ? 'rgba(255,255,255,0.08)' : 'none', border: 'none', fontSize: 12, fontWeight: 800, color: addTab === tab ? '#EFEFEF' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
                   {tab === 'quick' ? '⚡ Quick Add' : '👨‍🍳 Recipes'}
                 </button>
               ))}
@@ -662,7 +662,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 18 }}>
                   {quickPicks[mt.key]?.map(q => (
-                    <button key={q} onClick={() => setMealName(q)} style={{ padding: '6px 12px', borderRadius: 99, background: mealName === q ? `${mt.color}20` : 'rgba(255,255,255,0.04)', border: `1px solid ${mealName === q ? mt.color + '50' : 'rgba(255,255,255,0.08)'}`, fontSize: 12, color: mealName === q ? mt.color : '#666', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s ease' }}>
+                    <button key={q} onClick={() => setMealName(q)} style={{ padding: '6px 12px', borderRadius: 99, background: mealName === q ? `${mt.color}20` : 'rgba(255,255,255,0.04)', border: `1px solid ${mealName === q ? mt.color + '50' : 'rgba(255,255,255,0.08)'}`, fontSize: 12, color: mealName === q ? mt.color : 'rgba(255,255,255,0.48)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s ease' }}>
                       {q}
                     </button>
                   ))}
@@ -691,7 +691,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
                   </div>
                 )}
 
-                <button onClick={handleAdd} disabled={!mealName.trim() || saving} style={{ width: '100%', padding: '15px 0', borderRadius: 16, background: mealName.trim() ? `linear-gradient(135deg,${mt.color},${mt.color}bb)` : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: mealName.trim() ? '#0A0A0A' : '#333', cursor: mealName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif', marginBottom: 10 }}>
+                <button onClick={handleAdd} disabled={!mealName.trim() || saving} style={{ width: '100%', padding: '15px 0', borderRadius: 16, background: mealName.trim() ? `linear-gradient(135deg,${mt.color},${mt.color}bb)` : 'rgba(255,255,255,0.05)', border: 'none', fontSize: 14, fontWeight: 800, color: mealName.trim() ? '#0A0A0A' : 'rgba(255,255,255,0.28)', cursor: mealName.trim() ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif', marginBottom: 10 }}>
                   {saving ? 'SAVING…' : `ADD ${mt.label.toUpperCase()}`}
                 </button>
 
@@ -781,7 +781,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                     <div>
                       <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>{scanResult.name}</p>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: `${confidenceColor[scanResult.confidence] ?? '#888'}20`, color: confidenceColor[scanResult.confidence] ?? '#888', border: `1px solid ${confidenceColor[scanResult.confidence] ?? '#888'}40` }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: `${confidenceColor[scanResult.confidence] ?? 'rgba(255,255,255,0.55)'}20`, color: confidenceColor[scanResult.confidence] ?? 'rgba(255,255,255,0.55)', border: `1px solid ${confidenceColor[scanResult.confidence] ?? 'rgba(255,255,255,0.55)'}40` }}>
                         {scanResult.confidence} confidence
                       </span>
                     </div>
@@ -833,7 +833,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
             <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)', marginBottom: 8 }}>DAILY CALORIES</p>
             <input type="number" value={targetInput} onChange={e => setTargetInput(e.target.value)} placeholder="e.g. 2000" style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(249,115,22,0.25)', color: '#EFEFEF', fontSize: 16, fontWeight: 700, boxSizing: 'border-box', fontFamily: 'Satoshi,sans-serif', outline: 'none', marginBottom: 16 }} />
 
-            <button onClick={() => setShowMacroTargets(s => !s)} style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 700, color: showMacroTargets ? '#EFEFEF' : '#444', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 16 }}>
+            <button onClick={() => setShowMacroTargets(s => !s)} style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 700, color: showMacroTargets ? '#EFEFEF' : 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 16 }}>
               {showMacroTargets ? '▾' : '▸'} Macro targets (optional)
             </button>
 
@@ -985,11 +985,11 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
                     const pct    = Math.round(day.cal / maxCal * 100)
                     return (
                       <div key={day.date} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: day.date === today ? '#f97316' : '#555', width: 28, flexShrink: 0 }}>{dayShort(day.date)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: day.date === today ? '#f97316' : 'rgba(255,255,255,0.42)', width: 28, flexShrink: 0 }}>{dayShort(day.date)}</span>
                         <div style={{ flex: 1, height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
                           <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: day.count === 0 ? 'transparent' : day.date === today ? '#f97316' : 'rgba(249,115,22,0.4)', transition: 'width 0.4s ease' }} />
                         </div>
-                        <span style={{ fontSize: 11, color: day.count > 0 ? '#EFEFEF' : '#2a2a2a', width: 60, textAlign: 'right', flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: day.count > 0 ? '#EFEFEF' : 'rgba(255,255,255,0.18)', width: 60, textAlign: 'right', flexShrink: 0 }}>
                           {day.count > 0 ? `${day.cal.toLocaleString()} cal` : '—'}
                         </span>
                       </div>
@@ -1065,7 +1065,7 @@ export function MealsClient({ meals: initMeals, weekDays, today, weekStart, pref
                               <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${checked ? '#4ade80' : 'rgba(255,255,255,0.15)'}`, background: checked ? '#4ade80' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s ease' }}>
                                 {checked && <span style={{ fontSize: 10, color: '#0A0A0A', fontWeight: 900 }}>✓</span>}
                               </div>
-                              <span style={{ fontSize: 13, color: checked ? '#444' : '#EFEFEF', textDecoration: checked ? 'line-through' : 'none', fontFamily: 'Satoshi,sans-serif', fontWeight: 500, transition: 'all 0.15s ease' }}>{item}</span>
+                              <span style={{ fontSize: 13, color: checked ? 'rgba(255,255,255,0.35)' : '#EFEFEF', textDecoration: checked ? 'line-through' : 'none', fontFamily: 'Satoshi,sans-serif', fontWeight: 500, transition: 'all 0.15s ease' }}>{item}</span>
                             </button>
                           )
                         })}
