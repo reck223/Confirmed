@@ -208,7 +208,7 @@ function HeroSection({ firstName, greeting, streak, todayLabel, goals, focusPool
                 />
                 {/* Center */}
                 <text x="62" y="57" textAnchor="middle" fill="#EFEFEF" fontSize="22" fontWeight="900" fontFamily="Satoshi,sans-serif">{avgProgress}%</text>
-                <text x="62" y="73" textAnchor="middle" fill="#444" fontSize="8" fontWeight="800" letterSpacing="1.8" fontFamily="Satoshi,sans-serif">PROGRESS</text>
+                <text x="62" y="73" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="8" fontWeight="800" letterSpacing="1.8" fontFamily="Satoshi,sans-serif">PROGRESS</text>
               </svg>
             </div>
 
@@ -570,7 +570,7 @@ function GoalGroupCard({ group, doneIds, onToggle, cardDelay, mode = 'work', sel
 }
 
 function TodaysFocus({ pool }: { pool: FocusItem[] }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(pool.length > 0)
   const [catFilter, setCatFilter] = useState<string | null>(null)
   const [mode, setMode] = useState<'pick' | 'work'>('pick')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -646,7 +646,7 @@ function TodaysFocus({ pool }: { pool: FocusItem[] }) {
               : `${groups.length} goal${groups.length !== 1 ? 's' : ''} · pick your focus`}
           </p>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s cubic-bezier(0.34,1.1,0.64,1)' }}>
           <path d="M6 9l6 6 6-6"/>
         </svg>
       </button>
@@ -990,10 +990,10 @@ function CirclePulse({ posts, inCircle, onPost }: { posts: RecentPost[]; inCircl
                         cursor: 'pointer', transition: 'all 0.2s ease', fontFamily: 'Satoshi,sans-serif',
                         background: active ? `${color}15` : 'rgba(255,255,255,0.03)',
                         border: `1px solid ${active ? color + '40' : 'rgba(255,255,255,0.06)'}`,
-                        color: active ? color : '#3A3A3A',
+                        color: active ? color : 'rgba(255,255,255,0.45)',
                       }}>
                         <span style={{ fontSize: 17, lineHeight: 1 }}>{emoji}</span>
-                        {count > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: active ? color : '#555' }}>{count}</span>}
+                        {count > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: active ? color : 'rgba(255,255,255,0.45)' }}>{count}</span>}
                       </button>
                     )
                   })}
@@ -1482,8 +1482,14 @@ export function HomeClient({
       {/* ── QUICK ACTIONS ── */}
       <QuickActions inCircle={inCircle} reflectionDone={reflectionDone} />
 
+      {/* ── ENERGY CHECK-IN ── */}
+      <CheckinWidget todayCheckin={todayCheckin} checkinHistory={checkinHistory} />
+
       {/* ── TODAY'S FOCUS ── */}
       {goals.length > 0 && focusPool.length > 0 && <TodaysFocus pool={focusPool} />}
+
+      {/* ── CIRCLE PULSE ── */}
+      <CirclePulse posts={recentPosts} inCircle={inCircle} onPost={() => setPostOpen(true)} />
 
       {/* ── PLAYBOOK ── */}
       <div style={{ padding: '0 20px', marginBottom: 28 }}>
@@ -1495,20 +1501,20 @@ export function HomeClient({
               <p style={{ fontSize: 14, fontWeight: 700, color: '#EFEFEF', marginBottom: 2 }}>Learn the process</p>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>12 lessons on goal-setting & accountability</p>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><path d="M9 18l6-6-6-6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}><path d="M9 18l6-6-6-6"/></svg>
           </div>
         </Link>
       </div>
 
-      {/* ── ENERGY CHECK-IN ── */}
-      <CheckinWidget todayCheckin={todayCheckin} checkinHistory={checkinHistory} />
-
       {/* ── REFLECTION NUDGE — hidden when urgent banner is already at top ── */}
       {!showReflectionBanner && (
-        <div style={{ padding: '0 20px' }}>
+        <div style={{ padding: '0 20px 8px' }}>
           <ReflectionNudge done={reflectionDone} streak={streak} assessmentDay={assessmentDay} />
         </div>
       )}
+
+      {/* ── POST MODAL ── */}
+      {postOpen && <CreatePostModal onClose={() => setPostOpen(false)} userId={userId} />}
 
     </div>
   )
