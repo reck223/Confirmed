@@ -8,13 +8,99 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data }, { data: goalRows }, { count: followersCount }, { count: followingCount }, { data: assessRows }, { data: achievementRows }, { data: postRows }, { data: circleMemberRows }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('goals')
+      .select('id, title, category, progress, deadline, status, visibility')
+      .eq('user_id', user.id)
+      .neq('goal_type', 'letter')
+      .order('created_at', { ascending: false }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('follows') as any).select('id', { count: 'exact', head: true }).eq('following_id', user.id),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('follows') as any).select('id', { count: 'exact', head: true }).eq('follower_id', user.id),
+    supabase.from('assessments').select('week_start, rating').eq('user_id', user.id).order('week_start', { ascending: false }).limit(26),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('achievements') as any).select('type, earned_at').eq('user_id', user.id).order('earned_at', { ascending: true }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('posts') as any).select('id, content, type, created_at, media_url, media_type, visibility').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30),
+    supabase.from('circle_members').select('circle_id').eq('user_id', user.id),
+  ])
 
   if (!data) redirect('/signin')
 
-  return <ProfileClient profile={data as Profile} />
+  const goals = (goalRows ?? []) as { id: string; title: string; category: string | null; progress: number; deadline: string | null; status: string; visibility: string }[]
+  const assessmentHistory = (assessRows ?? []) as { week_start: string; rating: number | null }[]
+  const achievements = (achievementRows ?? []) as { type: string; earned_at: string }[]
+  const rawPosts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; media_url: string | null; media_type: string | null; visibility: string }[]
+  // Count OTHER members across all the user's circles (matches what the modal shows)
+  const myCircleIds = (circleMemberRows ?? []).map((r: { circle_id: string }) => r.circle_id)
+  let circleCount = 0
+  if (myCircleIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count } = await (supabase.from('circle_members') as any)
+      .select('user_id', { count: 'exact', head: true })
+      .in('circle_id', myCircleIds)
+      .neq('user_id', user.id)
+    circleCount = count ?? 0
+  }
+
+  // Fetch reactions + comments for posts
+  const postIds = rawPosts.map(p => p.id)
+  const [{ data: reactRows }, { data: commentRows }] = await Promise.all([
+    postIds.length
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('post_reactions') as any).select('post_id, type, user_id').in('post_id', postIds)
+      : Promise.resolve({ data: [] }),
+    postIds.length
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('post_comments') as any).select('id, post_id, user_id, content, created_at').in('post_id', postIds).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+  ])
+
+  type RawReact = { post_id: string; type: string; user_id: string }
+  type RawComment = { id: string; post_id: string; user_id: string; content: string; created_at: string }
+
+  // Build comment author names
+  const commentAuthorIds = [...new Set(((commentRows ?? []) as RawComment[]).map(c => c.user_id))]
+  const { data: commentProfiles } = commentAuthorIds.length
+    ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', commentAuthorIds)
+    : { data: [] }
+  const commentProfileMap = Object.fromEntries(
+    ((commentProfiles ?? []) as { id: string; full_name: string | null; avatar_url: string | null }[]).map(p => [p.id, p])
+  )
+
+  const posts = rawPosts.map(p => {
+    const reacts = ((reactRows ?? []) as RawReact[]).filter(r => r.post_id === p.id)
+    const comments = ((commentRows ?? []) as RawComment[])
+      .filter(c => c.post_id === p.id)
+      .map(c => ({ id: c.id, user_id: c.user_id, author_name: commentProfileMap[c.user_id]?.full_name ?? null, author_avatar: commentProfileMap[c.user_id]?.avatar_url ?? null, content: c.content, created_at: c.created_at }))
+    return {
+      ...p,
+      reactions: {
+        fire: reacts.filter(r => r.type === 'fire').length,
+        strong: reacts.filter(r => r.type === 'strong').length,
+        relate: reacts.filter(r => r.type === 'relate').length,
+      },
+      my_reactions: {
+        fire: reacts.some(r => r.type === 'fire' && r.user_id === user.id),
+        strong: reacts.some(r => r.type === 'strong' && r.user_id === user.id),
+        relate: reacts.some(r => r.type === 'relate' && r.user_id === user.id),
+      },
+      comments,
+    }
+  })
+
+  return (
+    <ProfileClient
+      profile={data as Profile}
+      goals={goals}
+      followersCount={followersCount ?? 0}
+      followingCount={followingCount ?? 0}
+      circleCount={circleCount}
+      assessmentHistory={assessmentHistory}
+      achievements={achievements}
+      posts={posts}
+    />
+  )
 }

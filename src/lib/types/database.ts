@@ -10,15 +10,20 @@ export type Database = {
           username: string | null
           full_name: string | null
           avatar_url: string | null
+          cover_url: string | null
           bio: string | null
           tagline: string | null
           streak: number
           assessments_submitted: number
           goals_complete: number
+          xp: number
+          level: number
           cover_theme: string
           assessment_day: string
           assessment_time: string
           focus_areas: string[]
+          pinned_goal_id: string | null
+          date_of_birth: string | null
           created_at: string
           updated_at: string
         }
@@ -27,6 +32,7 @@ export type Database = {
           username?: string | null
           full_name?: string | null
           avatar_url?: string | null
+          cover_url?: string | null
           bio?: string | null
           tagline?: string | null
           streak?: number
@@ -36,11 +42,14 @@ export type Database = {
           assessment_day?: string
           assessment_time?: string
           focus_areas?: string[]
+          pinned_goal_id?: string | null
+          date_of_birth?: string | null
         }
         Update: {
           username?: string | null
           full_name?: string | null
           avatar_url?: string | null
+          cover_url?: string | null
           bio?: string | null
           tagline?: string | null
           streak?: number
@@ -50,6 +59,8 @@ export type Database = {
           assessment_day?: string
           assessment_time?: string
           focus_areas?: string[]
+          pinned_goal_id?: string | null
+          date_of_birth?: string | null
         }
       }
       circles: {
@@ -104,7 +115,7 @@ export type Database = {
           deadline: string | null
           next_action: string | null
           why_it_matters: string | null
-          goal_type: 'standard' | 'reading' | 'letter'
+          goal_type: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date: string | null
           created_at: string
           updated_at: string
@@ -120,7 +131,7 @@ export type Database = {
           deadline?: string | null
           next_action?: string | null
           why_it_matters?: string | null
-          goal_type?: 'standard' | 'reading' | 'letter'
+          goal_type?: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date?: string | null
         }
         Update: {
@@ -132,7 +143,7 @@ export type Database = {
           deadline?: string | null
           next_action?: string | null
           why_it_matters?: string | null
-          goal_type?: 'standard' | 'reading' | 'letter'
+          goal_type?: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date?: string | null
         }
       }
@@ -246,6 +257,27 @@ export type Database = {
           content?: string
         }
       }
+      post_comments: {
+        Relationships: []
+        Row: {
+          id: string; post_id: string; user_id: string
+          content: string; created_at: string
+        }
+        Insert: { id?: string; post_id: string; user_id: string; content: string }
+        Update: { content?: string }
+      }
+      achievements: {
+        Relationships: []
+        Row: { id: string; user_id: string; type: string; earned_at: string }
+        Insert: { id?: string; user_id: string; type: string }
+        Update: Record<string, never>
+      }
+      playbook_progress: {
+        Relationships: []
+        Row: { id: string; user_id: string; lesson_id: string; completed_at: string }
+        Insert: { id?: string; user_id: string; lesson_id: string }
+        Update: Record<string, never>
+      }
       post_reactions: {
         Relationships: []
         Row: {
@@ -329,5 +361,14 @@ export type GoalBook = {
   status: 'reading' | 'read' | 'queue'
   rating: number | null
   date_finished: string | null
+  created_at: string
+}
+
+export type GoalEntry = {
+  id: string
+  goal_id: string
+  user_id: string
+  type: 'habit_log' | 'contribution' | 'destination'
+  content: Record<string, unknown>
   created_at: string
 }

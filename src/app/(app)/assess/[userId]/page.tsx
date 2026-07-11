@@ -49,7 +49,7 @@ export default async function ViewAssessPage({ params }: { params: Promise<{ use
         <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 6 }}>
           {(ownerProfile as { full_name: string | null }).full_name ?? 'This person'} hasn&apos;t reflected yet this week
         </p>
-        <p style={{ fontSize: 13, color: '#555', fontWeight: 300 }}>Check back after their reflection day.</p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Check back after their reflection day.</p>
       </div>
     )
   }
@@ -79,7 +79,7 @@ export default async function ViewAssessPage({ params }: { params: Promise<{ use
       {/* Back */}
       <a href="/circle" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 24, textDecoration: 'none' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-        <span style={{ fontSize: 12, color: '#555' }}>Back to Circle</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)' }}>Back to Circle</span>
       </a>
 
       {/* Hero */}

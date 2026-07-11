@@ -5,6 +5,7 @@ import { AssessTabs } from './AssessTabs'
 import { FieldComments } from './AssessComments'
 import { DeleteReflectionButton } from './DeleteReflectionButton'
 import { ArchiveChapterCard } from './ArchiveChapterCard'
+import { generateCoachInsight } from './aiCoach'
 import type { Assessment } from '@/lib/types/database'
 
 type AssessmentComment = {
@@ -96,6 +97,11 @@ export default async function AssessPage() {
   const lateDay = (setDayNum + 1) % 7
   const isAllowed = todayNum === setDayNum || todayNum === lateDay
 
+  // Generate AI coaching insight if user has submitted this week and has history
+  const coachInsight = existing && assessments.length >= 2
+    ? await generateCoachInsight(assessments)
+    : null
+
   // ── This Week content ──
   let thisWeekContent: React.ReactNode
 
@@ -155,7 +161,7 @@ export default async function AssessPage() {
         {/* Rating bar sparkline (all weeks) */}
         {assessments.length > 1 && (
           <div style={{ marginBottom: 14, padding: '14px 18px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.01)' }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#444', marginBottom: 10 }}>YOUR JOURNEY — {assessments.length} WEEKS</p>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>YOUR JOURNEY — {assessments.length} WEEKS</p>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32 }}>
               {[...assessments].reverse().map((a, i) => {
                 const r = a.rating ?? 5
@@ -169,6 +175,25 @@ export default async function AssessPage() {
           </div>
         )}
 
+        {/* ── AI COACH CARD ── */}
+        {coachInsight && (
+          <div style={{ marginBottom: 14, padding: '22px 22px', borderRadius: 22, background: 'linear-gradient(135deg,rgba(139,92,246,0.09) 0%,rgba(212,175,55,0.05) 100%)', border: '1px solid rgba(139,92,246,0.22)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(139,92,246,0.12)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>✦</div>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.16em', color: '#a78bfa' }}>YOUR COACH</span>
+              </div>
+              <p style={{ fontSize: 15, color: '#D0D0D0', fontWeight: 300, lineHeight: 1.9, fontFamily: 'Georgia,serif', letterSpacing: '0.01em' }}>
+                {coachInsight}
+              </p>
+              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', marginTop: 14, fontWeight: 400 }}>
+                Powered by Claude · Based on your last {Math.min(assessments.length, 6)} reflections
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Journal entries with comments */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {existing.wins       && <JournalField label="WINS"        emoji="🏆" content={existing.wins}       accent="#22c55e" assessmentId={existing.id} field="wins"        comments={comments} currentUserId={user.id} ownerUserId={user.id} />}
@@ -178,7 +203,7 @@ export default async function AssessPage() {
           {existing.gratitude  && <JournalField label="YOUR CIRCLE" emoji="🤝" content={existing.gratitude}  accent="#38bdf8" assessmentId={existing.id} field="gratitude"   comments={comments} currentUserId={user.id} ownerUserId={user.id} />}
         </div>
 
-        <p style={{ marginTop: 20, fontSize: 11, color: '#333', textAlign: 'center', fontStyle: 'italic' }}>
+        <p style={{ marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.28)', textAlign: 'center', fontStyle: 'italic' }}>
           Come back {DAY_NAMES[setDayNum]} for Chapter {chapterNum + 1}
         </p>
         <DeleteReflectionButton assessmentId={existing.id} />
@@ -195,8 +220,8 @@ export default async function AssessPage() {
             <h2 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 8 }}>
               Opens {DAY_NAMES[setDayNum]}
             </h2>
-            <p style={{ fontSize: 13, color: '#555', fontWeight: 300, lineHeight: 1.7, marginBottom: 28 }}>
-              Your reflection window opens on <strong style={{ color: '#888' }}>{DAY_NAMES[setDayNum]}</strong>.<br />
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.7, marginBottom: 28 }}>
+              Your reflection window opens on <strong style={{ color: 'rgba(255,255,255,0.58)' }}>{DAY_NAMES[setDayNum]}</strong>.<br />
               Late submissions accepted through {DAY_NAMES[lateDay]}.
             </p>
             <div style={{ display: 'inline-block', padding: '14px 24px', borderRadius: 16, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.18)' }}>
@@ -218,7 +243,7 @@ export default async function AssessPage() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: '#555', marginBottom: 8 }}>YOUR MEMOIR</p>
+        <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.42)', marginBottom: 8 }}>YOUR MEMOIR</p>
         <h1 style={{ fontSize: 32, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
           {history.length} Chapter{history.length !== 1 ? 's' : ''}<br />Written.
         </h1>
@@ -228,7 +253,7 @@ export default async function AssessPage() {
         <div style={{ textAlign: 'center', padding: '60px 20px', borderRadius: 24, border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
           <p style={{ fontSize: 40, marginBottom: 14 }}>📖</p>
           <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 6 }}>No chapters yet</p>
-          <p style={{ fontSize: 13, color: '#555', fontWeight: 300, lineHeight: 1.65 }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.65 }}>
             Complete a weekly reflection and it will live here forever.
           </p>
         </div>

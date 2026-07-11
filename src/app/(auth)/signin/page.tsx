@@ -79,7 +79,7 @@ function SignInInner() {
             priority
             style={{ width: 'min(80vw, 380px)', height: 'auto', marginBottom: 16, filter: 'drop-shadow(0 0 18px rgba(212,175,55,0.5))' }}
           />
-          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: '#666', fontStyle: 'italic' }}>Welcome back.</p>
+          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic' }}>Welcome back.</p>
         </div>
 
         {/* ── FORGOT PASSWORD PANEL ── */}
@@ -89,7 +89,7 @@ function SignInInner() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 40, marginBottom: 16 }}>📬</div>
                 <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 8 }}>Check your inbox</p>
-                <p style={{ fontSize: 13, color: '#666', lineHeight: 1.6, marginBottom: 24 }}>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, marginBottom: 24 }}>
                   We sent a reset link to <strong style={{ color: '#D4AF37' }}>{resetEmail}</strong>. Click it to set a new password.
                 </p>
                 <button onClick={() => { setShowReset(false); setResetSent(false); setResetEmail('') }} className="btn-ghost" style={{ width: '100%' }}>
@@ -99,7 +99,7 @@ function SignInInner() {
             ) : (
               <>
                 <p style={{ fontSize: 15, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>Reset your password</p>
-                <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>Enter your email and we&apos;ll send you a reset link.</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', marginBottom: 20 }}>Enter your email and we&apos;ll send you a reset link.</p>
                 <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <input
                     type="email"
@@ -119,7 +119,7 @@ function SignInInner() {
                     {resetLoading ? 'SENDING…' : 'SEND RESET LINK'}
                   </button>
                 </form>
-                <button type="button" onClick={() => setShowReset(false)} style={{ display: 'block', width: '100%', marginTop: 14, fontSize: 13, color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: '10px 0' }}>
+                <button type="button" onClick={() => setShowReset(false)} style={{ display: 'block', width: '100%', marginTop: 14, fontSize: 13, color: 'rgba(255,255,255,0.42)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: '10px 0' }}>
                   ← Back to sign in
                 </button>
               </>
@@ -176,7 +176,7 @@ function SignInInner() {
             <button
               type="button"
               onClick={() => { setShowReset(true); setResetEmail(email) }}
-              style={{ fontSize: 13, color: '#555', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: '10px 0' }}
+              style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: '10px 0' }}
             >
               Forgot password?
             </button>
@@ -187,7 +187,7 @@ function SignInInner() {
           <Link href="/signup" className="btn-ghost" style={{ display: 'block', textAlign: 'center', padding: '15px', fontSize: 14 }}>
             Create an account
           </Link>
-          <p style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: '#444', letterSpacing: '0.03em' }}>
+          <p style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.03em' }}>
             A private platform. By joining, you commit to showing up.
           </p>
         </>

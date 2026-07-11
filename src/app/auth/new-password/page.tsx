@@ -36,7 +36,7 @@ export default function NewPasswordPage() {
             priority
             style={{ width: 'min(80vw, 380px)', height: 'auto', marginBottom: 16, filter: 'drop-shadow(0 0 18px rgba(212,175,55,0.5))' }}
           />
-          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: '#666' }}>Set your new password.</p>
+          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.50)' }}>Set your new password.</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

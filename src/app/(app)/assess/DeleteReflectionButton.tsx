@@ -18,7 +18,7 @@ export function DeleteReflectionButton({ assessmentId }: { assessmentId: string 
   if (confirming) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', padding: '12px 0' }}>
-        <span style={{ fontSize: 12, color: '#666' }}>Delete this reflection?</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)' }}>Delete this reflection?</span>
         <button
           onClick={handleDelete}
           disabled={isPending}
@@ -28,7 +28,7 @@ export function DeleteReflectionButton({ assessmentId }: { assessmentId: string 
         </button>
         <button
           onClick={() => setConfirming(false)}
-          style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+          style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
         >
           Cancel
         </button>
@@ -40,7 +40,7 @@ export function DeleteReflectionButton({ assessmentId }: { assessmentId: string 
     <div style={{ textAlign: 'center', paddingTop: 8 }}>
       <button
         onClick={() => setConfirming(true)}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#333', fontFamily: 'Satoshi,sans-serif', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, transition: 'color 0.15s' }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.28)', fontFamily: 'Satoshi,sans-serif', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, transition: 'color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
         onMouseLeave={e => (e.currentTarget.style.color = '#333')}
       >

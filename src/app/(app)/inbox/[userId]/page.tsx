@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { MessageThread } from './MessageThread'
-import { markThreadRead } from '../actions'
 import Link from 'next/link'
 
 const AVATAR_GRADS = [
@@ -42,19 +41,25 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
 
   const profile = otherProfile as { id: string; full_name: string | null; username: string | null; streak: number }
 
-  // Fetch all messages in this thread
+  // Fetch all messages where current user is sender or recipient, then filter to this thread
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: msgRows } = await (supabase.from('messages') as any)
     .select('id, sender_id, recipient_id, content, created_at, read_at')
-    .or(
-      `and(sender_id.eq.${user.id},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${user.id})`
-    )
+    .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
     .order('created_at', { ascending: true })
 
-  const messages = (msgRows ?? []) as RawMessage[]
+  const messages = ((msgRows ?? []) as RawMessage[]).filter(
+    m => (m.sender_id === user.id && m.recipient_id === otherId) ||
+         (m.sender_id === otherId && m.recipient_id === user.id)
+  )
 
-  // Mark unread messages as read
-  await markThreadRead(otherId)
+  // Mark unread messages in this thread as read (inline — no revalidatePath during render)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('messages') as any)
+    .update({ read_at: new Date().toISOString() })
+    .eq('sender_id', otherId)
+    .eq('recipient_id', user.id)
+    .is('read_at', null)
 
   const recipientName = profile.full_name ?? profile.username ?? 'Member'
 
@@ -76,7 +81,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF', lineHeight: 1 }}>{recipientName}</p>
-            {profile.username && <p style={{ fontSize: 11, color: '#555', marginTop: 3 }}>@{profile.username}</p>}
+            {profile.username && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>@{profile.username}</p>}
           </div>
           {profile.streak > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 10, background: 'rgba(255,149,0,0.08)', border: '1px solid rgba(255,149,0,0.2)', flexShrink: 0 }}>

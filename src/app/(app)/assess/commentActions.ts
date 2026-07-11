@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createNotification } from '@/lib/notifications'
 
 export async function addComment(assessmentId: string, field: string, content: string, ownerUserId: string) {
   const supabase = await createClient()
@@ -16,6 +17,13 @@ export async function addComment(assessmentId: string, field: string, content: s
     content: content.trim(),
   })
   if (error) return { error: error.message }
+
+  // Notify assessment owner (createNotification skips if commenting on own)
+  const { data: commenter } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+  await createNotification(ownerUserId, 'comment', {
+    commenter_name: (commenter as { full_name: string | null } | null)?.full_name ?? 'Someone',
+    preview: content.trim().slice(0, 60),
+  })
 
   revalidatePath('/assess')
   revalidatePath(`/assess/${ownerUserId}`)

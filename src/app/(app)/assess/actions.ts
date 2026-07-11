@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createNotification } from '@/lib/notifications'
 
 const DAY_MAP: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 
@@ -36,6 +37,33 @@ export async function submitAssessment(weekStart: string, formData: FormData) {
   }, { onConflict: 'user_id,week_start' })
 
   if (error) return { error: error.message }
+
+  // Notify circle members about the new reflection
+  const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+  const authorName = (profile as { full_name: string | null } | null)?.full_name ?? 'Someone'
+  const weekTitle = (formData.get('week_title') as string)?.trim() || null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: memberRows } = await (supabase.from('circle_members') as any)
+    .select('circle_id')
+    .eq('user_id', user.id)
+  const circleIds = ((memberRows ?? []) as { circle_id: string }[]).map(r => r.circle_id)
+
+  if (circleIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: allMembers } = await (supabase.from('circle_members') as any)
+      .select('user_id')
+      .in('circle_id', circleIds)
+      .neq('user_id', user.id)
+    const uniqueMembers = [...new Set(((allMembers ?? []) as { user_id: string }[]).map(m => m.user_id))]
+    await Promise.all(uniqueMembers.map(memberId =>
+      createNotification(memberId, 'assessment', {
+        author_name: authorName,
+        ...(weekTitle ? { week_title: weekTitle } : {}),
+      })
+    ))
+  }
+
   revalidatePath('/assess')
   revalidatePath('/home')
   return { success: true }

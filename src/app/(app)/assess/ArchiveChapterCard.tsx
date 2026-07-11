@@ -94,21 +94,21 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
             <h3 style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2, marginTop: 4, marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {a.week_title ? `"${a.week_title}"` : dateLabel}
             </h3>
-            {a.week_title && <p style={{ fontSize: 11, color: '#444', marginTop: 3 }}>{dateLabel}</p>}
+            {a.week_title && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>{dateLabel}</p>}
           </div>
           <div style={{ flexShrink: 0, textAlign: 'right' }}>
             <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, color: rColor, textShadow: `0 0 20px ${rColor}50` }}>{rating}</div>
-            <div style={{ fontSize: 9, color: '#444', fontWeight: 700, letterSpacing: '0.08em' }}>/10</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.08em' }}>/10</div>
           </div>
         </div>
         {preview && mode === 'view' && !open && (
-          <p style={{ fontSize: 12, color: '#555', fontWeight: 300, lineHeight: 1.6, fontStyle: 'italic', marginTop: 10 }}>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.6, fontStyle: 'italic', marginTop: 10 }}>
             &ldquo;{preview}{(a.wins?.length ?? 0) > 80 ? '…' : ''}&rdquo;
           </p>
         )}
         {mode === 'view' && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 10 }}>
-            <span style={{ fontSize: 10, color: '#333' }}>{open ? '▲ Close' : '▼ Read'}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>{open ? '▲ Close' : '▼ Read'}</span>
           </div>
         )}
       </button>
@@ -124,17 +124,17 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
 
               {/* Week title */}
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#555' }}>WEEK TITLE</span>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)' }}>WEEK TITLE</span>
                 <input value={form.week_title} onChange={set('week_title')} placeholder="Name this chapter…" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '10px 12px', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', outline: 'none' }} />
               </label>
 
               {/* Rating */}
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#555' }}>RATING
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)' }}>RATING
                   <span style={{ color: editColor, marginLeft: 8 }}>{editRating}/10</span>
                 </span>
                 <input type="range" min={1} max={10} value={form.rating} onChange={set('rating')} style={{ accentColor: editColor, width: '100%' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#333' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.28)' }}>
                   <span>1</span><span>5</span><span>10</span>
                 </div>
               </label>
@@ -168,7 +168,7 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
                 </button>
                 <button
                   onClick={() => setMode('view')}
-                  style={{ padding: '12px 18px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#666', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                  style={{ padding: '12px 18px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                 >
                   Cancel
                 </button>
@@ -177,7 +177,7 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
           ) : mode === 'confirmDelete' ? (
             /* ── DELETE CONFIRM ── */
             <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-              <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Permanently delete Chapter {chapterNum}?</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.58)', marginBottom: 16 }}>Permanently delete Chapter {chapterNum}?</p>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                 <button
                   onClick={handleDelete}
@@ -188,7 +188,7 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
                 </button>
                 <button
                   onClick={() => setMode('view')}
-                  style={{ padding: '10px 22px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#666', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                  style={{ padding: '10px 22px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                 >
                   Cancel
                 </button>
@@ -207,14 +207,14 @@ export function ArchiveChapterCard({ assessment: a, chapterNum }: Props) {
               <div style={{ display: 'flex', gap: 8, paddingTop: 6 }}>
                 <button
                   onClick={() => setMode('edit')}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#888', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.58)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Edit
                 </button>
                 <button
                   onClick={() => setMode('confirmDelete')}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                   onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)' }}
                   onMouseLeave={e => { e.currentTarget.style.color = '#666'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.15)' }}
                 >

@@ -83,7 +83,7 @@ export function FieldComments({
           {count > 0 ? `${count} comment${count !== 1 ? 's' : ''}` : 'Add a comment'}
         </span>
         {count > 0 && (
-          <span style={{ fontSize: 9, color: '#444', marginLeft: 'auto' }}>{open ? '▲' : '▼'}</span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginLeft: 'auto' }}>{open ? '▲' : '▼'}</span>
         )}
       </button>
 
@@ -101,9 +101,9 @@ export function FieldComments({
                   <div style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '9px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#EFEFEF' }}>{c.author_name ?? 'Member'}</span>
-                      <span style={{ fontSize: 10, color: '#444' }}>{timeAgo(c.created_at)}</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{timeAgo(c.created_at)}</span>
                       {c.user_id === currentUserId && (
-                        <button onClick={() => handleDelete(c.id)} style={{ marginLeft: 'auto', fontSize: 11, color: '#333', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: 0 }}>
+                        <button onClick={() => handleDelete(c.id)} style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.28)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: 0 }}>
                           ×
                         </button>
                       )}

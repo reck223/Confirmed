@@ -7,6 +7,61 @@ type Message = {
   id: string; sender_id: string; content: string; created_at: string; read_at: string | null
 }
 
+type SharedPost = {
+  id: string; type: string; content: string; author: string
+  authorAvatar: string | null; mediaUrl: string | null; mediaType: string | null
+}
+
+const TYPE_META: Record<string, { emoji: string; label: string; color: string }> = {
+  win:       { emoji: '🏆', label: 'Win',       color: '#4ade80' },
+  lesson:    { emoji: '💡', label: 'Lesson',    color: '#D4AF37' },
+  progress:  { emoji: '📈', label: 'Progress',  color: '#a78bfa' },
+  milestone: { emoji: '🎯', label: 'Milestone', color: '#7dd3fc' },
+  question:  { emoji: '❓', label: 'Support',   color: '#f472b6' },
+}
+
+function parsePost(content: string): SharedPost | null {
+  if (!content.startsWith('[[POST]]')) return null
+  try { return JSON.parse(content.slice(8)) } catch { return null }
+}
+
+function SharedPostCard({ post, isMine }: { post: SharedPost; isMine: boolean }) {
+  const meta = TYPE_META[post.type] ?? { emoji: '📌', label: 'Post', color: '#D4AF37' }
+  const GRADS = ['linear-gradient(135deg,#22c55e,#0ea5e9)','linear-gradient(135deg,#f472b6,#fb923c)','linear-gradient(135deg,#a78bfa,#38bdf8)','linear-gradient(135deg,#D4AF37,#f97316)']
+  const grad = GRADS[(post.id?.charCodeAt(0) ?? 0) % GRADS.length]
+  const av = post.author.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  return (
+    <div style={{ width: 240, borderRadius: 16, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+      {/* Post header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px 8px' }}>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#D4AF37,#a78bfa)', padding: 2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {post.authorAvatar
+            ? <img src={post.authorAvatar} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            : <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#FFF' }}>{av}</div>
+          }
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#EFEFEF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.author}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: `${meta.color}20`, color: meta.color, flexShrink: 0 }}>{meta.emoji} {meta.label}</span>
+      </div>
+      {/* Media */}
+      {post.mediaUrl && post.mediaType === 'image' && (
+        <img src={post.mediaUrl} alt="" style={{ width: '100%', display: 'block', maxHeight: 220, objectFit: 'cover' }} />
+      )}
+      {/* Text content */}
+      {post.content && (
+        <p style={{ fontSize: 13, color: '#C8C8C8', lineHeight: 1.55, padding: '8px 12px 12px', margin: 0, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {post.content}
+        </p>
+      )}
+      {/* Footer */}
+      <div style={{ padding: '0 12px 10px' }}>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Shared from Circle · Confirmed Creations</span>
+      </div>
+    </div>
+  )
+}
+
 const AVATAR_GRADS = [
   'linear-gradient(135deg,#22c55e,#0ea5e9)',
   'linear-gradient(135deg,#f472b6,#fb923c)',
@@ -107,7 +162,7 @@ export function MessageThread({
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 20px', minHeight: 280 }}>
             <div style={{ fontSize: 48, marginBottom: 14 }}>👋</div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>Say something to {firstName}</p>
-            <p style={{ fontSize: 13, color: '#555', fontWeight: 300 }}>This is the start of your conversation.</p>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>This is the start of your conversation.</p>
           </div>
         )}
 
@@ -132,7 +187,7 @@ export function MessageThread({
               {showDateSep && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 12px' }}>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                  <span style={{ fontSize: 10, color: '#444', fontWeight: 700, letterSpacing: '0.08em' }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.08em' }}>
                     {dateSeparatorLabel(msg.created_at)}
                   </span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -157,37 +212,41 @@ export function MessageThread({
                 )}
 
                 {/* Bubble */}
-                <div style={{
-                  maxWidth: '100%',
-                  padding: '9px 13px 12px',
-                  borderRadius: br,
-                  wordBreak: 'break-word',
-                  opacity: isTemp ? 0.6 : 1,
-                  transition: 'opacity 0.2s',
-                  background: isMine
-                    ? 'linear-gradient(135deg,#D4AF37,#9A7010)'
-                    : 'rgba(255,255,255,0.06)',
-                  color: isMine ? '#000' : '#EFEFEF',
-                  border: isMine
-                    ? 'none'
-                    : '1px solid rgba(255,255,255,0.07)',
-                }}>
-                  <p style={{ fontSize: 14, fontWeight: isMine ? 500 : 300, lineHeight: 1.5, margin: 0 }}>
-                    {msg.content}
-                  </p>
-                  {/* Timestamp inside bubble */}
-                  <p style={{
-                    fontSize: 9.5,
-                    textAlign: 'right',
-                    marginTop: 4,
-                    marginBottom: 0,
-                    opacity: 0.55,
-                    color: isMine ? '#000' : '#EFEFEF',
-                    letterSpacing: '0.01em',
-                  }}>
-                    {bubbleTime(msg.created_at)}{isTemp ? ' · sending…' : ''}
-                  </p>
-                </div>
+                {(() => {
+                  const sharedPost = parsePost(msg.content)
+                  if (sharedPost) {
+                    return (
+                      <div style={{ opacity: isTemp ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                        <SharedPostCard post={sharedPost} isMine={isMine} />
+                        <p style={{ fontSize: 9.5, textAlign: isMine ? 'right' : 'left', marginTop: 4, opacity: 0.45, color: '#EFEFEF', letterSpacing: '0.01em' }}>
+                          {bubbleTime(msg.created_at)}{isTemp ? ' · sending…' : ''}
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div style={{
+                      maxWidth: '100%',
+                      padding: '9px 13px 12px',
+                      borderRadius: br,
+                      wordBreak: 'break-word',
+                      opacity: isTemp ? 0.6 : 1,
+                      transition: 'opacity 0.2s',
+                      background: isMine
+                        ? 'linear-gradient(135deg,#D4AF37,#9A7010)'
+                        : 'rgba(255,255,255,0.06)',
+                      color: isMine ? '#000' : '#EFEFEF',
+                      border: isMine ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    }}>
+                      <p style={{ fontSize: 14, fontWeight: isMine ? 500 : 300, lineHeight: 1.5, margin: 0 }}>
+                        {msg.content}
+                      </p>
+                      <p style={{ fontSize: 9.5, textAlign: 'right', marginTop: 4, marginBottom: 0, opacity: 0.55, color: isMine ? '#000' : '#EFEFEF', letterSpacing: '0.01em' }}>
+                        {bubbleTime(msg.created_at)}{isTemp ? ' · sending…' : ''}
+                      </p>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )

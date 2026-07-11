@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default function SignUpPage() {
+function SignUpInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const joinCode = searchParams.get('joinCode')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,9 +30,11 @@ export default function SignUpPage() {
     })
     if (error) { setError(error.message); setLoading(false); return }
 
+    const dest = joinCode ? `/join/${joinCode}` : '/onboarding'
+
     // Session exists immediately (email confirmation disabled) — go straight in
     if (data.session) {
-      router.push('/home')
+      router.push(dest)
       router.refresh()
       return
     }
@@ -38,7 +42,7 @@ export default function SignUpPage() {
     // No session yet — try signing in directly in case confirmation is off but session wasn't returned
     const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
     if (signInData.session) {
-      router.push('/home')
+      router.push(dest)
       router.refresh()
       return
     }
@@ -64,9 +68,9 @@ export default function SignUpPage() {
         <div style={{ width: '100%', maxWidth: 340, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 24 }}>📬</div>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', marginBottom: 12 }}>Check your email</h1>
-          <p style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>We sent a confirmation link to</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', marginBottom: 6 }}>We sent a confirmation link to</p>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#D4AF37', marginBottom: 24 }}>{email}</p>
-          <p style={{ fontSize: 12, color: '#444' }}>Click the link to activate your account, then come back to sign in.</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Click the link to activate your account, then come back to sign in.</p>
           <Link href="/signin" style={{ display: 'inline-block', marginTop: 24, fontSize: 13, color: '#D4AF37', fontWeight: 700 }}>
             Back to Sign In →
           </Link>
@@ -89,7 +93,7 @@ export default function SignUpPage() {
             priority
             style={{ width: 'min(80vw, 380px)', height: 'auto', marginBottom: 16, filter: 'drop-shadow(0 0 18px rgba(212,175,55,0.5))' }}
           />
-          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: '#666', fontStyle: 'italic' }}>Join a community that holds you to your word.</p>
+          <p style={{ marginTop: 4, fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic' }}>Join a community that holds you to your word.</p>
         </div>
 
         {/* Google Sign-Up */}
@@ -117,7 +121,7 @@ export default function SignUpPage() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: '#444' }}>Your information is never shared.</p>
+        <p style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Your information is never shared.</p>
 
         <hr className="divider" style={{ margin: '24px 0' }} />
 
@@ -125,4 +129,8 @@ export default function SignUpPage() {
       </div>
     </div>
   )
+}
+
+export default function SignUpPage() {
+  return <Suspense fallback={null}><SignUpInner /></Suspense>
 }

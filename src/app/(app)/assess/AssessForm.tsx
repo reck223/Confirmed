@@ -110,11 +110,11 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
               <span className="gold-text" style={{ fontSize: 72, fontWeight: 900, lineHeight: 0.9 }}>{streak}</span>
               <div>
-                <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.2 }}>weeks of</p>
+                <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.2 }}>{streak === 1 ? 'week' : 'weeks'} of</p>
                 <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.2 }}>showing up.</p>
               </div>
             </div>
-            <p style={{ fontSize: 13, color: '#777', fontWeight: 300, marginTop: 10, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: 300, marginTop: 10, lineHeight: 1.6 }}>
               The difference between people who grow and people who repeat the same year is this: one writes it down. The other guesses.
             </p>
           </div>
@@ -122,7 +122,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
 
         {/* Question preview */}
         <div className="card" style={{ padding: '16px 18px', marginBottom: 20 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: '#555', marginBottom: 12 }}>6 QUESTIONS · ~12 MIN</p>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>6 QUESTIONS · ~12 MIN</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {QUESTIONS.map(q => (
               <div key={q.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -131,7 +131,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
                 </div>
                 <div>
                   <p style={{ fontSize: 12, fontWeight: 700, color: q.color }}>{q.label}</p>
-                  <p style={{ fontSize: 11, color: '#555', fontWeight: 300 }}>{q.subprompt}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>{q.subprompt}</p>
                 </div>
               </div>
             ))}
@@ -151,13 +151,13 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
       <div>
         <button onClick={() => setPhase('intro')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 28, fontFamily: 'Satoshi,sans-serif' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          <span style={{ fontSize: 13, color: '#666' }}>Back</span>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)' }}>Back</span>
         </button>
 
         <div style={{ marginBottom: 32 }}>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#777', marginBottom: 14 }}>BEFORE WE BEGIN</p>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.55)', marginBottom: 14 }}>BEFORE WE BEGIN</p>
           <h2 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 10 }}>How did this week feel?</h2>
-          <p style={{ fontSize: 14, color: '#666', fontWeight: 300, lineHeight: 1.7 }}>Gut level. Don&apos;t think too hard about it. One to ten.</p>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', fontWeight: 300, lineHeight: 1.7 }}>Gut level. Don&apos;t think too hard about it. One to ten.</p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 12 }}>
@@ -176,13 +176,13 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 36 }}>
-          <span style={{ fontSize: 11, color: '#444' }}>Rough week</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Rough week</span>
           {rating > 0 && (
             <span style={{ fontSize: 13, fontWeight: 700, color: rating >= 8 ? '#22c55e' : rating >= 5 ? '#D4AF37' : '#f59e0b' }}>
               {rating >= 8 ? 'Strong week 🔥' : rating >= 5 ? 'Solid week ✓' : 'Tough but here ⚡'}
             </span>
           )}
-          <span style={{ fontSize: 11, color: '#444' }}>Exceptional</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Exceptional</span>
         </div>
 
         <button className="btn-gold" onClick={() => { if (rating > 0) { setStep(1); setPhase('questions') } }}
@@ -213,12 +213,12 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
           <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', marginBottom: 2, color: q.color }}>
             {step} OF 6 · {q.label.toUpperCase()}
           </p>
-          <p style={{ fontSize: 10, color: '#555', fontWeight: 300 }}>Week of {weekStart}</p>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Week of {weekStart}</p>
         </div>
       </div>
 
       <h2 style={{ fontSize: 26, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.3, marginBottom: 8 }}>{q.prompt}</h2>
-      <p style={{ fontSize: 13, color: '#666', fontWeight: 300, lineHeight: 1.65, marginBottom: 24 }}>{q.subprompt}</p>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300, lineHeight: 1.65, marginBottom: 24 }}>{q.subprompt}</p>
 
       {(q as { isTitle?: boolean }).isTitle ? (
         <input
@@ -245,7 +245,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
       {/* Writing spark */}
       <div style={{ marginBottom: 24, padding: '11px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>💬</span>
-        <p style={{ fontSize: 11, color: '#555', fontWeight: 300, lineHeight: 1.55, fontStyle: 'italic' }}>{q.spark}</p>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.55, fontStyle: 'italic' }}>{q.spark}</p>
       </div>
 
       {error && <p style={{ color: '#c0392b', fontSize: 13, marginBottom: 12 }}>{error}</p>}
