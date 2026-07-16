@@ -8,7 +8,7 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  const [{ data }, { data: goalRows }, { count: followersCount }, { count: followingCount }, { data: assessRows }, { data: achievementRows }, { data: postRows }, { data: circleMemberRows }] = await Promise.all([
+  const [{ data }, { data: goalRows }, { count: followersCount }, { count: followingCount }, { data: assessRows }, { data: achievementRows }, { data: postRows }, { data: circleMemberRows }, { data: connectionRows }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('goals')
       .select('id, title, category, progress, deadline, status, visibility')
@@ -25,6 +25,12 @@ export default async function ProfilePage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('posts') as any).select('id, content, type, created_at, media_url, media_type, visibility').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30),
     supabase.from('circle_members').select('circle_id').eq('user_id', user.id),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('connections') as any)
+      .select('id, proposer_id, receiver_id, title, commitment, duration_days, start_date, end_date, status')
+      .or(`proposer_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false }),
   ])
 
   if (!data) redirect('/signin')
@@ -44,6 +50,22 @@ export default async function ProfilePage() {
       .neq('user_id', user.id)
     circleCount = count ?? 0
   }
+
+  // Build connections with partner profiles
+  type RawConnection = { id: string; proposer_id: string; receiver_id: string; title: string; commitment: string; duration_days: number; start_date: string | null; end_date: string | null; status: string }
+  const rawConnections = (connectionRows ?? []) as RawConnection[]
+  const partnerIds = [...new Set(rawConnections.map(c => c.proposer_id === user.id ? c.receiver_id : c.proposer_id))]
+  const { data: partnerProfiles } = partnerIds.length
+    ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', partnerIds)
+    : { data: [] }
+  const partnerMap = Object.fromEntries(
+    ((partnerProfiles ?? []) as { id: string; full_name: string | null; avatar_url: string | null }[]).map(p => [p.id, p])
+  )
+  const connections = rawConnections.map(c => {
+    const partnerId = c.proposer_id === user.id ? c.receiver_id : c.proposer_id
+    const partner = partnerMap[partnerId]
+    return { ...c, partnerName: partner?.full_name ?? null, partnerAvatar: partner?.avatar_url ?? null }
+  })
 
   // Fetch reactions + comments for posts
   const postIds = rawPosts.map(p => p.id)
@@ -101,6 +123,8 @@ export default async function ProfilePage() {
       assessmentHistory={assessmentHistory}
       achievements={achievements}
       posts={posts}
+      connections={connections}
+      currentUserId={user.id}
     />
   )
 }

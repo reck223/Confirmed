@@ -94,11 +94,20 @@ type AssessmentHistory = { week_start: string; rating: number | null }[]
 
 type ModalUser = { id: string; full_name: string | null; avatar_url: string | null; username: string | null }
 
-export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts }: {
+type Connection = {
+  id: string; proposer_id: string; receiver_id: string
+  title: string; commitment: string; duration_days: number
+  start_date: string | null; end_date: string | null; status: string
+  partnerName: string | null; partnerAvatar: string | null
+}
+
+export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts, connections, currentUserId }: {
   profile: Profile; goals: Goal[]; followersCount: number; followingCount: number; circleCount: number
   assessmentHistory: AssessmentHistory
   achievements: { type: string; earned_at: string }[]
   posts: ProfilePost[]
+  connections: Connection[]
+  currentUserId: string
 }) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -542,6 +551,54 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
           )}
         </div>
       </div>
+
+      {/* ── Active Connections ── */}
+      {connections.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 20 }}>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#38bdf8', marginBottom: 10 }}>CONNECTIONS</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {connections.map(c => {
+              const isProposer = c.proposer_id === currentUserId
+              const daysLeft = c.end_date
+                ? Math.max(0, Math.ceil((new Date(c.end_date).getTime() - Date.now()) / 86400000))
+                : c.duration_days
+              const total = c.duration_days
+              const pct = Math.max(0, Math.min(100, Math.round(((total - daysLeft) / total) * 100)))
+              const urgency = daysLeft <= 3 ? '#f87171' : daysLeft <= 7 ? '#fb923c' : '#38bdf8'
+              const initials = (name: string | null) => name ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '?'
+              const grad = (() => {
+                const id = isProposer ? c.receiver_id : c.proposer_id
+                const h = id.split('').reduce((a: number, ch: string) => a + ch.charCodeAt(0), 0)
+                const gs = ['linear-gradient(135deg,#22c55e,#0ea5e9)', 'linear-gradient(135deg,#f472b6,#fb923c)', 'linear-gradient(135deg,#a78bfa,#38bdf8)', 'linear-gradient(135deg,#D4AF37,#f97316)']
+                return gs[h % gs.length]
+              })()
+              return (
+                <div key={c.id} style={{ borderRadius: 18, border: '1px solid rgba(56,189,248,0.18)', background: 'linear-gradient(135deg,rgba(56,189,248,0.06),rgba(56,189,248,0.02))', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                      {c.partnerAvatar
+                        ? <img src={c.partnerAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
+                        : initials(c.partnerName)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>with {c.partnerName ?? 'Builder'}</p>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <p style={{ fontSize: 18, fontWeight: 900, color: urgency, lineHeight: 1 }}>{daysLeft}</p>
+                      <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.06em' }}>DAYS LEFT</p>
+                    </div>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg,#38bdf8,#0ea5e9)`, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                  </div>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 6, fontWeight: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.commitment}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Completed goals showcase ── */}
       {goals.filter(g => g.status === 'complete').length > 0 && (
