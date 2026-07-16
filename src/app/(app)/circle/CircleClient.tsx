@@ -1,5 +1,6 @@
 'use client'
-import { useState, useTransition, useRef, type ChangeEvent } from 'react'
+import { useState, useTransition, useRef, useEffect, type ChangeEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
@@ -9,7 +10,7 @@ import { createHomePost } from '@/app/(app)/home/actions'
 import { sendMessage } from '@/app/(app)/inbox/actions'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { toggleGoalReaction, addGoalComment, removeGoalComment } from '@/app/(app)/goals/actions'
-import type { LeaderboardEntry } from './page'
+import type { LeaderboardEntry, MemberStatus } from './page'
 import { ExploreClient } from '@/app/(app)/explore/ExploreClient'
 import type { Builder, PublicGoal } from '@/app/(app)/explore/ExploreClient'
 
@@ -57,6 +58,14 @@ const CAT_COLOR: Record<string, string> = {
   personal: '#14b8a6', adventure: '#84cc16', material: '#ef4444', spiritual: '#c084fc',
 }
 function catColor(cat: string | null) { return CAT_COLOR[cat ?? ''] ?? '#D4AF37' }
+
+const ENERGY_MAP: Record<number, string> = { 2: '😴 Low', 4: '😐 Okay', 6: '🙂 Good', 8: '😤 Great', 10: '⚡ Peak' }
+function getEnergyLabel(e: number | null): string | null {
+  if (!e) return null
+  const keys = [2, 4, 6, 8, 10]
+  const closest = keys.reduce((a, b) => Math.abs(b - e) < Math.abs(a - e) ? b : a)
+  return ENERGY_MAP[closest] ?? null
+}
 
 // ── Avatar gradients ──
 const AVATAR_GRADS = [
@@ -315,8 +324,8 @@ function CircleUnlockCard({ eligibility, requested }: { eligibility: CircleEligi
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⭕</div>
         <div>
-          <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', marginBottom: 2 }}>Circle Creator</p>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 400 }}>{metCount} of 4 requirements met</p>
+          <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', marginBottom: 2 }}>Earn Your Circle</p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 400 }}>Prove you&apos;re ready to lead — {metCount} of 4 done</p>
         </div>
         <div style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 99, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)' }}>
           <span style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.06em' }}>{metCount}/4</span>
@@ -364,7 +373,7 @@ function CircleUnlockCard({ eligibility, requested }: { eligibility: CircleEligi
           {sending ? 'SENDING...' : 'REQUEST CIRCLE ACCESS →'}
         </button>
       ) : (
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', textAlign: 'center', margin: 0 }}>Complete all 4 requirements to request access.</p>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', textAlign: 'center', margin: 0 }}>Finish the remaining requirements to unlock Circle access.</p>
       )}
     </div>
   )
@@ -381,7 +390,7 @@ type CircleEligibility = {
 type BirthdayProfile = { id: string; full_name: string | null; date_of_birth: string | null }
 
 export function CircleClient({
-  posts, circles, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
+  posts, circles, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
   circleEligibility, circleRequested, circleApproved, birthdayProfiles,
 }: {
   posts: PostWithMeta[]; circles: CircleInfo[]; userId: string
@@ -390,6 +399,7 @@ export function CircleClient({
   followingPosts: PostWithMeta[]
   memberAssessments: MemberAssessment[]
   leaderboard: LeaderboardEntry[]
+  memberStatuses: MemberStatus[]
   userName: string | null; userStreak: number; userAvatar: string | null; userUsername: string | null
   sessions: Session[]; rsvps: SessionRsvp[]; rsvpProfiles: RsvpProfile[]
   exploreBuilders: Builder[]
@@ -401,7 +411,7 @@ export function CircleClient({
   circleApproved: boolean
   birthdayProfiles: BirthdayProfile[]
 }) {
-  const [mainTab, setMainTab] = useState<'circle' | 'sessions' | 'goals' | 'discover' | 'explore'>('circle')
+  const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions'>('board')
   const [feedFilter, setFeedFilter] = useState<'circle' | 'following'>('circle')
   const [showPost, setShowPost] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
@@ -417,12 +427,18 @@ export function CircleClient({
   const [postIsVideo, setPostIsVideo] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
+  const [inviteSearch, setInviteSearch] = useState('')
+  const [inviteSent, setInviteSent] = useState<Set<string>>(new Set())
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const router = useRouter()
   const postFileRef = useRef<HTMLInputElement>(null)
 
   const primaryCircle = circles[0]
   const filteredPosts = filter === 'all' ? posts : posts.filter(p => p.type === filter)
   const selectedMeta = TYPE_META[postType]
+  const memberIdSet = new Set(memberStatuses.map(s => s.user_id))
+  const nonMemberProfiles = discoverProfiles.filter(p => !memberIdSet.has(p.id))
 
   function handlePostFileChange(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
@@ -486,11 +502,9 @@ export function CircleClient({
 
   // ── Tab navigation ──
   const TABS = [
-    { k: 'circle' as const,   l: 'Feed' },
-    { k: 'sessions' as const, l: 'Sessions' },
-    { k: 'goals' as const,    l: 'Goals' },
-    { k: 'discover' as const, l: 'Discover' },
-    { k: 'explore' as const,  l: 'Explore' },
+    { k: 'board' as const,    l: '⚔️ Board' },
+    { k: 'feed' as const,     l: '💬 Feed' },
+    { k: 'sessions' as const, l: '📅 Sessions' },
   ]
 
   const inviteLink = primaryCircle ? `https://confirmedcreations.com/join/${primaryCircle.code}` : ''
@@ -513,298 +527,429 @@ export function CircleClient({
     }
   }
 
+  async function handleInviteUser(toId: string, toName: string | null) {
+    if (!primaryCircle) return
+    const firstName = toName?.split(' ')[0]
+    const msg = `👋 Hey${firstName ? ` ${firstName}` : ''}! ${userName ?? 'Someone'} wants you to join their accountability circle "${primaryCircle.name}". Use code **${primaryCircle.code}** or join here: ${inviteLink}`
+    await sendMessage(toId, msg)
+    setInviteSent(prev => new Set([...prev, toId]))
+  }
+
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px 20px' }} className="view-panel">
 
-      {/* ── Page tabs ── */}
-      <div style={{ display: 'flex', marginBottom: 24, gap: 8 }}>
-        <Link href="/home" style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', textAlign: 'center', fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', textDecoration: 'none', display: 'block', fontFamily: 'Satoshi,sans-serif' }}>
-          HOME
-        </Link>
-        <div style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)', textAlign: 'center', fontSize: 12, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}>
-          CIRCLE
-        </div>
-      </div>
 
-      {/* ── Invite modal ── */}
-      {showInvite && primaryCircle && (
-        <div onClick={() => setShowInvite(false)} className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(212,175,55,0.2)', maxHeight: '85dvh', overflow: 'hidden', animation: 'scaleIn 0.2s ease both' }}>
-            {/* Gold header */}
-            <div style={{ background: 'linear-gradient(135deg,#18120A,#0F0C03)', borderBottom: '1px solid rgba(212,175,55,0.15)', padding: '28px 24px 24px', position: 'relative' }}>
-              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, margin: '0 auto 20px' }} />
-              <button onClick={() => setShowInvite(false)} style={{ position: 'absolute', top: 20, right: 20, width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.50)', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
-              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>INVITE TO {primaryCircle.name.toUpperCase()}</p>
-              <p style={{ fontSize: 22, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                {userName ? `${userName.split(' ')[0]} is building.` : 'Join the Circle.'}
-              </p>
-              {userStreak > 0 && (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 10px', borderRadius: 999, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)' }}>
-                  <span style={{ fontSize: 12 }}>🔥</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#D4AF37' }}>{userStreak}-week streak</span>
-                </div>
-              )}
-            </div>
+      {/* ── Invite modal (portal) ── */}
+      {mounted && showInvite && primaryCircle && createPortal(
+        <>
+          {/* Backdrop — tap anywhere outside card to close */}
+          <div
+            className="modal-open"
+            onClick={() => { setShowInvite(false); setInviteSearch('') }}
+            style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)' }}
+          />
+          {/* Card — above backdrop, pointer-events re-enabled on card only */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', pointerEvents: 'none' }}>
+            <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 520, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(212,175,55,0.2)', maxHeight: '85dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'scaleIn 0.2s ease both' }}>
 
-            <div style={{ padding: '24px 24px 0' }}>
-              {/* QR code */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-                <div style={{ background: '#fff', borderRadius: 16, padding: 14, display: 'inline-block' }}>
-                  <QRCodeSVG value={inviteLink} size={160} fgColor="#080808" bgColor="#ffffff" />
-                </div>
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg,#18120A,#0F0C03)', borderBottom: '1px solid rgba(212,175,55,0.15)', padding: '20px 24px 20px', position: 'relative', flexShrink: 0 }}>
+                <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, margin: '0 auto 16px' }} />
+                <button onClick={() => { setShowInvite(false); setInviteSearch('') }} style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#EFEFEF', fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 4 }}>INVITE TO {primaryCircle.name.toUpperCase()}</p>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                  {userName ? `${userName.split(' ')[0]} is building.` : 'Join the Circle.'}
+                </p>
+                {userStreak > 0 && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 10px', borderRadius: 999, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)' }}>
+                    <span style={{ fontSize: 12 }}>🔥</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#D4AF37' }}>{userStreak}-week streak</span>
+                  </div>
+                )}
               </div>
 
-              {/* Code display */}
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)', marginBottom: 6 }}>INVITE CODE</p>
-                <p style={{ fontSize: 36, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.35em' }}>{primaryCircle.code}</p>
-              </div>
+              {/* Scrollable body */}
+              <div style={{ padding: '20px 24px 24px', overflowY: 'auto', flex: 1 }}>
+                {/* QR code */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                  <div style={{ background: '#fff', borderRadius: 16, padding: 12, display: 'inline-block' }}>
+                    <QRCodeSVG value={inviteLink} size={120} fgColor="#080808" bgColor="#ffffff" />
+                  </div>
+                </div>
 
-              {/* Link display */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{inviteLink}</p>
-                <button onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
-                  {copied ? '✓ Copied' : 'Copy'}
+                {/* Code display */}
+                <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)', marginBottom: 4 }}>INVITE CODE</p>
+                  <p style={{ fontSize: 32, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.35em' }}>{primaryCircle.code}</p>
+                </div>
+
+                {/* Link + copy */}
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{inviteLink}</p>
+                  <button onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: copied ? '#4ade80' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}>
+                    {copied ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
+
+                {/* Share button */}
+                <button onClick={handleShare} style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', color: '#000', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em', marginBottom: 20 }}>
+                  Share Invite ↗
                 </button>
+
+                {/* In-app invite */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
+                  <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: 12 }}>OR SEND DIRECTLY IN THE APP</p>
+                  <input
+                    value={inviteSearch}
+                    onChange={e => setInviteSearch(e.target.value)}
+                    placeholder="Search by name or username…"
+                    className="cc-input"
+                    style={{ marginBottom: 10, fontSize: 13 }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {nonMemberProfiles
+                      .filter(p => {
+                        if (!inviteSearch.trim()) return true
+                        const q = inviteSearch.toLowerCase()
+                        return (p.full_name ?? '').toLowerCase().includes(q) || (p.username ?? '').toLowerCase().includes(q)
+                      })
+                      .slice(0, 20)
+                      .map(p => {
+                        const sent = inviteSent.has(p.id)
+                        return (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarGrad(p.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+                              {p.avatar_url
+                                ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                : initials(p.full_name)
+                              }
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name ?? 'Anonymous'}</p>
+                              {p.username && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>@{p.username}</p>}
+                            </div>
+                            <button
+                              onClick={() => { if (!sent) handleInviteUser(p.id, p.full_name) }}
+                              disabled={sent}
+                              style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 10, border: sent ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(212,175,55,0.3)', background: sent ? 'rgba(74,222,128,0.1)' : 'rgba(212,175,55,0.1)', color: sent ? '#4ade80' : '#D4AF37', fontSize: 11, fontWeight: 800, cursor: sent ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}
+                            >
+                              {sent ? '✓ Sent' : 'Invite'}
+                            </button>
+                          </div>
+                        )
+                      })
+                    }
+                    {nonMemberProfiles.filter(p => {
+                      if (!inviteSearch.trim()) return true
+                      const q = inviteSearch.toLowerCase()
+                      return (p.full_name ?? '').toLowerCase().includes(q) || (p.username ?? '').toLowerCase().includes(q)
+                    }).length === 0 && (
+                      <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.35)', padding: '16px 0' }}>
+                        {inviteSearch ? 'No users found' : 'No other users to invite yet'}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Share button */}
-              <button onClick={handleShare} style={{ width: '100%', padding: '15px', borderRadius: 14, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', color: '#000', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}>
-                Share Invite ↗
-              </button>
             </div>
           </div>
-        </div>
+        </>,
+        document.body
       )}
 
       {/* ── Page header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>YOUR CIRCLE</p>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>
+            {circles.length > 0 ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
+          </p>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-            {mainTab === 'circle'   ? (circles.length > 0 ? 'Real people.\nReal progress.' : 'Find Your\nPeople.') :
-             mainTab === 'sessions' ? 'Show up\nTogether.' :
-             mainTab === 'goals'    ? "Circle's\nGoals." :
-             mainTab === 'discover' ? 'What people\nare building.' :
-                                      'Find your\ntribe.'}
+            {circles.length > 0 ? '⚔️ War Room' : 'Find Your\nPeople.'}
           </h1>
         </div>
-        {mainTab === 'circle' && circles.length > 0 && (
-          <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ SHARE</button>
+        {circles.length > 0 && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowInvite(true)} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
+            <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ Share</button>
+          </div>
         )}
       </div>
 
       {/* ── Tab bar ── */}
-      <div style={{ position: 'relative', marginBottom: 24 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {circles.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
           {TABS.map(t => (
-            <button key={t.k} className={`comm-tab${mainTab === t.k ? ' active' : ''}`} onClick={() => setMainTab(t.k)} style={{ flex: 'none', minWidth: 'max-content', padding: '11px 18px' }}>
+            <button key={t.k} onClick={() => setMainTab(t.k)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 12, background: mainTab === t.k ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)', color: mainTab === t.k ? '#EFEFEF' : 'rgba(255,255,255,0.35)', transition: 'all 0.2s', boxShadow: mainTab === t.k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none' }}>
               {t.l}
             </button>
           ))}
         </div>
-        {/* Right fade to hint at more tabs */}
-        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 1, width: 40, background: 'linear-gradient(to left, #0A0A0A, transparent)', pointerEvents: 'none' }} />
-      </div>
+      )}
 
-      {/* ══════════ CIRCLE TAB ══════════ */}
-      {mainTab === 'circle' && (
+      {/* ══════════ NO CIRCLE ══════════ */}
+      {circles.length === 0 && (
         <>
-          {circles.length === 0 ? (
-            <>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Accountability is better together.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-                {/* Create circle: approved → show button | not approved → show progress card */}
-                {circleApproved ? (
-                  <button onClick={() => setShowCreate(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)', textAlign: 'left', cursor: 'pointer' }}>
-                    <p style={{ fontSize: 28, marginBottom: 10 }}>✨</p>
-                    <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Create a Circle</p>
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Start your own group and invite people with a code.</p>
-                  </button>
-                ) : (
-                  <CircleUnlockCard
-                    eligibility={circleEligibility}
-                    requested={circleRequested}
-                  />
-                )}
-                <button onClick={() => setShowJoin(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', textAlign: 'left', cursor: 'pointer' }}>
-                  <p style={{ fontSize: 28, marginBottom: 10 }}>🔑</p>
-                  <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Join a Circle</p>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Enter an invite code from a friend.</p>
-                </button>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Most people fail alone. The ones who don&apos;t have a Circle.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+            {circleApproved ? (
+              <button onClick={() => setShowCreate(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)', textAlign: 'left', cursor: 'pointer' }}>
+                <p style={{ fontSize: 28, marginBottom: 10 }}>✨</p>
+                <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Start a Circle</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Lead a private group of up to 10 people. You set the standard.</p>
+              </button>
+            ) : (
+              <CircleUnlockCard eligibility={circleEligibility} requested={circleRequested} />
+            )}
+            <button onClick={() => setShowJoin(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', textAlign: 'left', cursor: 'pointer' }}>
+              <p style={{ fontSize: 28, marginBottom: 10 }}>🔑</p>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Join a Circle</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Got a code? Get in. Someone who believes in you is waiting.</p>
+            </button>
+          </div>
+          {successCode && (
+            <div style={{ padding: 20, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)' }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>CIRCLE CREATED — SHARE THIS CODE</p>
+              <p style={{ fontSize: 36, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.3em' }}>{successCode}</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ══════════ BOARD TAB (WAR ROOM) ══════════ */}
+      {circles.length > 0 && mainTab === 'board' && (
+        <>
+          {/* Who's Showing Up — member status grid */}
+          <div style={{ marginBottom: 28 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>WHO&apos;S SHOWING UP</p>
+            {memberStatuses.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <p style={{ fontSize: 32, marginBottom: 12 }}>👥</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>Just you so far</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Invite people to your circle to see their progress here.</p>
               </div>
-              {successCode && (
-                <div style={{ padding: 20, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)' }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>CIRCLE CREATED — SHARE THIS CODE</p>
-                  <p style={{ fontSize: 36, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.3em' }}>{successCode}</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {memberStatuses.map(s => (
+                  <MemberStatusCard key={s.user_id} status={s} userId={userId} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Weekly leaderboard */}
+          {leaderboard.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>THIS WEEK&apos;S BOARD</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {leaderboard.map((entry, i) => (
+                  <div key={entry.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: i === 0 ? 'rgba(212,175,55,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${i === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: i === 0 ? '#D4AF37' : i === 1 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.28)', width: 18, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.user_id === userId ? 'You' : (entry.full_name ?? 'Member')}
+                      </p>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                        {entry.post_count} post{entry.post_count !== 1 ? 's' : ''} · {entry.assessment_count} reflection{entry.assessment_count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: i === 0 ? '#D4AF37' : '#EFEFEF' }}>{entry.score}pts</span>
+                      {entry.streak > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>🔥{entry.streak}w</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Reflections strip */}
+          {memberAssessments.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 10 }}>THIS WEEK&apos;S REFLECTIONS</p>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+                {memberAssessments.map(ma => {
+                  const rColors: Record<number, string> = { 1:'#f87171',2:'#f87171',3:'#fb923c',4:'#fbbf24',5:'#fbbf24',6:'#D4AF37',7:'#D4AF37',8:'#4ade80',9:'#4ade80',10:'#22c55e' }
+                  const r = ma.rating ?? 7
+                  const color = rColors[r] ?? '#D4AF37'
+                  return (
+                    <a key={ma.user_id} href={`/assess/${ma.user_id}`} style={{ display: 'block', textDecoration: 'none', flexShrink: 0, width: 160, borderRadius: 16, overflow: 'hidden', border: `1px solid ${color}20` }}>
+                      <div style={{ height: 3, background: `linear-gradient(90deg,${color},${color}55)` }} />
+                      <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatarGrad(ma.user_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#FFF' }}>
+                            {initials(ma.full_name)}
+                          </div>
+                          <span style={{ fontSize: 16, fontWeight: 900, color, textShadow: `0 0 12px ${color}60` }}>{r}</span>
+                        </div>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: '#EFEFEF', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ma.week_title ? `"${ma.week_title}"` : (ma.full_name?.split(' ')[0] ?? 'Member')}
+                        </p>
+                        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>Read reflection →</p>
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Next upcoming session */}
+          {sessions.length > 0 && (() => {
+            const next = sessions[0]
+            const sDate = new Date(next.scheduled_at)
+            const isLive = Date.now() >= sDate.getTime() - 5 * 60000 && Date.now() <= sDate.getTime() + 60 * 60000
+            return (
+              <div style={{ marginBottom: 24, padding: '14px 16px', borderRadius: 14, background: isLive ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isLive ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: isLive ? '#4ade80' : 'rgba(255,255,255,0.42)', marginBottom: 4 }}>
+                      {isLive ? '🔴 LIVE NOW' : '📅 COMING UP'}
+                    </p>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.title}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{sDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {sDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+                  </div>
+                  <button onClick={() => setMainTab('sessions')} style={{ flexShrink: 0, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                    View all →
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Birthday strip */}
+          {(() => {
+            const today = new Date()
+            const upcoming = birthdayProfiles
+              .map(p => {
+                if (!p.date_of_birth) return null
+                const [, bMm, bDd] = p.date_of_birth.split('-').map(Number)
+                const thisYear = new Date(today.getFullYear(), bMm - 1, bDd)
+                if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
+                const diffMs = thisYear.getTime() - today.setHours(0,0,0,0)
+                const daysAway = Math.round(diffMs / 86400000)
+                return { ...p, month: bMm, day: bDd, daysAway }
+              })
+              .filter((x): x is NonNullable<typeof x> => x !== null)
+              .sort((a, b) => a.daysAway - b.daysAway)
+              .slice(0, 5)
+            if (upcoming.length === 0) return null
+            return (
+              <div style={{ marginBottom: 24, padding: '14px 16px', borderRadius: 18, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.14)' }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#fbbf24', marginBottom: 12 }}>🎂 UPCOMING BIRTHDAYS</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {upcoming.map(p => {
+                    const isToday = p.daysAway === 0
+                    const isSoon = p.daysAway <= 7
+                    const monthName = new Date(2000, p.month - 1).toLocaleString('en-US', { month: 'short' })
+                    return (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarGrad(p.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+                          {initials(p.full_name)}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#fbbf24' : '#EFEFEF' }}>{p.full_name ?? 'Member'}</p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{monthName} {p.day}</p>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: isToday ? '#fbbf24' : isSoon ? '#f97316' : 'rgba(255,255,255,0.28)', flexShrink: 0 }}>
+                          {isToday ? '🎉 Today!' : `${p.daysAway}d`}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+        </>
+      )}
+
+      {/* ══════════ FEED TAB ══════════ */}
+      {circles.length > 0 && mainTab === 'feed' && (
+        <>
+          {/* Invite strip */}
+          {primaryCircle && (
+            <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowInvite(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(212,175,55,0.15),rgba(212,175,55,0.06))', border: '1px solid rgba(212,175,55,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Satoshi,sans-serif' }}>
+                <span style={{ fontSize: 18 }}>✉️</span>
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', marginBottom: 1 }}>Invite to {primaryCircle.name}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300 }}>Share link · QR code · copy code</p>
+                </div>
+              </button>
+              <button onClick={() => setShowJoin(true)} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.42)', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap' }}>Join another</button>
+            </div>
+          )}
+
+          {/* Feed toggle: My Circle vs Following */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 3 }}>
+            {([
+              { k: 'circle' as const,    l: '👥 My Circle' },
+              { k: 'following' as const, l: `Following${followingPosts.length > 0 ? ` (${followingPosts.length})` : ''}` },
+            ] as const).map(({ k, l }) => (
+              <button key={k} onClick={() => { setFeedFilter(k); if (k === 'circle') setFilter('all') }} style={{
+                flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13,
+                background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)',
+                transition: 'all 0.2s',
+                boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+              }}>{l}</button>
+            ))}
+          </div>
+
+          {feedFilter === 'circle' ? (
+            <>
+              {/* Type filter */}
+              <div style={{ margin: '0 -20px', marginBottom: 18 }}>
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', padding: '0 20px 4px' }}>
+                  {FILTER_TABS.map(t => (
+                    <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.55)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filteredPosts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                  <p style={{ fontSize: 40, marginBottom: 14 }}>💬</p>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No posts yet</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {filteredPosts.map((post, idx) => (
+                    <div key={post.id}>
+                      <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
+                      {idx < filteredPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
+                    </div>
+                  ))}
                 </div>
               )}
             </>
           ) : (
-            <>
-              {/* Invite strip */}
-              {primaryCircle && (
-                <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-                  <button onClick={() => setShowInvite(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(212,175,55,0.15),rgba(212,175,55,0.06))', border: '1px solid rgba(212,175,55,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Satoshi,sans-serif' }}>
-                    <span style={{ fontSize: 18 }}>✉️</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', marginBottom: 1 }}>Invite to {primaryCircle.name}</p>
-                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300 }}>Share link · QR code · copy code</p>
-                    </div>
-                  </button>
-                  <button onClick={() => setShowJoin(true)} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.42)', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap' }}>Join another</button>
-                </div>
-              )}
-              {/* 🎂 Birthday calendar */}
-              {(() => {
-                const today = new Date()
-                const mm = today.getMonth() + 1
-                const dd = today.getDate()
-                const upcoming = birthdayProfiles
-                  .map(p => {
-                    if (!p.date_of_birth) return null
-                    const [, bMm, bDd] = p.date_of_birth.split('-').map(Number)
-                    const thisYear = new Date(today.getFullYear(), bMm - 1, bDd)
-                    if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
-                    const diffMs = thisYear.getTime() - today.setHours(0,0,0,0)
-                    const daysAway = Math.round(diffMs / 86400000)
-                    return { ...p, month: bMm, day: bDd, daysAway }
-                  })
-                  .filter((x): x is NonNullable<typeof x> => x !== null)
-                  .sort((a, b) => a.daysAway - b.daysAway)
-                  .slice(0, 5)
-                if (upcoming.length === 0) return null
-                return (
-                  <div style={{ marginBottom: 18, padding: '14px 16px', borderRadius: 18, background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.14)' }}>
-                    <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#fbbf24', marginBottom: 12 }}>🎂 UPCOMING BIRTHDAYS</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {upcoming.map(p => {
-                        const isToday = p.daysAway === 0
-                        const isSoon  = p.daysAway <= 7
-                        const monthName = new Date(2000, p.month - 1).toLocaleString('en-US', { month: 'short' })
-                        return (
-                          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarGrad(p.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
-                              {initials(p.full_name)}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <p style={{ fontSize: 13, fontWeight: 700, color: isToday ? '#fbbf24' : '#EFEFEF' }}>{p.full_name ?? 'Member'}</p>
-                              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{monthName} {p.day}</p>
-                            </div>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: isToday ? '#fbbf24' : isSoon ? '#f97316' : 'rgba(255,255,255,0.28)', flexShrink: 0 }}>
-                              {isToday ? '🎉 Today!' : `${p.daysAway}d`}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
+            followingPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                <p style={{ fontSize: 40, marginBottom: 14 }}>✦</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No following posts yet</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Follow builders in Explore to see their updates here.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {followingPosts.map((post, idx) => (
+                  <div key={post.id}>
+                    <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
+                    {idx < followingPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
                   </div>
-                )
-              })()}
-
-              {/* This Week's Reflections strip */}
-              {memberAssessments.length > 0 && (
-                <div style={{ marginBottom: 18 }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 10 }}>THIS WEEK&apos;S REFLECTIONS</p>
-                  <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-                    {memberAssessments.map(ma => {
-                      const rColors: Record<number, string> = { 1:'#f87171',2:'#f87171',3:'#fb923c',4:'#fbbf24',5:'#fbbf24',6:'#D4AF37',7:'#D4AF37',8:'#4ade80',9:'#4ade80',10:'#22c55e' }
-                      const r = ma.rating ?? 7
-                      const color = rColors[r] ?? '#D4AF37'
-                      return (
-                        <a key={ma.user_id} href={`/assess/${ma.user_id}`} style={{ display: 'block', textDecoration: 'none', flexShrink: 0, width: 160, borderRadius: 16, overflow: 'hidden', border: `1px solid ${color}20` }}>
-                          <div style={{ height: 3, background: `linear-gradient(90deg,${color},${color}55)` }} />
-                          <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatarGrad(ma.user_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#FFF' }}>
-                                {initials(ma.full_name)}
-                              </div>
-                              <span style={{ fontSize: 16, fontWeight: 900, color, textShadow: `0 0 12px ${color}60` }}>{r}</span>
-                            </div>
-                            <p style={{ fontSize: 11, fontWeight: 700, color: '#EFEFEF', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {ma.week_title ? `"${ma.week_title}"` : (ma.full_name?.split(' ')[0] ?? 'Member')}
-                            </p>
-                            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>Read reflection →</p>
-                          </div>
-                        </a>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Feed toggle: My Circle vs Following */}
-              <div style={{ display: 'flex', gap: 0, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 3 }}>
-                {([
-                  { k: 'circle' as const,    l: '👥 My Circle' },
-                  { k: 'following' as const, l: `Following${followingPosts.length > 0 ? ` (${followingPosts.length})` : ''}` },
-                ] as const).map(({ k, l }) => (
-                  <button key={k} onClick={() => { setFeedFilter(k); if (k === 'circle') setFilter('all') }} style={{
-                    flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                    fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13,
-                    background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)',
-                    transition: 'all 0.2s',
-                    boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-                  }}>{l}</button>
                 ))}
               </div>
-
-              {feedFilter === 'circle' ? (
-                <>
-                  {/* Type filter */}
-                  <div style={{ margin: '0 -20px', marginBottom: 18 }}>
-                    <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', padding: '0 20px 4px' }}>
-                      {FILTER_TABS.map(t => (
-                        <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.55)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
-                          {t.l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {filteredPosts.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                      <p style={{ fontSize: 40, marginBottom: 14 }}>💬</p>
-                      <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No posts yet</p>
-                      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {filteredPosts.map((post, idx) => (
-                        <div key={post.id}>
-                          <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
-                          {idx < filteredPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Following feed */
-                followingPosts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                    <p style={{ fontSize: 40, marginBottom: 14 }}>✦</p>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No following posts yet</p>
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Follow builders in Explore to see their updates here.</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {followingPosts.map((post, idx) => (
-                      <div key={post.id}>
-                        <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
-                        {idx < followingPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-            </>
+            )
           )}
         </>
       )}
 
       {/* ══════════ SESSIONS TAB ══════════ */}
-      {mainTab === 'sessions' && (
+      {circles.length > 0 && mainTab === 'sessions' && (
         <SessionsTab
           sessions={sessions}
           rsvps={rsvps}
@@ -812,27 +957,6 @@ export function CircleClient({
           userId={userId}
           primaryCircle={primaryCircle ?? null}
         />
-      )}
-
-      {/* ══════════ GOALS TAB ══════════ */}
-      {mainTab === 'goals' && (
-        <GoalsTab circleGoals={circleGoals} userId={userId} />
-      )}
-
-      {/* ══════════ DISCOVER TAB ══════════ */}
-      {mainTab === 'discover' && (
-        <ExploreClient
-          builders={exploreBuilders}
-          goals={exploreGoals}
-          followingIds={followingIds}
-          currentUserId={userId}
-          embedded
-        />
-      )}
-
-      {/* ══════════ EXPLORE TAB ══════════ */}
-      {mainTab === 'explore' && (
-        <BuilderSpotlight builders={newBuilders} followingIds={followingIds} circleCode={primaryCircle?.code ?? null} />
       )}
 
       {/* ══ Share Modal ══ */}
@@ -1721,6 +1845,71 @@ function FollowBtn({ id, userId, followingIds, isPending, onFollow, onUnfollow, 
 }
 
 // ══════════════════════════════════════════════════════
+// Member Status Card (War Room board)
+// ══════════════════════════════════════════════════════
+function MemberStatusCard({ status, userId }: { status: MemberStatus; userId: string }) {
+  const isYou = status.user_id === userId
+  const activeToday = status.posted_today || status.energy_today !== null
+  const activeWeek = status.post_count_week > 0
+  const dotColor = activeToday ? '#4ade80' : activeWeek ? '#D4AF37' : '#444'
+  const borderColor = activeToday ? 'rgba(74,222,128,0.3)' : activeWeek ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)'
+  const glowShadow = activeToday ? '0 0 20px rgba(74,222,128,0.1)' : 'none'
+  const energyTxt = getEnergyLabel(status.energy_today)
+  const profileHref = `/profile/${status.user_id}`
+
+  return (
+    <Link href={profileHref} style={{ textDecoration: 'none', display: 'block' }}>
+      <div style={{ padding: '14px 12px', borderRadius: 16, background: '#111', border: `1px solid ${borderColor}`, boxShadow: glowShadow }}>
+        {/* Avatar + status dot */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', background: avatarGrad(status.user_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: '#fff' }}>
+              {status.avatar_url
+                ? <img src={status.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                : initials(status.full_name)
+              }
+            </div>
+            <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: dotColor, border: '2px solid #111', boxShadow: activeToday ? '0 0 5px rgba(74,222,128,0.9)' : 'none' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 800, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+              {isYou ? 'You' : (status.full_name ?? 'Member')}
+            </p>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', lineHeight: 1.3 }}>
+              {status.streak > 0 ? `🔥 ${status.streak}w` : 'Starting out'}
+            </p>
+          </div>
+        </div>
+
+        {/* Energy */}
+        {energyTxt && (
+          <p style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, marginBottom: 6 }}>{energyTxt}</p>
+        )}
+
+        {/* Active goal */}
+        {status.active_goal ? (
+          <div style={{ marginBottom: 6 }}>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 5, lineHeight: 1.3 }}>
+              {status.active_goal.title}
+            </p>
+            <div style={{ height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, status.active_goal.progress))}%`, background: catColor(status.active_goal.category), borderRadius: 2 }} />
+            </div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginBottom: 6 }}>No active goal</p>
+        )}
+
+        {/* Post count */}
+        <p style={{ fontSize: 10, color: activeWeek ? '#D4AF37' : 'rgba(255,255,255,0.28)', fontWeight: activeWeek ? 700 : 400 }}>
+          {status.post_count_week > 0 ? `✓ ${status.post_count_week} post${status.post_count_week !== 1 ? 's' : ''} this week` : 'No posts yet'}
+        </p>
+      </div>
+    </Link>
+  )
+}
+
+// ══════════════════════════════════════════════════════
 // Shared sub-components
 // ══════════════════════════════════════════════════════
 type ShareMember = { id: string; name: string | null; avatar: string | null }
@@ -1864,7 +2053,7 @@ function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { p
       )}
 
       {/* Action bar — Instagram style */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 20px 6px' }}>
         {/* Handshake reaction */}
         <button onClick={handleFire} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px 4px 0' }}>
           <span style={{ fontSize: 22, lineHeight: 1, filter: fireActive ? 'drop-shadow(0 0 8px rgba(212,175,55,1)) drop-shadow(0 0 16px rgba(212,175,55,0.7))' : 'grayscale(1) opacity(0.35)', transition: 'filter 0.2s' }}>🤝</span>
