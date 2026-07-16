@@ -445,6 +445,7 @@ export function CircleClient({
     } catch {}
   }, [])
   const [expandedPost, setExpandedPost] = useState<PostWithMeta | null>(null)
+  const [showCommitSheet, setShowCommitSheet] = useState(false)
   const [commitmentText, setCommitmentText] = useState('')
   const [submittingCommit, setSubmittingCommit] = useState(false)
   const [localCommitments, setLocalCommitments] = useState<CircleCommitment[]>(weekCommitments)
@@ -789,7 +790,7 @@ export function CircleClient({
           <div style={{ marginBottom: 28 }}>
             <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>THIS WEEK&apos;S COMMITMENTS</p>
 
-            {/* My commitment or input */}
+            {/* My commitment or CTA */}
             {myCommitment ? (
               <CommitmentCard
                 commitment={myCommitment}
@@ -798,66 +799,16 @@ export function CircleClient({
                 onStatus={handleCommitStatus}
               />
             ) : (
-              <div style={{ borderRadius: 16, background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.15)', padding: '14px 16px', marginBottom: 10 }}>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 12 }}>WHAT&apos;S YOUR #1 COMMITMENT?</p>
-
-                {/* Active goals — one tap to commit */}
-                {myActiveGoals.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                    {myActiveGoals.map(goal => {
-                      const catColor = CAT_COLOR[goal.category ?? ''] ?? '#D4AF37'
-                      return (
-                        <button
-                          key={goal.id}
-                          onClick={async () => {
-                            if (submittingCommit || !primaryCircle) return
-                            setSubmittingCommit(true)
-                            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-                            const optimistic: CircleCommitment = {
-                              id: `temp-${Date.now()}`, circle_id: primaryCircle.id, user_id: userId,
-                              week_start: weekStart.toISOString().split('T')[0], text: goal.title,
-                              status: 'active', witness_count: 0, full_name: userName,
-                              avatar_url: userAvatar, username: userUsername, created_at: new Date().toISOString(),
-                            }
-                            setLocalCommitments(prev => [...prev, optimistic])
-                            const result = await postCommitment(primaryCircle.id, goal.title)
-                            if (result?.error) setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
-                            setSubmittingCommit(false)
-                          }}
-                          disabled={submittingCommit}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s' }}
-                        >
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: catColor, flexShrink: 0 }} />
-                          <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goal.title}</p>
-                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>→</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Custom text fallback */}
-                <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', marginBottom: 8 }}>
-                  {myActiveGoals.length > 0 ? 'OR TYPE A CUSTOM COMMITMENT' : 'TYPE YOUR COMMITMENT'}
-                </p>
-                <textarea
-                  value={commitmentText}
-                  onChange={e => setCommitmentText(e.target.value)}
-                  maxLength={200}
-                  placeholder="I commit to _____ by end of week."
-                  rows={2}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', color: '#EFEFEF', fontSize: 13, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                  <button
-                    onClick={handlePostCommitment}
-                    disabled={!commitmentText.trim() || submittingCommit}
-                    style={{ padding: '8px 18px', borderRadius: 10, background: commitmentText.trim() ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.06)', border: 'none', color: commitmentText.trim() ? '#000' : 'rgba(255,255,255,0.25)', fontSize: 12, fontWeight: 800, cursor: commitmentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}
-                  >
-                    {submittingCommit ? 'Posting…' : 'Post it →'}
-                  </button>
+              <button
+                onClick={() => setShowCommitSheet(true)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 16, background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent', marginBottom: 10 }}
+              >
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 3 }}>YOUR COMMITMENT</p>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>What are you locking in this week?</p>
                 </div>
-              </div>
+                <span style={{ fontSize: 18, color: '#D4AF37', flexShrink: 0 }}>→</span>
+              </button>
             )}
 
             {/* Others' commitments */}
@@ -1102,6 +1053,88 @@ export function CircleClient({
             </div>
           )}
         </>
+      )}
+
+      {/* ── Commitment sheet (portal) ── */}
+      {mounted && showCommitSheet && primaryCircle && createPortal(
+        <>
+          <div onClick={() => { setShowCommitSheet(false); setCommitmentText('') }} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)' }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100000, maxHeight: '80dvh', display: 'flex', flexDirection: 'column', background: '#0E0E0E', borderRadius: '24px 24px 0 0', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            {/* Handle */}
+            <div style={{ flexShrink: 0, padding: '14px 0 0', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
+            </div>
+            {/* Header */}
+            <div style={{ flexShrink: 0, padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37', marginBottom: 4 }}>THIS WEEK&apos;S COMMITMENT</p>
+              <p style={{ fontSize: 18, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.01em' }}>What are you locking in?</p>
+            </div>
+            {/* Scrollable body */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '16px 20px 36px' }}>
+              {/* Goals */}
+              {myActiveGoals.length > 0 && (
+                <>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>PICK A GOAL</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                    {myActiveGoals.map(goal => {
+                      const catColor = CAT_COLOR[goal.category ?? ''] ?? '#D4AF37'
+                      return (
+                        <button
+                          key={goal.id}
+                          disabled={submittingCommit}
+                          onClick={async () => {
+                            if (submittingCommit || !primaryCircle) return
+                            setSubmittingCommit(true)
+                            setShowCommitSheet(false)
+                            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+                            const optimistic: CircleCommitment = {
+                              id: `temp-${Date.now()}`, circle_id: primaryCircle.id, user_id: userId,
+                              week_start: weekStart.toISOString().split('T')[0], text: goal.title,
+                              status: 'active', witness_count: 0, full_name: userName,
+                              avatar_url: userAvatar, username: userUsername, created_at: new Date().toISOString(),
+                            }
+                            setLocalCommitments(prev => [...prev, optimistic])
+                            const result = await postCommitment(primaryCircle.id, goal.title)
+                            if (result?.error) setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
+                            setSubmittingCommit(false)
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: catColor, flexShrink: 0, boxShadow: `0 0 8px ${catColor}66` }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goal.title}</p>
+                            {goal.progress > 0 && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{goal.progress}% complete</p>}
+                          </div>
+                          <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>→</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              {/* Custom */}
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>
+                {myActiveGoals.length > 0 ? 'OR TYPE A CUSTOM COMMITMENT' : 'YOUR COMMITMENT'}
+              </p>
+              <textarea
+                value={commitmentText}
+                onChange={e => setCommitmentText(e.target.value)}
+                maxLength={200}
+                placeholder="I commit to _____ by end of week."
+                rows={3}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 14px', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6, marginBottom: 12 }}
+              />
+              <button
+                onClick={() => { handlePostCommitment(); setShowCommitSheet(false) }}
+                disabled={!commitmentText.trim() || submittingCommit}
+                style={{ width: '100%', padding: '14px', borderRadius: 14, background: commitmentText.trim() ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.06)', border: 'none', color: commitmentText.trim() ? '#000' : 'rgba(255,255,255,0.2)', fontSize: 14, fontWeight: 800, cursor: commitmentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}
+              >
+                {submittingCommit ? 'Posting…' : 'Lock it in →'}
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body
       )}
 
       {/* ── Expanded post bottom sheet (portal) ── */}
