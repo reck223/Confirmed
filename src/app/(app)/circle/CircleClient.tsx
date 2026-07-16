@@ -393,7 +393,7 @@ type BirthdayProfile = { id: string; full_name: string | null; date_of_birth: st
 export function CircleClient({
   posts, circles, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
   circleEligibility, circleRequested, circleApproved, birthdayProfiles,
-  weekCommitments, myWitnessedIds,
+  weekCommitments, myWitnessedIds, myActiveGoals,
 }: {
   posts: PostWithMeta[]; circles: CircleInfo[]; userId: string
   discoverProfiles: DiscoverProfile[]
@@ -414,6 +414,7 @@ export function CircleClient({
   birthdayProfiles: BirthdayProfile[]
   weekCommitments: CircleCommitment[]
   myWitnessedIds: string[]
+  myActiveGoals: { id: string; title: string; category: string | null; progress: number }[]
 }) {
   const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions'>('board')
   const [feedFilter, setFeedFilter] = useState<'circle' | 'following'>('circle')
@@ -798,14 +799,54 @@ export function CircleClient({
               />
             ) : (
               <div style={{ borderRadius: 16, background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.15)', padding: '14px 16px', marginBottom: 10 }}>
-                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 10 }}>WHAT&apos;S YOUR #1 COMMITMENT?</p>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 12 }}>WHAT&apos;S YOUR #1 COMMITMENT?</p>
+
+                {/* Active goals — one tap to commit */}
+                {myActiveGoals.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                    {myActiveGoals.map(goal => {
+                      const catColor = CAT_COLOR[goal.category ?? ''] ?? '#D4AF37'
+                      return (
+                        <button
+                          key={goal.id}
+                          onClick={async () => {
+                            if (submittingCommit || !primaryCircle) return
+                            setSubmittingCommit(true)
+                            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+                            const optimistic: CircleCommitment = {
+                              id: `temp-${Date.now()}`, circle_id: primaryCircle.id, user_id: userId,
+                              week_start: weekStart.toISOString().split('T')[0], text: goal.title,
+                              status: 'active', witness_count: 0, full_name: userName,
+                              avatar_url: userAvatar, username: userUsername, created_at: new Date().toISOString(),
+                            }
+                            setLocalCommitments(prev => [...prev, optimistic])
+                            const result = await postCommitment(primaryCircle.id, goal.title)
+                            if (result?.error) setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
+                            setSubmittingCommit(false)
+                          }}
+                          disabled={submittingCommit}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s' }}
+                        >
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: catColor, flexShrink: 0 }} />
+                          <p style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goal.title}</p>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>→</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Custom text fallback */}
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  {myActiveGoals.length > 0 ? 'OR TYPE A CUSTOM COMMITMENT' : 'TYPE YOUR COMMITMENT'}
+                </p>
                 <textarea
                   value={commitmentText}
                   onChange={e => setCommitmentText(e.target.value)}
                   maxLength={200}
                   placeholder="I commit to _____ by end of week."
                   rows={2}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', color: '#EFEFEF', fontSize: 13, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                   <button

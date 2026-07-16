@@ -441,6 +441,17 @@ export default async function CirclePage() {
     }
   }
 
+  // ── Current user's active goals (for commitment quick-pick) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: myGoalRows } = await (supabase.from('goals') as any)
+    .select('id, title, category, progress')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .neq('goal_type', 'letter')
+    .order('created_at', { ascending: false })
+    .limit(6)
+  const myActiveGoals = (myGoalRows ?? []) as { id: string; title: string; category: string | null; progress: number }[]
+
   // ── Weekly commitments ──
   let weekCommitments: CircleCommitment[] = []
   let myWitnessedIds: string[] = []
@@ -506,6 +517,7 @@ export default async function CirclePage() {
       birthdayProfiles={birthdayProfiles}
       weekCommitments={weekCommitments}
       myWitnessedIds={myWitnessedIds}
+      myActiveGoals={myActiveGoals}
     />
   )
 }
