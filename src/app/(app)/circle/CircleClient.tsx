@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
-import { createCircle, joinCircle, createPost, toggleReaction, followUser, unfollowUser, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
+import { createCircle, joinCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
 import { requestCircleAccess } from './module/actions'
 import { createHomePost } from '@/app/(app)/home/actions'
 import { sendMessage } from '@/app/(app)/inbox/actions'
@@ -104,9 +104,7 @@ function builderGrad(id: string) {
   return GRADS[id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % GRADS.length]
 }
 
-function NewBuilderCard({ builder, isFollowing: init, circleCode }: { builder: NewBuilder; isFollowing: boolean; circleCode: string | null }) {
-  const [following, setFollowing] = useState(init)
-  const [pending, setPending] = useState(false)
+function NewBuilderCard({ builder, circleCode }: { builder: NewBuilder; circleCode: string | null }) {
   const [invited, setInvited] = useState(false)
   const grad = builderGrad(builder.id)
   const nameInit = builder.full_name ? builder.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '?'
@@ -115,14 +113,6 @@ function NewBuilderCard({ builder, isFollowing: init, circleCode }: { builder: N
   const isNew = days <= 7
   const ringColor = builder.streak >= 13 ? '#D4AF37' : builder.streak >= 4 ? '#f97316' : 'rgba(255,255,255,0.18)'
   const ringGlow = builder.streak >= 13 ? '0 0 14px rgba(212,175,55,0.6)' : builder.streak >= 4 ? '0 0 14px rgba(249,115,22,0.5)' : 'none'
-
-  async function handleFollow() {
-    setPending(true)
-    if (following) await unfollowUser(builder.id)
-    else await followUser(builder.id)
-    setFollowing(f => !f)
-    setPending(false)
-  }
 
   function handleInvite() {
     if (!circleCode) return
@@ -191,22 +181,6 @@ function NewBuilderCard({ builder, isFollowing: init, circleCode }: { builder: N
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={handleFollow}
-            disabled={pending}
-            style={{
-              flex: 1, padding: '11px 0', borderRadius: 14,
-              border: following ? '1px solid rgba(255,255,255,0.1)' : 'none',
-              background: following ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#D4AF37,#9A7010)',
-              color: following ? 'rgba(255,255,255,0.42)' : '#000',
-              fontSize: 13, fontWeight: 800, cursor: 'pointer',
-              fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em',
-              opacity: pending ? 0.5 : 1, transition: 'all 0.2s',
-              boxShadow: following ? 'none' : '0 4px 16px rgba(212,175,55,0.3)',
-            }}
-          >
-            {following ? 'Following ✓' : '+ Follow'}
-          </button>
           {circleCode && (
             <button
               onClick={handleInvite}
@@ -228,7 +202,7 @@ function NewBuilderCard({ builder, isFollowing: init, circleCode }: { builder: N
   )
 }
 
-function BuilderSpotlight({ builders, followingIds, circleCode }: { builders: NewBuilder[]; followingIds: string[]; circleCode: string | null }) {
+function BuilderSpotlight({ builders, circleCode }: { builders: NewBuilder[]; circleCode: string | null }) {
   const [search, setSearch] = useState('')
   const q = search.trim().toLowerCase()
   const filtered = q
@@ -267,7 +241,7 @@ function BuilderSpotlight({ builders, followingIds, circleCode }: { builders: Ne
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '0 20px' }}>
           {filtered.map(b => (
-            <NewBuilderCard key={b.id} builder={b} isFollowing={followingIds.includes(b.id)} circleCode={circleCode} />
+            <NewBuilderCard key={b.id} builder={b} circleCode={circleCode} />
           ))}
         </div>
       )}
@@ -417,7 +391,6 @@ export function CircleClient({
   myActiveGoals: { id: string; title: string; category: string | null; progress: number }[]
 }) {
   const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions'>('board')
-  const [feedFilter, setFeedFilter] = useState<'circle' | 'following'>('circle')
   const [showPost, setShowPost] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
@@ -511,14 +484,6 @@ export function CircleClient({
 
   function handleReaction(postId: string, type: 'fire' | 'strong' | 'relate') {
     startTransition(async () => { await toggleReaction(postId, type); router.refresh() })
-  }
-
-  function handleFollow(id: string) {
-    startTransition(async () => { await followUser(id); router.refresh() })
-  }
-
-  function handleUnfollow(id: string) {
-    startTransition(async () => { await unfollowUser(id); router.refresh() })
   }
 
   // ── Tab navigation ──
@@ -976,7 +941,7 @@ export function CircleClient({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)' }}>
-                POSTS {feedFilter === 'circle' ? filteredPosts.length : followingPosts.length}
+                POSTS {filteredPosts.length}
               </p>
             </div>
             <button onClick={() => setShowPost(true)} style={{ padding: '7px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', color: '#000', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}>
@@ -984,58 +949,30 @@ export function CircleClient({
             </button>
           </div>
 
-          {/* Circle / Following toggle */}
-          <div style={{ display: 'flex', gap: 0, marginBottom: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 3 }}>
-            {([
-              { k: 'circle' as const,    l: '👥 My Circle' },
-              { k: 'following' as const, l: `Following${followingPosts.length > 0 ? ` (${followingPosts.length})` : ''}` },
-            ] as const).map(({ k, l }) => (
-              <button key={k} onClick={() => { setFeedFilter(k); if (k === 'circle') setFilter('all') }} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)', transition: 'all 0.2s', boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none' }}>{l}</button>
-            ))}
+          {/* Type filter chips */}
+          <div style={{ margin: '0 -20px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
+              {FILTER_TABS.map(t => (
+                <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.42)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.07)', transition: 'all 0.15s' }}>{t.l}</button>
+              ))}
+            </div>
           </div>
-
-          {feedFilter === 'circle' ? (
-            <>
-              {/* Type filter chips */}
-              <div style={{ margin: '0 -20px', marginBottom: 14 }}>
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
-                  {FILTER_TABS.map(t => (
-                    <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.42)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.07)', transition: 'all 0.15s' }}>{t.l}</button>
-                  ))}
-                </div>
-              </div>
-              {filteredPosts.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                  <p style={{ fontSize: 40, marginBottom: 14 }}>💬</p>
-                  <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No posts yet</p>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {filteredPosts.map(post => (
-                    <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
-                  ))}
-                </div>
-              )}
-            </>
+          {filteredPosts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <p style={{ fontSize: 40, marginBottom: 14 }}>💬</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No posts yet</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
+            </div>
           ) : (
-            followingPosts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                <p style={{ fontSize: 40, marginBottom: 14 }}>✦</p>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No following posts yet</p>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Follow builders in Explore to see their updates here.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {followingPosts.map(post => (
-                  <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
-                ))}
-              </div>
-            )
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {filteredPosts.map(post => (
+                <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
+              ))}
+            </div>
           )}
 
           {/* Invite strip at bottom */}
-          {primaryCircle && feedFilter === 'circle' && (
+          {primaryCircle && (
             <div style={{ marginTop: 20, display: 'flex', gap: 8 }}>
               <button onClick={() => setShowInvite(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Satoshi,sans-serif' }}>
                 <span style={{ fontSize: 16 }}>✉️</span>
@@ -1244,62 +1181,6 @@ export function CircleClient({
           <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'JOINING...' : 'JOIN CIRCLE'}</button>
         </form>
       </CCModal>
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════
-// Following Tab
-// ══════════════════════════════════════════════════════
-function FollowingTab({ followingIds, discoverProfiles, followingPosts, userId, myAvatar, onReact, onDiscover }: {
-  followingIds: string[]; discoverProfiles: DiscoverProfile[]; followingPosts: PostWithMeta[]
-  userId: string; myAvatar: string | null; onReact: (id: string, type: 'fire' | 'strong' | 'relate') => void
-  onDiscover: () => void
-}) {
-  const followedProfiles = discoverProfiles.filter(p => followingIds.includes(p.id))
-
-  if (followingIds.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <p style={{ fontSize: 40, marginBottom: 14 }}>👤</p>
-        <p style={{ fontSize: 17, fontWeight: 800, color: '#EFEFEF', marginBottom: 6 }}>No one followed yet</p>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 24 }}>Follow builders doing incredible things.</p>
-        <button onClick={onDiscover} className="btn-gold" style={{ width: 'auto', padding: '12px 24px', fontSize: 11 }}>DISCOVER PEOPLE →</button>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {/* Avatar scroll */}
-      <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 4, marginBottom: 24, scrollbarWidth: 'none' }}>
-        {followedProfiles.map(p => (
-          <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <div style={{ width: 50, height: 50, borderRadius: '50%', background: avatarGrad(p.id), color: '#FFF', fontSize: 14, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255,255,255,0.1)' }}>
-              {initials(p.full_name)}
-            </div>
-            <p style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.50)', maxWidth: 52, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {p.username ?? p.full_name?.split(' ')[0] ?? '?'}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Posts */}
-      {followingPosts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)' }}>No posts from people you follow yet.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {followingPosts.map((post, idx) => (
-            <div key={post.id}>
-              <PostCard post={post} userId={userId} myAvatar={myAvatar} myName={null} shareMembers={[]} onReact={onReact} />
-              {idx < followingPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -1880,166 +1761,6 @@ function CalendarTab({ goals }: { goals: CalGoal[] }) {
         </div>
       )}
     </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════
-// Discover Tab
-// ══════════════════════════════════════════════════════
-function DiscoverTab({ profiles, followingIds, userId, isPending, onFollow, onUnfollow }: {
-  profiles: DiscoverProfile[]; followingIds: string[]
-  userId: string; isPending: boolean
-  onFollow: (id: string) => void; onUnfollow: (id: string) => void
-}) {
-  const [discFilter, setDiscFilter] = useState<'all' | 'following'>('all')
-  const filtered = discFilter === 'following'
-    ? profiles.filter(p => followingIds.includes(p.id))
-    : profiles
-
-  if (profiles.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <p style={{ fontSize: 40, marginBottom: 14 }}>✦</p>
-        <p style={{ fontSize: 17, fontWeight: 800, color: '#EFEFEF', marginBottom: 6 }}>No builders yet</p>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Invite others to join Confirmed Creations to discover people to follow.</p>
-      </div>
-    )
-  }
-
-  const spotlight = profiles.find(p => !followingIds.includes(p.id)) ?? profiles[0]
-  const rest = profiles.filter(p => p.id !== spotlight.id)
-
-  return (
-    <div>
-      {/* Filter toggle */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, gap: 2, border: '1px solid rgba(255,255,255,0.06)' }}>
-          {(['all', 'following'] as const).map(f => (
-            <button key={f} onClick={() => setDiscFilter(f)} style={{ padding: '5px 13px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', border: 'none', transition: 'all 0.15s', background: discFilter === f ? 'rgba(212,175,55,0.15)' : 'transparent', color: discFilter === f ? '#D4AF37' : 'rgba(255,255,255,0.42)' }}>
-              {f === 'all' ? 'All' : 'Following'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Spotlight card */}
-      {discFilter === 'all' && (
-        <div style={{ marginBottom: 16 }}>
-          <div className="disc-card" style={{ position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', inset: 0, background: avatarGrad(spotlight.id), zIndex: 0 }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(170deg,rgba(13,13,13,0) 0%,rgba(13,13,13,0.6) 45%,#0D0D0D 85%)', zIndex: 1 }} />
-            <div style={{ position: 'relative', zIndex: 2, padding: '18px 18px 20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37', background: 'rgba(212,175,55,0.14)', border: '1px solid rgba(212,175,55,0.3)', padding: '4px 10px', borderRadius: 6 }}>✦ SPOTLIGHT</span>
-              </div>
-              <a href={`/profile/${spotlight.id}`} style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, textDecoration: 'none' }}>
-                <div style={{ width: 66, height: 66, borderRadius: '50%', background: avatarGrad(spotlight.id), color: '#FFF', fontSize: 20, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(255,255,255,0.12)', boxShadow: '0 0 28px rgba(0,0,0,0.6)', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
-                  {spotlight.avatar_url ? <img src={spotlight.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} /> : initials(spotlight.full_name)}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{spotlight.full_name ?? 'Builder'}</p>
-                  {spotlight.username && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>@{spotlight.username}</p>}
-                </div>
-              </a>
-              {spotlight.tagline && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.14)', borderLeft: '3px solid rgba(212,175,55,0.4)' }}>
-                  <p style={{ fontSize: 13, color: '#D4AF37', fontStyle: 'italic', lineHeight: 1.6 }}>&ldquo;{spotlight.tagline}&rdquo;</p>
-                </div>
-              )}
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16, overflow: 'hidden' }}>
-                <div className="disc-stat" style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                  <p className="disc-stat-n" style={{ color: '#FF9500' }}>🔥 {spotlight.streak}w</p>
-                  <p className="disc-stat-l">STREAK</p>
-                </div>
-                <div className="disc-stat">
-                  <p className="disc-stat-n" style={{ color: '#D4AF37' }}>{spotlight.goals_complete}</p>
-                  <p className="disc-stat-l">GOALS DONE</p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <FollowBtn id={spotlight.id} userId={userId} followingIds={followingIds} isPending={isPending} onFollow={onFollow} onUnfollow={onUnfollow} large />
-                <a href={`/inbox/${spotlight.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '13px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.48)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Builder cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {filtered.filter(p => p.id !== spotlight.id || discFilter === 'following').map(p => (
-          <div key={p.id} className="disc-card">
-            <div className="disc-band" style={{ background: avatarGrad(p.id) }}>
-              {p.streak > 0 && (
-                <div style={{ position: 'absolute', top: 10, left: 12, display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '4px 8px', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <span style={{ fontSize: 11 }}>🔥</span>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: '#FF9500' }}>{p.streak}w</span>
-                </div>
-              )}
-              <div className="disc-av-float" style={{ width: 52, height: 52, fontSize: 14, background: avatarGrad(p.id), overflow: 'hidden', position: 'relative' }}>
-                {p.avatar_url ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} /> : initials(p.full_name)}
-              </div>
-            </div>
-            <div style={{ padding: '30px 16px 18px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-                <a href={`/profile/${p.id}`} style={{ minWidth: 0, textDecoration: 'none' }}>
-                  <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', lineHeight: 1.15 }}>{p.full_name ?? 'Builder'}</p>
-                  {p.username && <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>@{p.username}</p>}
-                </a>
-                <FollowBtn id={p.id} userId={userId} followingIds={followingIds} isPending={isPending} onFollow={onFollow} onUnfollow={onUnfollow} />
-              </div>
-              {p.tagline && (
-                <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic', lineHeight: 1.55, marginBottom: 12, paddingLeft: 10, borderLeft: '2px solid rgba(212,175,55,0.25)' }}>
-                  &ldquo;{p.tagline}&rdquo;
-                </p>
-              )}
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.025)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', marginBottom: 10 }}>
-                <div className="disc-stat" style={{ borderRight: '1px solid rgba(255,255,255,0.04)' }}>
-                  <p className="disc-stat-n">{p.streak}</p>
-                  <p className="disc-stat-l">STREAK</p>
-                </div>
-                <div className="disc-stat">
-                  <p className="disc-stat-n" style={{ color: '#D4AF37' }}>{p.goals_complete}</p>
-                  <p className="disc-stat-l">DONE</p>
-                </div>
-              </div>
-              <a href={`/inbox/${p.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', textDecoration: 'none', color: 'rgba(255,255,255,0.58)', fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif' }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Message
-              </a>
-            </div>
-          </div>
-        ))}
-
-        {discFilter === 'following' && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '52px 20px' }}>
-            <p style={{ fontSize: 36, marginBottom: 14 }}>✦</p>
-            <p style={{ fontSize: 17, fontWeight: 800, color: '#EFEFEF', marginBottom: 6 }}>No one followed yet</p>
-            <button onClick={() => setDiscFilter('all')} className="btn-gold" style={{ width: 'auto', padding: '12px 26px', marginTop: 12, fontSize: 11 }}>SEE ALL BUILDERS →</button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function FollowBtn({ id, userId, followingIds, isPending, onFollow, onUnfollow, large }: {
-  id: string; userId: string; followingIds: string[]
-  isPending: boolean; onFollow: (id: string) => void; onUnfollow: (id: string) => void
-  large?: boolean
-}) {
-  if (id === userId) return null
-  const isFollowing = followingIds.includes(id)
-  return (
-    <button
-      onClick={() => isFollowing ? onUnfollow(id) : onFollow(id)}
-      disabled={isPending}
-      style={{ padding: large ? '13px' : '8px 14px', borderRadius: large ? 12 : 9, fontSize: large ? 13 : 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0, width: large ? '100%' : undefined, letterSpacing: large ? '0.04em' : undefined, background: isFollowing ? 'rgba(139,92,246,0.1)' : 'rgba(212,175,55,0.1)', color: isFollowing ? '#a78bfa' : '#D4AF37', border: isFollowing ? '1px solid rgba(139,92,246,0.25)' : '1px solid rgba(212,175,55,0.25)' }}
-    >
-      {isFollowing ? '✓ Following' : '+ Follow'}
-    </button>
   )
 }
 

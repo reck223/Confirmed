@@ -483,18 +483,6 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
             )}
           </div>
 
-          {/* Follower / Circle counts */}
-          <div style={{ display: 'flex', gap: 20, paddingBottom: 6 }}>
-            {([
-              { label: 'FOLLOWERS', value: liveFollowers ?? followersCount, key: 'followers' },
-              { label: 'FOLLOWING', value: liveFollowing ?? followingCount, key: 'following' },
-            ] as { label: string; value: number; key: 'circle' | 'followers' | 'following' }[]).map(({ label, value, key }) => (
-              <button key={key} onClick={() => openUsersModal(key)} style={{ textAlign: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'Satoshi,sans-serif' }}>
-                <p style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', lineHeight: 1 }}>{value}</p>
-                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', fontWeight: 600, marginTop: 2 }}>{label}</p>
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Name + Building since */}

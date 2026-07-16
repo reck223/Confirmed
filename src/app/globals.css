@@ -7,11 +7,22 @@
 /* Prevent text selection on tap */
 button, a { -webkit-tap-highlight-color: transparent; user-select: none; }
 
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Modal center-pop animation — used by all modal panels */
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.92) translateY(12px); filter: blur(6px); }
   60%  { filter: blur(0); }
   to   { opacity: 1; transform: scale(1)    translateY(0);    filter: blur(0); }
+}
+
+/* Bottom sheet slide-up — used by post detail, share sheets */
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
 /* Prevent body scroll when any modal is open */
@@ -459,6 +470,14 @@ details[open].chapter-card .reflect-chevron { transform: rotate(180deg); }
 }
 div:hover > .avatar-hover-overlay { opacity: 1 !important; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Playbook node ring pulse */
+@keyframes playbookRing {
+  0%   { transform: scale(1);    opacity: 0.4; }
+  70%  { transform: scale(1.6);  opacity: 0; }
+  100% { transform: scale(1.6);  opacity: 0; }
+}
+.playbook-ring { animation: playbookRing 1.9s ease-out infinite; }
 
 /* Today's Focus animations */
 @keyframes focusGroupIn {

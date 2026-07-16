@@ -96,3 +96,22 @@ export async function logBodyWeight(date: string, weightLbs: number) {
   await (supabase.from('body_weight_logs') as any).upsert({ user_id: user.id, date, weight_lbs: weightLbs })
   revalidatePath('/tools/workout')
 }
+
+export async function upsertBodyMetrics(
+  metricDate: string,
+  weightLbs: number | null,
+  sleepHours: number | null,
+  waterCups: number | null,
+  steps: number | null,
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('body_metrics') as any).upsert({
+    user_id: user.id, metric_date: metricDate,
+    weight_lbs: weightLbs, sleep_hours: sleepHours,
+    water_cups: waterCups, steps,
+  })
+  revalidatePath('/tools/workout')
+}

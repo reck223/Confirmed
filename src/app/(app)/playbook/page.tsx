@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { PlaybookClient } from './PlaybookClient'
 import { PLAYBOOK } from './content'
 
@@ -22,11 +23,13 @@ export default async function PlaybookPage() {
   )
 
   return (
-    <PlaybookClient
-      modules={PLAYBOOK}
-      completedLessonIds={[...completedLessonIds]}
-      totalLessons={totalLessons}
-      completedCount={completedCount}
-    />
+    <Suspense>
+      <PlaybookClient
+        modules={PLAYBOOK}
+        completedLessonIds={[...completedLessonIds]}
+        totalLessons={totalLessons}
+        completedCount={completedCount}
+      />
+    </Suspense>
   )
 }

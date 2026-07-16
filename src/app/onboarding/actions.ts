@@ -44,17 +44,36 @@ export async function saveOnboarding(data: {
 
   if (existing) return { error: 'That username is already taken — go back and pick another' }
 
+  // Core fields — always present
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload: Record<string, any> = {
+    username: clean,
+    tagline: data.tagline || null,
+    focus_areas: data.focusAreas,
+  }
+  // Only include date_of_birth when the user actually filled it in, so a
+  // missing column never blocks onboarding.
+  if (data.dateOfBirth) payload.date_of_birth = data.dateOfBirth
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('profiles') as any)
-    .update({
-      username: clean,
-      tagline: data.tagline || null,
-      focus_areas: data.focusAreas,
-      date_of_birth: data.dateOfBirth || null,
-    })
+    .update(payload)
     .eq('id', user.id)
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Column doesn't exist yet — retry without it so onboarding still works
+    if (error.code === '42703' || error.message.includes('date_of_birth')) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (payload as any).date_of_birth
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: e2 } = await (supabase.from('profiles') as any)
+        .update(payload)
+        .eq('id', user.id)
+      if (e2) return { error: e2.message }
+    } else {
+      return { error: error.message }
+    }
+  }
 
   revalidatePath('/', 'layout')
   return { success: true }

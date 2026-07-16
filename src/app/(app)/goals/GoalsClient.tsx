@@ -509,7 +509,9 @@ function GoalTemplatePicker({ onSelect, onSkip }: { onSelect: (t: GoalTemplateIt
   )
 }
 
-export function GoalsClient({ goals, milestones, books: allBooks, entries: allEntries, initialGoalId }: { goals: Goal[]; milestones: GoalMilestone[]; books: GoalBook[]; entries: GoalEntry[]; initialGoalId?: string | null }) {
+type TrackerBook = { id: string; title: string; author: string | null; total_pages: number | null; current_page: number; status: string; goal_id: string }
+
+export function GoalsClient({ goals, milestones, books: allBooks, entries: allEntries, trackerBooks: allTrackerBooks = [], initialGoalId, firstName, streak }: { goals: Goal[]; milestones: GoalMilestone[]; books: GoalBook[]; entries: GoalEntry[]; trackerBooks?: TrackerBook[]; initialGoalId?: string | null; firstName?: string; streak?: number }) {
   const [showCreate, setShowCreate] = useState(false)
   const [createView, setCreateView] = useState<'templates' | 'form'>('templates')
   const [tmplTitle, setTmplTitle] = useState('')
@@ -558,6 +560,11 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
   }, {})
 
   const booksByGoal = allBooks.reduce<Record<string, GoalBook[]>>((acc, b) => {
+    ;(acc[b.goal_id] ??= []).push(b)
+    return acc
+  }, {})
+
+  const trackerBooksByGoal = allTrackerBooks.reduce<Record<string, TrackerBook[]>>((acc, b) => {
     ;(acc[b.goal_id] ??= []).push(b)
     return acc
   }, {})
@@ -1264,6 +1271,45 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
                         <div style={{ textAlign: 'right' }}>
                           <span style={{ fontSize: 15, fontWeight: 900, color: accent }}>{progress}%</span>
                           <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', marginTop: 1 }}>{doneCount} of {ms.length} complete</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linked Reading Tracker books */}
+                    {(trackerBooksByGoal[logGoal.id] ?? []).length > 0 && (
+                      <div style={{ marginTop: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.42)' }}>📖 LINKED BOOKS</p>
+                          <a href="/tools/reading" style={{ fontSize: 10, fontWeight: 700, color: accent, textDecoration: 'none', opacity: 0.7 }}>Open Reading →</a>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(trackerBooksByGoal[logGoal.id] ?? []).map(book => {
+                            const pct = book.total_pages && book.total_pages > 0 ? Math.round((book.current_page / book.total_pages) * 100) : null
+                            const statusColor = book.status === 'finished' ? '#22c55e' : book.status === 'reading' ? accent : 'rgba(255,255,255,0.35)'
+                            const statusLabel = book.status === 'finished' ? '✓ Done' : book.status === 'reading' ? 'Reading' : 'Queued'
+                            return (
+                              <div key={book.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: `1px solid ${accent}15` }}>
+                                <div style={{ width: 32, height: 42, borderRadius: 5, background: `${accent}18`, border: `1px solid ${accent}28`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: accent }}>
+                                  {book.title[0]?.toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</p>
+                                  {book.author && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>{book.author}</p>}
+                                  {pct !== null && (
+                                    <div>
+                                      <div style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 2 }}>
+                                        <div style={{ height: '100%', width: `${pct}%`, background: statusColor, borderRadius: 3 }} />
+                                      </div>
+                                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{book.current_page}/{book.total_pages} pages</p>
+                                    </div>
+                                  )}
+                                </div>
+                                <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 7px', borderRadius: 6, background: book.status === 'finished' ? 'rgba(34,197,94,0.12)' : `${accent}12`, color: statusColor, alignSelf: 'flex-start', flexShrink: 0, border: `1px solid ${statusColor}30` }}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )}

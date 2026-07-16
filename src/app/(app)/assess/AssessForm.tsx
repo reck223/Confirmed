@@ -89,7 +89,7 @@ export function AssessForm({ weekStart, streak }: { weekStart: string; streak: n
       formData.set('week_title', answers.week_title ?? '')
       const result = await submitAssessment(weekStart, formData)
       if (result.error) { setError(result.error); return }
-      router.refresh()
+      router.push('/home#reflection')
     })
   }
 

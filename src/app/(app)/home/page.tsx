@@ -1,184 +1,134 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { HomeClient } from './HomeClient'
-import type { Profile, Goal, GoalMilestone } from '@/lib/types/database'
+import { PLAYBOOK } from '../playbook/content'
+import type { Profile, Goal } from '@/lib/types/database'
 
 function getTodayLabel() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()
 }
 
-export type RecentPost = {
-  id: string; content: string; type: string; created_at: string
-  user_id: string; author_name: string | null
-  media_url: string | null; media_type: string | null
-  reactions: { fire: number; strong: number; relate: number }
-  my_reactions: { fire: boolean; strong: boolean; relate: boolean }
+function getLast7Dates(): string[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (6 - i))
+    return d.toISOString().split('T')[0]
+  })
 }
 
-export type CheckinDay = { date: string; energy: number }
-
-// A unit of work the user can pick to focus on today — either a real
-// milestone, or (for goals with none yet) the goal's next action.
-export type FocusItem = {
-  id: string
-  kind: 'milestone' | 'goal'
-  goalId: string
-  goalTitle: string
-  category: string | null
-  deadline: string | null
-  text: string
-  progress: number
+function getWeekStart(): string {
+  const now = new Date()
+  const sunday = new Date(now)
+  sunday.setDate(now.getDate() - now.getDay())
+  return sunday.toISOString().split('T')[0]
 }
+
+const DAY_MAP: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  const [{ data: profileData }, { data: goalsData }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('goals').select('*').eq('user_id', user.id).eq('status', 'active').order('created_at', { ascending: false }),
+  const last7 = getLast7Dates()
+  const sevenDaysAgo = last7[0]
+
+  const today = new Date().toISOString().split('T')[0]
+
+  const [
+    { data: profileData },
+    { data: goalsData },
+    { data: checkInData },
+    { data: playbookRows },
+    { data: assessmentData },
+    { data: journalToday },
+    { data: energyRow },
+  ] = await Promise.all([
+    supabase.from('profiles').select('full_name, streak, xp, level, pinned_goal_id, assessment_day').eq('id', user.id).single(),
+    supabase.from('goals')
+      .select('id, title, category, progress, next_action, deadline')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+      .limit(5),
+    supabase.from('check_ins').select('date').eq('user_id', user.id).gte('date', sevenDaysAgo),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('playbook_progress') as any).select('lesson_id').eq('user_id', user.id),
+    supabase.from('assessments').select('id, rating, week_title').eq('user_id', user.id).eq('week_start', getWeekStart()).maybeSingle(),
+    supabase.from('journal_entries').select('id').eq('user_id', user.id).gte('created_at', today).limit(1),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('daily_checkins') as any).select('energy').eq('user_id', user.id).eq('date', today).maybeSingle(),
   ])
 
-  const profile = profileData as Profile | null
-  const goals = (goalsData as Goal[] | null) ?? []
+  type ProfileRow = Pick<Profile, 'full_name' | 'streak' | 'xp' | 'level' | 'pinned_goal_id'> & { assessment_day?: string }
+  const profile = profileData as ProfileRow | null
   const firstName = profile?.full_name?.split(' ')[0] ?? user.email?.split('@')[0] ?? 'there'
 
-  // Check-in: today + last 7 days
-  const today = new Date().toISOString().split('T')[0]
-  const ago = new Date(today); ago.setDate(ago.getDate() - 7)
-  const sevenDaysAgo = ago.toISOString().split('T')[0]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: checkinRows } = await (supabase.from('daily_checkins') as any)
-    .select('date, energy')
-    .eq('user_id', user.id)
-    .gte('date', sevenDaysAgo)
-    .order('date', { ascending: false })
+  type GoalRow = Pick<Goal, 'id' | 'title' | 'category' | 'progress' | 'next_action' | 'deadline'>
+  const goals = (goalsData ?? []) as GoalRow[]
 
-  const checkinHistory: CheckinDay[] = (checkinRows ?? []) as CheckinDay[]
-  const todayCheckin = checkinHistory.find(c => c.date === today) ?? null
+  // 7-day momentum: one dot per day, gold if check-in exists
+  const checkedDates = new Set((checkInData ?? []).map((r: { date: string }) => r.date))
+  const momentumDays = last7.map(date => ({
+    date,
+    dayLabel: new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
+    done: checkedDates.has(date),
+  }))
 
-  // Focus pool: real undone milestones for active goals, falling back to
-  // the goal's next action for goals that don't have milestones yet.
-  const activeGoals = goals.filter(g => g.goal_type !== 'letter')
-  let focusPool: FocusItem[] = []
-  if (activeGoals.length > 0) {
-    const goalIds = activeGoals.map(g => g.id)
-    const { data: msData } = await supabase
-      .from('goal_milestones')
-      .select('*')
-      .in('goal_id', goalIds)
-      .eq('done', false)
-      .order('created_at', { ascending: true })
+  // Mission: pinned goal first, else most recently updated active goal
+  const pinnedId = profile?.pinned_goal_id
+  const missionGoal = (pinnedId ? goals.find(g => g.id === pinnedId) : undefined) ?? goals[0] ?? null
 
-    const milestones = (msData as GoalMilestone[] | null) ?? []
-    const goalMap = Object.fromEntries(activeGoals.map(g => [g.id, g]))
-    const goalsWithMilestones = new Set(milestones.map(m => m.goal_id))
+  // Rings: top 3 active goals
+  const ringGoals = goals.slice(0, 3)
 
-    focusPool = milestones.map(m => ({
-      id: m.id,
-      kind: 'milestone' as const,
-      goalId: m.goal_id,
-      goalTitle: goalMap[m.goal_id]?.title ?? '',
-      category: goalMap[m.goal_id]?.category ?? null,
-      deadline: m.due_date ?? goalMap[m.goal_id]?.deadline ?? null,
-      text: m.text,
-      progress: goalMap[m.goal_id]?.progress ?? 0,
-    }))
+  // Weekly reflection state
+  const assessmentDay = profile?.assessment_day ?? 'Sun'
+  const setDayNum = DAY_MAP[assessmentDay] ?? 0
+  const todayNum = new Date().getDay()
+  const lateDay = (setDayNum + 1) % 7
+  const reflectionUnlocked = todayNum === setDayNum || todayNum === lateDay
+  const reflectionDayName = DAY_NAMES[setDayNum]
+  type AssessRow = { id: string; rating: number | null; week_title: string | null }
+  const weeklyReflection = assessmentData
+    ? { rating: (assessmentData as AssessRow).rating ?? 5, weekTitle: (assessmentData as AssessRow).week_title }
+    : null
 
-    for (const g of activeGoals) {
-      if (!goalsWithMilestones.has(g.id)) {
-        focusPool.push({
-          id: `goal:${g.id}`,
-          kind: 'goal' as const,
-          goalId: g.id,
-          goalTitle: g.title,
-          category: g.category,
-          deadline: g.deadline,
-          text: g.next_action ?? g.title,
-          progress: g.progress ?? 0,
-        })
+  // Next playbook lesson: first uncompleted across all modules
+  const completedIds = new Set((playbookRows ?? []).map((r: { lesson_id: string }) => r.lesson_id))
+  type NextLesson = { moduleEmoji: string; moduleTitle: string; moduleColor: string; lessonTitle: string; duration: string }
+  let nextLesson: NextLesson | null = null
+  outer: for (const mod of PLAYBOOK) {
+    for (const lesson of mod.lessons) {
+      if (!completedIds.has(lesson.id)) {
+        nextLesson = { moduleEmoji: mod.emoji, moduleTitle: mod.title, moduleColor: mod.color, lessonTitle: lesson.title, duration: lesson.duration }
+        break outer
       }
     }
   }
 
-  // Weekly reflection: done this week?
-  const weekStart = new Date()
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-  const weekStartStr = weekStart.toISOString().split('T')[0]
-  const { data: assessRow } = await supabase.from('assessments')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('week_start', weekStartStr)
-    .limit(1)
-    .single()
-  const reflectionDone = !!assessRow
-
-  // Circle posts (2-3 most recent)
-  let recentPosts: RecentPost[] = []
-  const { data: memberRows } = await supabase.from('circle_members').select('circle_id').eq('user_id', user.id)
-  const circleIds = ((memberRows ?? []) as { circle_id: string }[]).map(r => r.circle_id)
-
-  if (circleIds.length > 0) {
-    const { data: postRows } = await supabase.from('posts')
-      .select('id, content, type, created_at, user_id, media_url, media_type')
-      .order('created_at', { ascending: false })
-      .limit(5)
-
-    const posts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; user_id: string; media_url: string | null; media_type: string | null }[]
-
-    if (posts.length > 0) {
-      const authorIds = [...new Set(posts.map(p => p.user_id))]
-      const postIds = posts.map(p => p.id)
-
-      const [{ data: profileRows }, { data: reactionRows }] = await Promise.all([
-        supabase.from('profiles').select('id, full_name').in('id', authorIds),
-        supabase.from('post_reactions').select('post_id, user_id, type').in('post_id', postIds),
-      ])
-
-      const profileMap = Object.fromEntries(
-        ((profileRows ?? []) as { id: string; full_name: string | null }[]).map(p => [p.id, p.full_name])
-      )
-      const reactions = (reactionRows ?? []) as { post_id: string; user_id: string; type: string }[]
-
-      recentPosts = posts.map(post => {
-        const pr = reactions.filter(r => r.post_id === post.id)
-        return {
-          ...post,
-          author_name: profileMap[post.user_id] ?? null,
-          media_url:   post.media_url  ?? null,
-          media_type:  post.media_type ?? null,
-          reactions: {
-            fire: pr.filter(r => r.type === 'fire').length,
-            strong: pr.filter(r => r.type === 'strong').length,
-            relate: pr.filter(r => r.type === 'relate').length,
-          },
-          my_reactions: {
-            fire: pr.some(r => r.user_id === user.id && r.type === 'fire'),
-            strong: pr.some(r => r.user_id === user.id && r.type === 'strong'),
-            relate: pr.some(r => r.user_id === user.id && r.type === 'relate'),
-          },
-        }
-      })
-    }
-  }
+  const qodAnswered  = (journalToday ?? []).length > 0
+  const missionDone  = checkedDates.has(today)
+  const energyToday  = (energyRow as { energy: number } | null)?.energy ?? null
 
   return (
     <HomeClient
-      todayLabel={getTodayLabel()}
       firstName={firstName}
       streak={profile?.streak ?? 0}
-      goals={goals}
-      focusPool={focusPool}
-      isNewUser={goals.length === 0}
-      todayCheckin={todayCheckin ? { energy: todayCheckin.energy, note: null } : null}
-      checkinHistory={checkinHistory}
-      recentPosts={recentPosts}
-      reflectionDone={reflectionDone}
-      assessmentDay={profile?.assessment_day ?? 'Sun'}
-      inCircle={circleIds.length > 0}
-      userId={user.id}
-      isCreator={user.email === 'graysdarius@gmail.com'}
+      xp={profile?.xp ?? 0}
+      level={profile?.level ?? 1}
+      todayLabel={getTodayLabel()}
+      momentumDays={momentumDays}
+      missionGoal={missionGoal}
+      ringGoals={ringGoals}
+      nextLesson={nextLesson}
+      weeklyReflection={weeklyReflection}
+      reflectionUnlocked={reflectionUnlocked}
+      reflectionDayName={reflectionDayName}
+      qodAnswered={qodAnswered}
+      missionDone={missionDone}
+      energyToday={energyToday}
     />
   )
 }

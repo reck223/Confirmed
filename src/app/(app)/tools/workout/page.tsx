@@ -11,12 +11,13 @@ export default async function WorkoutPage() {
   const since90 = new Date(); since90.setDate(since90.getDate() - 90)
   const sinceStr = since90.toISOString().split('T')[0]
 
-  // Parallel: sessions, goals, templates, body weight logs
+  // Parallel: sessions, goals, templates, body weight logs, body metrics
   const [
     { data: sessionRows },
     { data: goalRows },
     { data: templateRows },
     { data: bwRows },
+    { data: metricsRows },
   ] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('workout_sessions') as any)
@@ -41,16 +42,24 @@ export default async function WorkoutPage() {
       .eq('user_id', user.id)
       .gte('date', sinceStr)
       .order('date', { ascending: true }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('body_metrics') as any)
+      .select('metric_date, weight_lbs, sleep_hours, water_cups, steps')
+      .eq('user_id', user.id)
+      .gte('metric_date', sinceStr)
+      .order('metric_date', { ascending: true }),
   ])
 
   type SessionRow  = { id: string; name: string; date: string; duration_mins: number | null; goal_id: string | null }
   type GoalRow     = { id: string; title: string; category: string | null }
   type TemplateRow = { id: string; name: string; exercises: unknown }
   type BwRow       = { date: string; weight_lbs: number }
+  type MetricRow   = { metric_date: string; weight_lbs: number | null; sleep_hours: number | null; water_cups: number | null; steps: number | null }
 
-  const sessions  = (sessionRows  ?? []) as SessionRow[]
-  const goals     = (goalRows     ?? []) as GoalRow[]
-  const bwLogs    = (bwRows       ?? []) as BwRow[]
+  const sessions    = (sessionRows  ?? []) as SessionRow[]
+  const goals       = (goalRows     ?? []) as GoalRow[]
+  const bwLogs      = (bwRows       ?? []) as BwRow[]
+  const metricsLogs = (metricsRows  ?? []) as MetricRow[]
   const templates = ((templateRows ?? []) as TemplateRow[]).map(t => ({
     id: t.id,
     name: t.name,
@@ -59,7 +68,7 @@ export default async function WorkoutPage() {
   const goalMap = new Map(goals.map(g => [g.id, g.title]))
 
   if (sessions.length === 0) {
-    return <WorkoutClient sessions={[]} prs={{}} goals={goals} templates={templates} bwLogs={bwLogs} today={today} />
+    return <WorkoutClient sessions={[]} prs={{}} goals={goals} templates={templates} bwLogs={bwLogs} metricsLogs={metricsLogs} today={today} />
   }
 
   const sessionIds = sessions.map(s => s.id)
@@ -118,6 +127,7 @@ export default async function WorkoutPage() {
       goals={goals}
       templates={templates}
       bwLogs={bwLogs}
+      metricsLogs={metricsLogs}
       today={today}
     />
   )

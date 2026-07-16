@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { saveWorkoutSession, deleteWorkoutSession, saveTemplate, deleteTemplate, logBodyWeight } from './actions'
+import { saveWorkoutSession, deleteWorkoutSession, saveTemplate, deleteTemplate, logBodyWeight, upsertBodyMetrics } from './actions'
 import { generateWorkoutPlan } from './aiActions'
+import ShareToFeedSheet from '@/components/ShareToFeedSheet'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SetRow   = { id: string; set_number: number; reps: number | null; weight_lbs: number | null; duration_mins: number | null }
@@ -13,7 +14,8 @@ type SetEntry = { id: string; reps: string; weight: string; duration: string; do
 type ExEntry  = { id: string; name: string; isCardio: boolean; sets: SetEntry[] }
 type TplEx    = { name: string; isCardio: boolean; sets: { reps: number | null; weightLbs: number | null; durationMins: number | null }[] }
 type Template = { id: string; name: string; exercises: TplEx[] }
-type BwLog    = { date: string; weight_lbs: number }
+type BwLog      = { date: string; weight_lbs: number }
+type MetricLog  = { metric_date: string; weight_lbs: number | null; sleep_hours: number | null; water_cups: number | null; steps: number | null }
 
 type Props = {
   sessions: Session[]
@@ -21,6 +23,7 @@ type Props = {
   goals: Goal[]
   templates: Template[]
   bwLogs: BwLog[]
+  metricsLogs: MetricLog[]
   today: string
 }
 
@@ -553,10 +556,10 @@ const INP: React.CSSProperties = {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function WorkoutClient({ sessions: initSessions, prs, goals, templates: initTemplates, bwLogs: initBwLogs, today }: Props) {
+export function WorkoutClient({ sessions: initSessions, prs, goals, templates: initTemplates, bwLogs: initBwLogs, metricsLogs: initMetrics, today }: Props) {
   // Core workout state
   const [sessions, setSessions]             = useState(initSessions)
-  const [view, setView]                     = useState<'week' | 'history' | 'active' | 'start'>('week')
+  const [view, setView]                     = useState<'week' | 'history' | 'active' | 'start' | 'metrics'>('week')
   const [sessionName, setSessionName]       = useState('')
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null)
   const [exercises, setExercises]           = useState<ExEntry[]>([])
@@ -587,6 +590,16 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
   const [bwLogs, setBwLogs]   = useState<BwLog[]>(initBwLogs)
   const [bwInput, setBwInput] = useState('')
   const [savingBw, setSavingBw] = useState(false)
+
+  // Body metrics
+  const [metricsLogs, setMetricsLogs] = useState<MetricLog[]>(initMetrics)
+  const [mWeight, setMWeight]         = useState('')
+  const [mSleep, setMSleep]           = useState('')
+  const [mWater, setMWater]           = useState('')
+  const [mSteps, setMSteps]           = useState('')
+  const [mDate, setMDate]             = useState(today)
+  const [savingMetrics, setSavingMetrics] = useState(false)
+  const [shareCaption, setShareCaption] = useState<string | null>(null)
 
   // Trend modal
   const [trendEx, setTrendEx] = useState<string | null>(null)
@@ -920,6 +933,9 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
     setView('week')
     await saveWorkoutSession(sessionName, durationMins, exInputs, selectedGoalId)
     setSaving(false)
+    const exNames = exercises.map(e => e.name).slice(0, 3).join(', ')
+    const caption = `💪 Just wrapped a ${durationMins}-minute ${sessionName} session${exNames ? ` — ${exNames}${exercises.length > 3 ? ' + more' : ''}` : ''}. Showing up every day. 🔥`
+    setShareCaption(caption)
   }
 
   function handleDelete(id: string) {
@@ -1791,6 +1807,165 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
     </div>
   )
 
+  // ── METRICS ──────────────────────────────────────────────────────────────────
+  if (view === 'metrics') {
+    const todayEntry = metricsLogs.find(m => m.metric_date === mDate) ?? null
+
+    async function handleSaveMetrics() {
+      const w = mWeight ? parseFloat(mWeight) : null
+      const s = mSleep  ? parseFloat(mSleep)  : null
+      const wa = mWater ? parseInt(mWater)     : null
+      const st = mSteps ? parseInt(mSteps)     : null
+      if (!w && !s && !wa && !st) return
+      setSavingMetrics(true)
+      const updated: MetricLog = { metric_date: mDate, weight_lbs: w, sleep_hours: s, water_cups: wa, steps: st }
+      setMetricsLogs(prev => {
+        const filtered = prev.filter(m => m.metric_date !== mDate)
+        return [...filtered, updated].sort((a, b) => a.metric_date.localeCompare(b.metric_date))
+      })
+      await upsertBodyMetrics(mDate, w, s, wa, st)
+      setMWeight(''); setMSleep(''); setMWater(''); setMSteps('')
+      setSavingMetrics(false)
+    }
+
+    function MiniChart({ data, color, label, unit }: { data: { date: string; val: number }[]; color: string; label: string; unit: string }) {
+      if (data.length < 2) return (
+        <div style={{ padding: '12px 14px', borderRadius: 14, background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 4, letterSpacing: '0.08em' }}>{label}</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Log more data to see trend</p>
+        </div>
+      )
+      const W = 160, H = 48, PAD = 4
+      const vals = data.map(d => d.val)
+      const minV = Math.min(...vals), maxV = Math.max(...vals)
+      const range = maxV - minV || 0.1
+      const xs = data.map((_, i) => PAD + (i / (data.length - 1)) * (W - PAD * 2))
+      const ys = data.map(d => H - PAD - ((d.val - minV) / range) * (H - PAD * 2))
+      const pts = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+      const latest = vals[vals.length - 1]
+      return (
+        <div style={{ padding: '12px 14px', borderRadius: 14, background: '#0d0d0d', border: `1px solid ${color}20` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '0.08em' }}>{label}</p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: '#EFEFEF', fontVariantNumeric: 'tabular-nums' }}>{latest}<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{unit}</span></p>
+          </div>
+          <svg width={W} height={H} style={{ display: 'block', overflow: 'visible' }}>
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="3" fill={color} />
+          </svg>
+        </div>
+      )
+    }
+
+    const wData  = metricsLogs.filter(m => m.weight_lbs != null).map(m => ({ date: m.metric_date, val: m.weight_lbs! }))
+    const sData  = metricsLogs.filter(m => m.sleep_hours != null).map(m => ({ date: m.metric_date, val: m.sleep_hours! }))
+    const waData = metricsLogs.filter(m => m.water_cups != null).map(m => ({ date: m.metric_date, val: m.water_cups! }))
+    const stData = metricsLogs.filter(m => m.steps != null).map(m => ({ date: m.metric_date, val: m.steps! }))
+
+    const MINP: React.CSSProperties = {
+      flex: 1, padding: '10px 12px', borderRadius: 11, background: 'rgba(255,255,255,0.05)',
+      border: '1px solid rgba(255,255,255,0.09)', color: '#EFEFEF', fontSize: 14,
+      fontFamily: 'Satoshi,sans-serif', outline: 'none', boxSizing: 'border-box',
+    }
+
+    return (
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 20px 80px', fontFamily: 'Satoshi,sans-serif' }}>
+        <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        <div style={{ paddingTop: 4, paddingBottom: 20, animation: 'fadeUp 0.3s ease both' }}>
+          <Link href="/tools" style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>← Tools</Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, animation: 'fadeUp 0.35s 0.05s ease both' }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', marginBottom: 4 }}>Workout</h1>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Body metrics tracking</p>
+          </div>
+          <button onClick={() => { setExercises([]); setSelectedGoalId(null); setSessionName(''); setSelectedTypes([]); nameIsAutoRef.current = true; setView('start') }} style={{ padding: '12px 20px', borderRadius: 16, background: 'linear-gradient(135deg,#ef4444,#f97316)', border: 'none', fontSize: 13, fontWeight: 900, color: '#fff', cursor: 'pointer', letterSpacing: '0.03em', fontFamily: 'Satoshi,sans-serif', boxShadow: '0 6px 24px rgba(239,68,68,0.35)' }}>
+            + Plan
+          </button>
+        </div>
+
+        {/* Nav tabs */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, animation: 'fadeUp 0.36s 0.06s ease both' }}>
+          {(['week', 'history', 'metrics'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ padding: '8px 16px', borderRadius: 10, background: view === v ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${view === v ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: view === v ? '#ef4444' : 'rgba(255,255,255,0.4)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textTransform: 'capitalize' }}>
+              {v === 'week' ? 'Plan' : v === 'history' ? 'History' : 'Metrics'}
+            </button>
+          ))}
+        </div>
+
+        {/* Log form */}
+        <div style={{ borderRadius: 20, background: '#0d0d0d', border: '1px solid rgba(56,189,248,0.15)', padding: '18px', marginBottom: 20, animation: 'fadeUp 0.38s 0.07s ease both' }}>
+          <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#38bdf8', marginBottom: 14 }}>📊 LOG TODAY&apos;S METRICS</p>
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 5, letterSpacing: '0.06em' }}>DATE</p>
+            <input type="date" value={mDate} onChange={e => setMDate(e.target.value)} style={{ ...MINP, width: '100%', colorScheme: 'dark' }} />
+          </div>
+          {todayEntry && (
+            <p style={{ fontSize: 11, color: '#38bdf8', marginBottom: 10 }}>
+              ✓ Logged on {mDate}: {[todayEntry.weight_lbs && `${todayEntry.weight_lbs}lbs`, todayEntry.sleep_hours && `${todayEntry.sleep_hours}h sleep`, todayEntry.water_cups && `${todayEntry.water_cups} cups water`, todayEntry.steps && `${todayEntry.steps} steps`].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 5, letterSpacing: '0.06em' }}>WEIGHT (lbs)</p>
+              <input type="number" inputMode="decimal" value={mWeight} onChange={e => setMWeight(e.target.value)} placeholder={todayEntry?.weight_lbs?.toString() ?? '—'} style={MINP} />
+            </div>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 5, letterSpacing: '0.06em' }}>SLEEP (hours)</p>
+              <input type="number" inputMode="decimal" value={mSleep} onChange={e => setMSleep(e.target.value)} placeholder={todayEntry?.sleep_hours?.toString() ?? '—'} style={MINP} />
+            </div>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 5, letterSpacing: '0.06em' }}>WATER (cups)</p>
+              <input type="number" inputMode="numeric" value={mWater} onChange={e => setMWater(e.target.value)} placeholder={todayEntry?.water_cups?.toString() ?? '—'} style={MINP} />
+            </div>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 5, letterSpacing: '0.06em' }}>STEPS</p>
+              <input type="number" inputMode="numeric" value={mSteps} onChange={e => setMSteps(e.target.value)} placeholder={todayEntry?.steps?.toString() ?? '—'} style={MINP} />
+            </div>
+          </div>
+          <button onClick={handleSaveMetrics} disabled={savingMetrics || (!mWeight && !mSleep && !mWater && !mSteps)} style={{ width: '100%', padding: '12px 0', borderRadius: 13, background: (mWeight || mSleep || mWater || mSteps) ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${(mWeight || mSleep || mWater || mSteps) ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.07)'}`, fontSize: 13, fontWeight: 800, color: (mWeight || mSleep || mWater || mSteps) ? '#38bdf8' : 'rgba(255,255,255,0.2)', cursor: (mWeight || mSleep || mWater || mSteps) ? 'pointer' : 'not-allowed', fontFamily: 'Satoshi,sans-serif' }}>
+            {savingMetrics ? 'SAVING…' : 'SAVE METRICS'}
+          </button>
+        </div>
+
+        {/* Mini charts */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20, animation: 'fadeUp 0.4s 0.09s ease both' }}>
+          <MiniChart data={wData}  color="#38bdf8" label="WEIGHT"  unit=" lbs" />
+          <MiniChart data={sData}  color="#a78bfa" label="SLEEP"   unit="h" />
+          <MiniChart data={waData} color="#22c55e" label="WATER"   unit=" cups" />
+          <MiniChart data={stData} color="#f97316" label="STEPS"   unit="" />
+        </div>
+
+        {/* Log table */}
+        {metricsLogs.length > 0 && (
+          <div style={{ borderRadius: 20, background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', animation: 'fadeUp 0.42s 0.1s ease both' }}>
+            <div style={{ padding: '14px 16px 10px' }}>
+              <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>HISTORY</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {[...metricsLogs].reverse().slice(0, 14).map(m => (
+                  <div key={m.metric_date} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr 1fr', gap: 6, padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontVariantNumeric: 'tabular-nums' }}>{new Date(m.metric_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#38bdf8', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{m.weight_lbs != null ? `${m.weight_lbs}` : '—'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{m.sleep_hours != null ? `${m.sleep_hours}h` : '—'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#22c55e', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{m.water_cups != null ? `${m.water_cups}c` : '—'}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#f97316', fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{m.steps != null ? m.steps.toLocaleString() : '—'}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr 1fr', gap: 6, padding: '6px 0', marginTop: 4 }}>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}></span>
+                <span style={{ fontSize: 9, color: '#38bdf8', textAlign: 'right', fontWeight: 700 }}>lbs</span>
+                <span style={{ fontSize: 9, color: '#a78bfa', textAlign: 'right', fontWeight: 700 }}>sleep</span>
+                <span style={{ fontSize: 9, color: '#22c55e', textAlign: 'right', fontWeight: 700 }}>water</span>
+                <span style={{ fontSize: 9, color: '#f97316', textAlign: 'right', fontWeight: 700 }}>steps</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── HISTORY ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 20px 80px', fontFamily: 'Satoshi,sans-serif' }}>
@@ -1811,6 +1986,15 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
         <button onClick={() => { setExercises([]); setSelectedGoalId(null); setSessionName(''); setSelectedTypes([]); nameIsAutoRef.current = true; setView('start') }} style={{ padding: '12px 20px', borderRadius: 16, background: 'linear-gradient(135deg,#ef4444,#f97316)', border: 'none', fontSize: 13, fontWeight: 900, color: '#fff', cursor: 'pointer', letterSpacing: '0.03em', fontFamily: 'Satoshi,sans-serif', boxShadow: '0 6px 24px rgba(239,68,68,0.35)' }}>
           + Plan
         </button>
+      </div>
+
+      {/* Nav tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, animation: 'fadeUp 0.37s 0.055s ease both' }}>
+        {(['week', 'history', 'metrics'] as const).map(v => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: '8px 16px', borderRadius: 10, background: view === v ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${view === v ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.07)'}`, fontSize: 12, fontWeight: 800, color: view === v ? '#ef4444' : 'rgba(255,255,255,0.4)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+            {v === 'week' ? 'Plan' : v === 'history' ? 'History' : 'Metrics'}
+          </button>
+        ))}
       </div>
 
       {/* Body weight card */}
@@ -1928,6 +2112,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
         </div>
       )}
       {demoEx && EXERCISE_INFO[demoEx] && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx]} onClose={() => setDemoEx(null)} />}
+      {shareCaption !== null && <ShareToFeedSheet defaultCaption={shareCaption} onClose={() => setShareCaption(null)} />}
     </div>
   )
 }

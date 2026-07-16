@@ -1,9 +1,7 @@
 'use client'
-import { useState, useTransition, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { followUser, unfollowUser } from '../circle/actions'
 import { getLevelInfo } from '@/lib/xp'
 
 
@@ -63,11 +61,10 @@ function timeAgo(iso: string) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export function ExploreClient({
-  builders, goals, followingIds, currentUserId, circleCode, embedded,
+  builders, goals, currentUserId, circleCode, embedded,
 }: {
   builders: Builder[]
   goals: PublicGoal[]
-  followingIds: string[]
   currentUserId: string
   circleCode?: string | null
   embedded?: boolean
@@ -76,20 +73,6 @@ export function ExploreClient({
   const [tab, setTab] = useState<'goals' | 'builders' | 'leaders'>('goals')
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<string | null>(null)
-  const [following, setFollowing] = useState(new Set(followingIds))
-  const [pending, startTransition] = useTransition()
-  void pending
-  const router = useRouter()
-
-  function handleFollow(userId: string) {
-    const wasFollowing = following.has(userId)
-    setFollowing(prev => { const n = new Set(prev); wasFollowing ? n.delete(userId) : n.add(userId); return n })
-    startTransition(async () => {
-      wasFollowing ? await unfollowUser(userId) : await followUser(userId)
-      router.refresh()
-    })
-  }
-
   const availableCats = useMemo(() => {
     const s = new Set<string>()
     goals.forEach(g => { if (g.category) s.add(g.category) })
@@ -271,7 +254,7 @@ export function ExploreClient({
       {/* ── BUILDERS TAB ─────────────────────────────────────────────────── */}
       {tab === 'builders' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filteredBuilders.map(b => <BuilderCard key={b.id} builder={b} isFollowing={following.has(b.id)} onFollow={() => handleFollow(b.id)} circleCode={circleCode} />)}
+          {filteredBuilders.map(b => <BuilderCard key={b.id} builder={b} circleCode={circleCode} />)}
           {isEmpty && <EmptyState tab="builders" hasFilter={!!catFilter || !!search} />}
         </div>
       )}
@@ -287,7 +270,7 @@ export function ExploreClient({
                 <div style={{ flex: 1, height: 1, background: 'rgba(74,222,128,0.12)' }} />
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{newGoals.length}</span>
               </div>
-              {newGoals.map(g => <GoalCard key={g.id} goal={g} isFollowing={following.has(g.user_id)} onFollow={() => handleFollow(g.user_id)} />)}
+              {newGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
               {olderGoals.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 2 }}>
                   <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.35)' }}>ALL GOALS</p>
@@ -295,11 +278,11 @@ export function ExploreClient({
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{olderGoals.length}</span>
                 </div>
               )}
-              {olderGoals.map(g => <GoalCard key={g.id} goal={g} isFollowing={following.has(g.user_id)} onFollow={() => handleFollow(g.user_id)} />)}
+              {olderGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
             </>
           )}
           {/* Flat list when searching/filtering */}
-          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g} isFollowing={following.has(g.user_id)} onFollow={() => handleFollow(g.user_id)} />)}
+          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
           {isEmpty && <EmptyState tab="goals" hasFilter={!!catFilter || !!search} />}
         </div>
       )}
@@ -372,9 +355,8 @@ export function ExploreClient({
 }
 
 // ── Builder Card ───────────────────────────────────────────────────────────
-function BuilderCard({ builder: b, isFollowing, onFollow, circleCode }: { builder: Builder; isFollowing: boolean; onFollow: () => void; circleCode?: string | null }) {
+function BuilderCard({ builder: b, circleCode }: { builder: Builder; circleCode?: string | null }) {
   const levelInfo = getLevelInfo(b.xp)
-  const [pressed, setPressed] = useState(false)
   const [invited, setInvited] = useState(false)
 
   function handleInvite(e: React.MouseEvent) {
@@ -459,37 +441,23 @@ function BuilderCard({ builder: b, isFollowing, onFollow, circleCode }: { builde
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={e => { e.preventDefault(); e.stopPropagation(); setPressed(true); setTimeout(() => setPressed(false), 150); onFollow() }}
-              style={{
-                padding: '7px 14px', borderRadius: 10, border: '1px solid',
-                borderColor: isFollowing ? 'rgba(255,255,255,0.12)' : 'rgba(212,175,55,0.45)',
-                background: isFollowing ? 'rgba(255,255,255,0.05)' : 'rgba(212,175,55,0.12)',
-                color: isFollowing ? 'rgba(255,255,255,0.42)' : '#D4AF37',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
-                transition: 'all 0.2s',
-                transform: pressed ? 'scale(0.94)' : 'scale(1)',
-              }}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </button>
-            {circleCode && (
+          {/* Invite button */}
+          {circleCode && (
+            <div style={{ flexShrink: 0 }}>
               <button
                 onClick={handleInvite}
                 style={{
                   padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(56,189,248,0.35)',
                   background: invited ? 'rgba(56,189,248,0.15)' : 'rgba(56,189,248,0.07)',
-                  color: invited ? '#38bdf8' : '#38bdf8',
+                  color: '#38bdf8',
                   fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
                   transition: 'all 0.2s',
                 }}
               >
                 {invited ? 'Sent ✓' : 'Invite'}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </Link>
@@ -497,10 +465,9 @@ function BuilderCard({ builder: b, isFollowing, onFollow, circleCode }: { builde
 }
 
 // ── Goal Card ──────────────────────────────────────────────────────────────
-function GoalCard({ goal: g, isFollowing, onFollow }: { goal: PublicGoal; isFollowing: boolean; onFollow: () => void }) {
+function GoalCard({ goal: g }: { goal: PublicGoal }) {
   const m = cat(g.category)
   const authorLevel = getLevelInfo(g.authorLevel === 1 ? 0 : g.authorLevel === 2 ? 150 : g.authorLevel === 3 ? 350 : g.authorLevel === 4 ? 700 : g.authorLevel === 5 ? 1200 : g.authorLevel === 6 ? 2000 : 3500)
-  const [pressed, setPressed] = useState(false)
   const dotsFilled = Math.round(g.progress / 10)
 
   return (
@@ -544,8 +511,8 @@ function GoalCard({ goal: g, isFollowing, onFollow }: { goal: PublicGoal; isFoll
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300, marginLeft: 4 }}>{g.progress}%</span>
         </div>
 
-        {/* Author row + follow button */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        {/* Author row */}
+        <div style={{ display: 'flex', alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
           <Link href={`/profile/${g.user_id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
@@ -561,21 +528,6 @@ function GoalCard({ goal: g, isFollowing, onFollow }: { goal: PublicGoal; isFoll
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>{g.authorName ?? 'Builder'}</span>
           </Link>
-
-          <button
-            onClick={e => { e.stopPropagation(); setPressed(true); setTimeout(() => setPressed(false), 150); onFollow() }}
-            style={{
-              padding: '6px 14px', borderRadius: 9, border: '1px solid',
-              borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : `${m.accent}55`,
-              background: isFollowing ? 'transparent' : m.bg,
-              color: isFollowing ? 'rgba(255,255,255,0.35)' : m.text,
-              fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
-              transition: 'all 0.2s',
-              transform: pressed ? 'scale(0.92)' : 'scale(1)',
-            }}
-          >
-            {isFollowing ? 'Following' : 'Follow'}
-          </button>
         </div>
       </div>
     </div>

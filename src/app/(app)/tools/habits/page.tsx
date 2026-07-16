@@ -1,85 +1,73 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { HabitsClient } from './HabitsClient'
+import { ChallengesClient } from './ChallengesClient'
 
-export default async function HabitsPage() {
+export default async function ChallengesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  // Last 7 days for the week grid (oldest → today)
-  const days: string[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i)
-    days.push(d.toISOString().split('T')[0])
-  }
-  const today = days[6]
-
-  // 90 days back for accurate long-term streaks
-  const since90 = new Date(); since90.setDate(since90.getDate() - 89)
+  const today = new Date().toISOString().split('T')[0]
+  const since90 = new Date(); since90.setDate(since90.getDate() - 90)
   const since90Str = since90.toISOString().split('T')[0]
 
-  const [{ data: habitRows }, { data: completionRows }] = await Promise.all([
+  const [{ data: challengeRows }, { data: logRows }, { data: goalRows }] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('habits') as any)
-      .select('id, name, icon, color, sort_order')
+    (supabase.from('challenges') as any)
+      .select('id, title, description, category, goal_id, duration_days, start_date, created_at')
       .eq('user_id', user.id)
-      .order('sort_order', { ascending: true }),
+      .order('created_at', { ascending: false }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('habit_completions') as any)
-      .select('habit_id, completed_date')
+    (supabase.from('challenge_logs') as any)
+      .select('challenge_id, log_date, note')
       .eq('user_id', user.id)
-      .gte('completed_date', since90Str)
-      .lte('completed_date', today),
+      .gte('log_date', since90Str),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('goals') as any)
+      .select('id, title')
+      .eq('user_id', user.id)
+      .neq('status', 'archived')
+      .order('created_at', { ascending: false })
+      .limit(20),
   ])
 
-  type Habit      = { id: string; name: string; icon: string; color: string; sort_order: number }
-  type Completion = { habit_id: string; completed_date: string }
+  type CRow = { id: string; title: string; description: string | null; category: string | null; goal_id: string | null; duration_days: number; start_date: string; created_at: string }
+  type LRow = { challenge_id: string; log_date: string; note: string | null }
+  type GRow = { id: string; title: string }
 
-  const habits      = (habitRows ?? []) as Habit[]
-  const completions = (completionRows ?? []) as Completion[]
+  const challenges = (challengeRows ?? []) as CRow[]
+  const logs       = (logRows ?? []) as LRow[]
+  const goals      = (goalRows ?? []) as GRow[]
 
-  // Full completion set for the 90-day window
-  const fullSet = new Set(completions.map(c => `${c.habit_id}|${c.completed_date}`))
+  const logsByChallenge = new Map<string, LRow[]>()
+  for (const l of logs) {
+    if (!logsByChallenge.has(l.challenge_id)) logsByChallenge.set(l.challenge_id, [])
+    logsByChallenge.get(l.challenge_id)!.push(l)
+  }
 
-  // 7-day subset for the grid UI
-  const doneSet = new Set([...fullSet].filter(k => {
-    const date = k.split('|')[1]
-    return date >= days[0] && date <= today
-  }))
-
-  // Real streak: walk back from today until a gap is found (up to 90 days)
-  function streak(habitId: string): number {
-    let s = 0
+  function calcStreak(challengeLogs: LRow[], startDate: string): number {
+    const logSet = new Set(challengeLogs.map(l => l.log_date))
+    let streak = 0
     const base = new Date(today)
     for (let i = 0; i < 90; i++) {
       const d = new Date(base); d.setDate(base.getDate() - i)
-      const dateStr = d.toISOString().split('T')[0]
-      if (fullSet.has(`${habitId}|${dateStr}`)) s++
+      const ds = d.toISOString().split('T')[0]
+      if (ds < startDate) break
+      if (logSet.has(ds)) streak++
       else break
     }
-    return s
+    return streak
   }
 
-  const habitsWithStreak = habits.map(h => ({ ...h, streak: streak(h.id) }))
+  const enriched = challenges.map(c => {
+    const cLogs = logsByChallenge.get(c.id) ?? []
+    return {
+      ...c,
+      logs: cLogs,
+      streak: calcStreak(cLogs, c.start_date),
+      daysLogged: cLogs.length,
+    }
+  })
 
-  // 84-day heatmap (12 weeks) — how many habits were done each day
-  type HeatDay = { date: string; done: number; total: number }
-  const heatmapDays: HeatDay[] = []
-  for (let i = 83; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
-    const done = habits.filter(h => fullSet.has(`${h.id}|${dateStr}`)).length
-    heatmapDays.push({ date: dateStr, done, total: habits.length })
-  }
-
-  return (
-    <HabitsClient
-      habits={habitsWithStreak}
-      days={days}
-      today={today}
-      doneSet={[...doneSet]}
-      heatmapDays={heatmapDays}
-    />
-  )
+  return <ChallengesClient challenges={enriched} goals={goals} today={today} />
 }

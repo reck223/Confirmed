@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen" style={{ background: '#080808', color: '#EFEFEF' }}>
       <AnimationObserver />
-      <TopBar unreadCount={unreadCount ?? 0} />
+      <TopBar unreadCount={unreadCount ?? 0} isCreator={user.email === 'graysdarius@gmail.com'} />
       <Nav
         userName={profile?.full_name ?? user.email?.split('@')[0]}
         userStreak={profile?.streak ?? 0}

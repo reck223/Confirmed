@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export function TopBar({ unreadCount }: { unreadCount: number }) {
+export function TopBar({ unreadCount, isCreator }: { unreadCount: number; isCreator?: boolean }) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -14,13 +14,16 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
 
   return (
     <header style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 40,
       height: 210,
       background: 'linear-gradient(to bottom, rgba(8,8,8,0.97) 0%, rgba(8,8,8,0.82) 52%, rgba(8,8,8,0.18) 82%, rgba(8,8,8,0) 100%)',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 16px',
       pointerEvents: 'none',
     }}>
+      <div style={{
+        maxWidth: 560, margin: '0 auto', height: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+      }}>
       {/* Brand logo */}
       <Link href="/home" style={{ pointerEvents: scrolled ? 'none' : 'auto', display: 'flex', alignItems: 'center' }}>
         <Image
@@ -50,6 +53,23 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
         transition: 'opacity 0.22s ease, transform 0.22s ease',
         pointerEvents: scrolled ? 'none' : 'auto',
       }}>
+        {isCreator && (
+          <Link href="/creator" style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'rgba(212,175,55,0.08)',
+            border: '1px solid rgba(212,175,55,0.2)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textDecoration: 'none',
+            boxShadow: 'inset 0 1px 0 rgba(212,175,55,0.1)',
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </Link>
+        )}
+
         <Link href="/settings" style={{
           width: 36, height: 36, borderRadius: 10,
           background: 'rgba(255,255,255,0.07)',
@@ -97,6 +117,7 @@ export function TopBar({ unreadCount }: { unreadCount: number }) {
             </span>
           )}
         </Link>
+      </div>
       </div>
     </header>
   )

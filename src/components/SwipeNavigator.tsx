@@ -1,140 +1,111 @@
 'use client'
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { setNavDirection } from '@/lib/navDirection'
-import { hapticLight } from '@/lib/native'
+import { usePathname } from 'next/navigation'
+import { getNavDirection, clearNavDirection } from '@/lib/navDirection'
 
-const TABS       = ['/home', '/goals', '/tools', '/profile']
-const COMMIT_PX  = 52    // px needed to commit a swipe
-const DRAG_SCALE = 0.28  // content moves 28% of finger travel
+// How far content shifts at maximum drag (px)
+const MAX_SHIFT = 56
 
 export function SwipeNavigator({ children }: { children: React.ReactNode }) {
-  const router   = useRouter()
-  const pathname = usePathname()
-  const wrapRef  = useRef<HTMLDivElement>(null)
+  const pathname  = usePathname()
+  const wrapRef   = useRef<HTMLDivElement>(null)
+  const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Per-gesture state lives in refs — no re-render needed
-  const startX     = useRef(0)
-  const startY     = useRef(0)
-  const startT     = useRef(0)
-  const tracking   = useRef(false)  // touch is active
-  const locked     = useRef(false)  // axis determined as horizontal
-  const navigating = useRef(false)  // navigation in flight
+  function clearTimer() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+  }
+
+  // Once a slide animation settles, remove the transform so that position:fixed children
+  // (post sheets, modals) go back to being positioned relative to the viewport.
+  function scheduleReset(delay: number) {
+    clearTimer()
+    timerRef.current = setTimeout(() => {
+      const el = wrapRef.current; if (!el) return
+      el.style.transition = ''
+      el.style.transform  = ''
+      el.style.opacity    = ''
+    }, delay)
+  }
 
   useEffect(() => {
-    // Non-null: effect only runs after mount, so the div is always present
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const el = wrapRef.current!
+    // ── Live drag: rubber-band content with finger ──────
+    function onSwipe(e: Event) {
+      const el = wrapRef.current; if (!el) return
+      clearTimer()
+      const dx    = (e as CustomEvent<{ dx: number }>).detail.dx
+      const shift = Math.sign(dx) * Math.min(Math.abs(dx) * 0.3, MAX_SHIFT)
+      // Subtle dim reinforces direction without being distracting
+      const dim   = 1 - (Math.abs(shift) / MAX_SHIFT) * 0.15
+      el.style.transition = 'none'
+      el.style.transform  = `translateX(${shift}px)`
+      el.style.opacity    = String(dim)
+    }
 
-    function spring() {
-      el.style.transition = 'transform 0.42s cubic-bezier(0.34,1.56,0.64,1), opacity 0.28s ease'
+    // ── Cancel: spring back to rest ─────────────────────
+    function onCancel() {
+      const el = wrapRef.current; if (!el) return
+      el.style.transition = 'transform 0.44s cubic-bezier(0.34,1.45,0.64,1), opacity 0.28s ease'
       el.style.transform  = 'translateX(0)'
       el.style.opacity    = '1'
-    }
-    function reset() {
-      tracking.current   = false
-      locked.current     = false
-      navigating.current = false
-      spring()
+      scheduleReset(520)
     }
 
-    function onTouchStart(e: TouchEvent) {
-      if (navigating.current) return
-      startX.current   = e.touches[0].clientX
-      startY.current   = e.touches[0].clientY
-      startT.current   = Date.now()
-      tracking.current = true
-      locked.current   = false
-      el.style.transition = 'none'
+    // ── Commit: slide off in swipe direction + fade ─────
+    function onCommit(e: Event) {
+      const el  = wrapRef.current; if (!el) return
+      clearTimer()
+      const dir = (e as CustomEvent<{ dir: string }>).detail.dir
+      const x   = dir === 'left' ? -90 : 90
+      el.style.transition = 'transform 0.19s cubic-bezier(0.4,0,1,1), opacity 0.16s ease'
+      el.style.transform  = `translateX(${x}px)`
+      el.style.opacity    = '0'
     }
 
-    function onTouchMove(e: TouchEvent) {
-      if (!tracking.current) return
-      const dx = e.touches[0].clientX - startX.current
-      const dy = e.touches[0].clientY - startY.current
-
-      if (!locked.current) {
-        // Wait for clear intent before locking direction
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-        // Vertical wins → let native scroll through
-        if (Math.abs(dy) > Math.abs(dx) * 0.85) {
-          tracking.current = false
-          return
-        }
-        locked.current = true
-      }
-
-      // Block native scroll — we own this gesture
-      e.preventDefault()
-
-      const currentIdx = TABS.findIndex(p => pathname.startsWith(p))
-      const canLeft    = currentIdx < TABS.length - 1 && dx < 0
-      const canRight   = currentIdx > 0               && dx > 0
-
-      // Heavy rubber-band at tab edges, free movement in valid direction
-      const drag = (canLeft || canRight) ? dx * DRAG_SCALE : dx * 0.05
-      el.style.transform = `translateX(${drag}px)`
-      el.style.opacity   = String(Math.max(0.55, 1 - Math.abs(drag) / 220))
-    }
-
-    function onTouchEnd(e: TouchEvent) {
-      if (!tracking.current || !locked.current) { reset(); return }
-
-      const dx       = e.changedTouches[0].clientX - startX.current
-      const dt       = Date.now() - startT.current
-      const velocity = Math.abs(dx) / Math.max(dt, 1)  // px per ms
-      const isFlick  = velocity > 0.35                  // fast swipe
-
-      const currentIdx = TABS.findIndex(p => pathname.startsWith(p))
-      let nextIdx = -1
-      if (dx < -COMMIT_PX || (dx < -14 && isFlick)) nextIdx = currentIdx + 1
-      if (dx >  COMMIT_PX || (dx >  14 && isFlick)) nextIdx = currentIdx - 1
-
-      if (nextIdx >= 0 && nextIdx < TABS.length) {
-        navigating.current = true
-        tracking.current   = false
-        locked.current     = false
-
-        const dir   = dx > 0 ? 'right' : 'left'
-        const exitX = dx > 0 ? 72 : -72
-        setNavDirection(dir)
-        hapticLight()  // native haptic pulse on swipe commit
-
-        // Sweep current content off-screen, then navigate
-        el.style.transition = 'transform 0.2s cubic-bezier(0.4,0,1,1), opacity 0.2s ease'
-        el.style.transform  = `translateX(${exitX}px)`
-        el.style.opacity    = '0'
-        setTimeout(() => router.push(TABS[nextIdx]), 95)
-      } else {
-        reset()
-      }
-    }
-
-    el.addEventListener('touchstart',  onTouchStart, { passive: true })
-    el.addEventListener('touchmove',   onTouchMove,  { passive: false })
-    el.addEventListener('touchend',    onTouchEnd,   { passive: true })
-    el.addEventListener('touchcancel', reset,        { passive: true })
-
+    window.addEventListener('nav-swipe',        onSwipe)
+    window.addEventListener('nav-swipe-cancel', onCancel)
+    window.addEventListener('nav-swipe-commit', onCommit)
     return () => {
-      el.removeEventListener('touchstart',  onTouchStart)
-      el.removeEventListener('touchmove',   onTouchMove)
-      el.removeEventListener('touchend',    onTouchEnd)
-      el.removeEventListener('touchcancel', reset)
+      window.removeEventListener('nav-swipe',        onSwipe)
+      window.removeEventListener('nav-swipe-cancel', onCancel)
+      window.removeEventListener('nav-swipe-commit', onCommit)
     }
-  }, [pathname, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Reset wrapper to origin before the new page paints — no flash
+  // ── New page enter: slide in from the opposite side ──
   useLayoutEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    el!.style.transition = 'none'
-    el!.style.transform  = 'translateX(0)'
-    el!.style.opacity    = '1'
-    navigating.current   = false
+    const el  = wrapRef.current; if (!el) return
+    clearTimer()
+    const dir = getNavDirection()
+    clearNavDirection()
+
+    if (dir) {
+      // Swipe left  → new page was to the right → enter from right (+x)
+      // Swipe right → new page was to the left  → enter from left  (-x)
+      const startX = dir === 'left' ? 80 : -80
+      el.style.transition = 'none'
+      el.style.transform  = `translateX(${startX}px)`
+      el.style.opacity    = '0'
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.34s cubic-bezier(0.25,1,0.5,1), opacity 0.24s ease'
+          el.style.transform  = 'translateX(0)'
+          el.style.opacity    = '1'
+          // Clear transform once settled — restores viewport context for fixed children
+          scheduleReset(420)
+        })
+      })
+    } else {
+      el.style.transition = ''
+      el.style.transform  = ''
+      el.style.opacity    = ''
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
   return (
-    <div ref={wrapRef} style={{ minHeight: '100%', willChange: 'transform, opacity' }}>
+    <div ref={wrapRef} style={{ minHeight: '100%' }}>
       {children}
     </div>
   )
