@@ -430,7 +430,15 @@ export function CircleClient({
   const [inviteSearch, setInviteSearch] = useState('')
   const [inviteSent, setInviteSent] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+    // Load persisted invites for this circle
+    const key = `manifest_invites_${circles[0]?.code ?? ''}`
+    try {
+      const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as string[]
+      if (stored.length) setInviteSent(new Set(stored))
+    } catch {}
+  }, [])
   const router = useRouter()
   const postFileRef = useRef<HTMLInputElement>(null)
 
@@ -532,7 +540,14 @@ export function CircleClient({
     const firstName = toName?.split(' ')[0]
     const msg = `👋 Hey${firstName ? ` ${firstName}` : ''}! ${userName ?? 'Someone'} wants you to join their accountability circle "${primaryCircle.name}". Use code **${primaryCircle.code}** or join here: ${inviteLink}`
     await sendMessage(toId, msg)
-    setInviteSent(prev => new Set([...prev, toId]))
+    setInviteSent(prev => {
+      const next = new Set([...prev, toId])
+      try {
+        const key = `manifest_invites_${primaryCircle.code}`
+        localStorage.setItem(key, JSON.stringify([...next]))
+      } catch {}
+      return next
+    })
   }
 
   return (
