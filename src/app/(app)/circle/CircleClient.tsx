@@ -393,6 +393,7 @@ type BirthdayProfile = { id: string; full_name: string | null; date_of_birth: st
 export function CircleClient({
   posts, circles, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
   circleEligibility, circleRequested, circleApproved, birthdayProfiles,
+  weekCommitments, myWitnessedIds,
 }: {
   posts: PostWithMeta[]; circles: CircleInfo[]; userId: string
   discoverProfiles: DiscoverProfile[]
@@ -442,6 +443,7 @@ export function CircleClient({
       if (stored.length) setInviteSent(new Set(stored))
     } catch {}
   }, [])
+  const [expandedPost, setExpandedPost] = useState<PostWithMeta | null>(null)
   const [commitmentText, setCommitmentText] = useState('')
   const [submittingCommit, setSubmittingCommit] = useState(false)
   const [localCommitments, setLocalCommitments] = useState<CircleCommitment[]>(weekCommitments)
@@ -983,46 +985,35 @@ export function CircleClient({
       {/* ══════════ FEED TAB ══════════ */}
       {circles.length > 0 && mainTab === 'feed' && (
         <>
-          {/* Invite strip */}
-          {primaryCircle && (
-            <div style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowInvite(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(212,175,55,0.15),rgba(212,175,55,0.06))', border: '1px solid rgba(212,175,55,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Satoshi,sans-serif' }}>
-                <span style={{ fontSize: 18 }}>✉️</span>
-                <div style={{ textAlign: 'left' }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', marginBottom: 1 }}>Invite to {primaryCircle.name}</p>
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300 }}>Share link · QR code · copy code</p>
-                </div>
-              </button>
-              <button onClick={() => setShowJoin(true)} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.42)', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap' }}>Join another</button>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)' }}>
+                POSTS {feedFilter === 'circle' ? filteredPosts.length : followingPosts.length}
+              </p>
             </div>
-          )}
+            <button onClick={() => setShowPost(true)} style={{ padding: '7px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', color: '#000', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}>
+              + NEW POST
+            </button>
+          </div>
 
-          {/* Feed toggle: My Circle vs Following */}
-          <div style={{ display: 'flex', gap: 0, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 3 }}>
+          {/* Circle / Following toggle */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 3 }}>
             {([
               { k: 'circle' as const,    l: '👥 My Circle' },
               { k: 'following' as const, l: `Following${followingPosts.length > 0 ? ` (${followingPosts.length})` : ''}` },
             ] as const).map(({ k, l }) => (
-              <button key={k} onClick={() => { setFeedFilter(k); if (k === 'circle') setFilter('all') }} style={{
-                flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13,
-                background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.2s',
-                boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-              }}>{l}</button>
+              <button key={k} onClick={() => { setFeedFilter(k); if (k === 'circle') setFilter('all') }} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, background: feedFilter === k ? 'rgba(255,255,255,0.08)' : 'transparent', color: feedFilter === k ? '#EFEFEF' : 'rgba(255,255,255,0.35)', transition: 'all 0.2s', boxShadow: feedFilter === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none' }}>{l}</button>
             ))}
           </div>
 
           {feedFilter === 'circle' ? (
             <>
-              {/* Type filter */}
-              <div style={{ margin: '0 -20px', marginBottom: 18 }}>
-                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', padding: '0 20px 4px' }}>
+              {/* Type filter chips */}
+              <div style={{ margin: '0 -20px', marginBottom: 14 }}>
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 20px 4px', scrollbarWidth: 'none' }}>
                   {FILTER_TABS.map(t => (
-                    <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.55)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.09)' }}>
-                      {t.l}
-                    </button>
+                    <button key={t.k} onClick={() => setFilter(t.k)} style={{ whiteSpace: 'nowrap', padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', flexShrink: 0, background: filter === t.k ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: filter === t.k ? '#D4AF37' : 'rgba(255,255,255,0.42)', border: filter === t.k ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.07)', transition: 'all 0.15s' }}>{t.l}</button>
                   ))}
                 </div>
               </div>
@@ -1033,12 +1024,9 @@ export function CircleClient({
                   <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {filteredPosts.map((post, idx) => (
-                    <div key={post.id}>
-                      <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
-                      {idx < filteredPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {filteredPosts.map(post => (
+                    <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
                   ))}
                 </div>
               )}
@@ -1048,20 +1036,47 @@ export function CircleClient({
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
                 <p style={{ fontSize: 40, marginBottom: 14 }}>✦</p>
                 <p style={{ fontSize: 16, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>No following posts yet</p>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Follow builders in Explore to see their updates here.</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Follow builders in Explore to see their updates here.</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {followingPosts.map((post, idx) => (
-                  <div key={post.id}>
-                    <PostCard post={post} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
-                    {idx < followingPosts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-                  </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {followingPosts.map(post => (
+                  <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
                 ))}
               </div>
             )
           )}
+
+          {/* Invite strip at bottom */}
+          {primaryCircle && feedFilter === 'circle' && (
+            <div style={{ marginTop: 20, display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowInvite(true)} style={{ flex: 1, padding: '12px 16px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Satoshi,sans-serif' }}>
+                <span style={{ fontSize: 16 }}>✉️</span>
+                <div style={{ textAlign: 'left' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', marginBottom: 1 }}>Invite to {primaryCircle.name}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 300 }}>Share link · QR · code</p>
+                </div>
+              </button>
+              <button onClick={() => setShowJoin(true)} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.42)', fontFamily: 'Satoshi,sans-serif', whiteSpace: 'nowrap' }}>Join another</button>
+            </div>
+          )}
         </>
+      )}
+
+      {/* ── Expanded post bottom sheet (portal) ── */}
+      {mounted && expandedPost && createPortal(
+        <>
+          <div onClick={() => setExpandedPost(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)' }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100000, maxHeight: '88dvh', display: 'flex', flexDirection: 'column', background: '#0E0E0E', borderRadius: '24px 24px 0 0', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div style={{ flexShrink: 0, padding: '14px 0 8px', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px 32px' }}>
+              <PostCard post={expandedPost} userId={userId} myAvatar={userAvatar} myName={userUsername ?? userName} shareMembers={discoverProfiles.map(p => ({ id: p.id, name: p.full_name, avatar: p.avatar_url ?? null }))} onReact={handleReaction} />
+            </div>
+          </div>
+        </>,
+        document.body
       )}
 
       {/* ══════════ SESSIONS TAB ══════════ */}
@@ -2081,6 +2096,70 @@ function MemberStatusCard({ status, userId }: { status: MemberStatus; userId: st
 // Shared sub-components
 // ══════════════════════════════════════════════════════
 type ShareMember = { id: string; name: string | null; avatar: string | null }
+
+// ══════════════════════════════════════════════════════
+// Feed Grid Cell
+// ══════════════════════════════════════════════════════
+const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/g
+function extractFirstUrl(text: string): string | null {
+  return text.match(URL_REGEX)?.[0] ?? null
+}
+
+function FeedGridCell({ post, onClick }: { post: PostWithMeta; onClick: () => void }) {
+  const [ogImage, setOgImage] = useState<string | null>(null)
+  const [siteName, setSiteName] = useState<string | null>(null)
+  const firstUrl = extractFirstUrl(post.content)
+  const hasMedia = !!post.media_url
+  const isVideo = post.media_type === 'video' || (!!post.media_url && post.media_url.includes('.mp4'))
+  const meta = TYPE_META[post.type] ?? TYPE_META['win']
+
+  useEffect(() => {
+    if (hasMedia || !firstUrl) return
+    fetch(`/api/og-preview?url=${encodeURIComponent(firstUrl)}`)
+      .then(r => r.json())
+      .then((d: { ogImage?: string; siteName?: string }) => {
+        if (d.ogImage) setOgImage(d.ogImage)
+        if (d.siteName) setSiteName(d.siteName)
+      })
+      .catch(() => {})
+  }, [firstUrl, hasMedia])
+
+  const thumbSrc = hasMedia ? post.media_url : ogImage
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ position: 'relative', aspectRatio: '1', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', background: thumbSrc ? '#111' : meta.bg, border: `1px solid ${thumbSrc ? 'rgba(255,255,255,0.07)' : meta.border}`, WebkitTapHighlightColor: 'transparent' }}
+    >
+      {thumbSrc ? (
+        <img src={thumbSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 10 }}>
+          <span style={{ fontSize: 22, marginBottom: 6 }}>{meta.emoji}</span>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical' as const }}>{post.content}</p>
+        </div>
+      )}
+      {/* Bottom overlay — site name or reaction count */}
+      {thumbSrc && (
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)', padding: '20px 8px 7px' }}>
+          {siteName && <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.03em' }}>{siteName}</p>}
+        </div>
+      )}
+      {/* Video play icon */}
+      {isVideo && (
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="12" height="14" viewBox="0 0 12 14" fill="white"><polygon points="0,0 12,7 0,14"/></svg>
+        </div>
+      )}
+      {/* Reaction count badge */}
+      {(post.reactions.fire + post.reactions.strong + post.reactions.relate) > 0 && (
+        <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', borderRadius: 99, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#fff' }}>
+          🔥{post.reactions.fire + post.reactions.strong + post.reactions.relate}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function PostCard({ post, userId, myAvatar, myName, shareMembers, onReact }: { post: PostWithMeta; userId: string; myAvatar: string | null; myName: string | null; shareMembers: ShareMember[]; onReact: (id: string, type: 'fire' | 'strong' | 'relate') => void }) {
   const router = useRouter()

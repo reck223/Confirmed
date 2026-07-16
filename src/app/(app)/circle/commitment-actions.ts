@@ -43,7 +43,8 @@ export async function witnessCommitment(commitmentId: string, toUserId: string) 
   const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
   const myName = (myProfile as { full_name: string | null } | null)?.full_name ?? 'Someone'
 
-  await supabase.from('notifications').insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('notifications') as any).insert({
     to_user_id: toUserId,
     from_user_id: user.id,
     type: 'witness',
