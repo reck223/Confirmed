@@ -565,14 +565,9 @@ export function CircleClient({
       username: userUsername,
       created_at: new Date().toISOString(),
     }
-    const saved = commitmentText.trim()
     setLocalCommitments(prev => [...prev, optimistic])
     setCommitmentText('')
-    const result = await postCommitment(primaryCircle.id, saved)
-    if (result?.error) {
-      setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
-      setCommitmentText(saved)
-    }
+    await postCommitment(primaryCircle.id, optimistic.text)
     setSubmittingCommit(false)
   }
 
@@ -1094,8 +1089,7 @@ export function CircleClient({
                               avatar_url: userAvatar, username: userUsername, created_at: new Date().toISOString(),
                             }
                             setLocalCommitments(prev => [...prev, optimistic])
-                            const result = await postCommitment(primaryCircle.id, goal.title)
-                            if (result?.error) setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
+                            await postCommitment(primaryCircle.id, goal.title)
                             setSubmittingCommit(false)
                           }}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent' }}
