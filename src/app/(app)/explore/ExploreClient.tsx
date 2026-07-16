@@ -1,5 +1,7 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { watchGoal, unwatchGoal } from '@/app/(app)/goals/watch-actions'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getLevelInfo } from '@/lib/xp'
@@ -14,6 +16,7 @@ export type PublicGoal = {
   id: string; title: string; category: string | null; progress: number
   created_at: string; user_id: string
   authorName: string | null; authorAvatar: string | null; authorLevel: number
+  watcherCount: number; isWatching: boolean
 }
 
 // ── Category meta — exact match with GoalsClient ──────────────────────────
@@ -469,6 +472,20 @@ function GoalCard({ goal: g }: { goal: PublicGoal }) {
   const m = cat(g.category)
   const authorLevel = getLevelInfo(g.authorLevel === 1 ? 0 : g.authorLevel === 2 ? 150 : g.authorLevel === 3 ? 350 : g.authorLevel === 4 ? 700 : g.authorLevel === 5 ? 1200 : g.authorLevel === 6 ? 2000 : 3500)
   const dotsFilled = Math.round(g.progress / 10)
+  const [watching, setWatching] = useState(g.isWatching)
+  const [watchCount, setWatchCount] = useState(g.watcherCount)
+  const [, startTransition] = useTransition()
+  const router = useRouter()
+
+  function handleWatch() {
+    const wasWatching = watching
+    setWatching(!wasWatching)
+    setWatchCount(c => wasWatching ? c - 1 : c + 1)
+    startTransition(async () => {
+      wasWatching ? await unwatchGoal(g.id) : await watchGoal(g.id)
+      router.refresh()
+    })
+  }
 
   return (
     <div style={{
@@ -511,8 +528,8 @@ function GoalCard({ goal: g }: { goal: PublicGoal }) {
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300, marginLeft: 4 }}>{g.progress}%</span>
         </div>
 
-        {/* Author row */}
-        <div style={{ display: 'flex', alignItems: 'center', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        {/* Author row + watch button */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
           <Link href={`/profile/${g.user_id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
@@ -528,6 +545,22 @@ function GoalCard({ goal: g }: { goal: PublicGoal }) {
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>{g.authorName ?? 'Builder'}</span>
           </Link>
+
+          <button
+            onClick={e => { e.stopPropagation(); handleWatch() }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 9, border: '1px solid',
+              borderColor: watching ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.1)',
+              background: watching ? 'rgba(56,189,248,0.1)' : 'transparent',
+              color: watching ? '#38bdf8' : 'rgba(255,255,255,0.42)',
+              fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+              transition: 'all 0.2s',
+            }}
+          >
+            {watching ? '👁 Watching' : '+ Watch'}
+            {watchCount > 0 && <span style={{ fontSize: 10, opacity: 0.7 }}>{watchCount}</span>}
+          </button>
         </div>
       </div>
     </div>

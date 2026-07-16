@@ -3,6 +3,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { markAllNotifsRead } from './actions'
+import { acceptConnection, declineConnection } from '@/app/(app)/profile/connection-actions'
 
 type Conversation = {
   otherId: string
@@ -124,6 +125,27 @@ const NOTIF_META: Record<string, { emoji: string; color: string; label: (n: Noti
     sub: n => n.data.preview ? `"${n.data.preview}"` : '',
     href: () => '/goals',
   },
+  witness: {
+    emoji: '👁',
+    color: '#a78bfa',
+    label: n => `${n.data.author_name ?? n.from_name ?? 'Someone'} is witnessing your commitment`,
+    sub: () => 'They see you — keep going',
+    href: () => '/circle',
+  },
+  connection_request: {
+    emoji: '🤝',
+    color: '#38bdf8',
+    label: n => `${n.data.author_name ?? n.from_name ?? 'Someone'} wants to Connect with you`,
+    sub: n => n.data.title ? `"${n.data.title}" · ${n.data.duration_days}d` : '',
+    href: n => n.from_user_id ? `/profile/${n.from_user_id}` : '/inbox',
+  },
+  connection_accepted: {
+    emoji: '✅',
+    color: '#4ade80',
+    label: n => `${n.data.author_name ?? n.from_name ?? 'Someone'} accepted your Connection`,
+    sub: n => n.data.message ?? '',
+    href: n => n.from_user_id ? `/profile/${n.from_user_id}` : '/inbox',
+  },
 }
 
 export function InboxClient({ conversations, notifications, currentUserId: _currentUserId, unreadNotifs }: {
@@ -135,12 +157,29 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
   const [tab, setTab] = useState<'messages' | 'activity'>('messages')
   const [, startTransition] = useTransition()
   const router = useRouter()
+  const [handledConnections, setHandledConnections] = useState<Record<string, 'accepted' | 'declined'>>({})
 
   const totalUnreadMessages = conversations.reduce((s, c) => s + c.unread, 0)
 
   function handleMarkRead() {
     startTransition(async () => {
       await markAllNotifsRead()
+      router.refresh()
+    })
+  }
+
+  function handleAcceptConnection(connectionId: string, notifId: string) {
+    setHandledConnections(prev => ({ ...prev, [notifId]: 'accepted' }))
+    startTransition(async () => {
+      await acceptConnection(connectionId)
+      router.refresh()
+    })
+  }
+
+  function handleDeclineConnection(connectionId: string, notifId: string) {
+    setHandledConnections(prev => ({ ...prev, [notifId]: 'declined' }))
+    startTransition(async () => {
+      await declineConnection(connectionId)
       router.refresh()
     })
   }
@@ -225,6 +264,49 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
               const meta = NOTIF_META[notif.type]
               if (!meta) return null
               const isUnread = !notif.read_at
+
+              // Connection requests get inline accept/decline buttons
+              if (notif.type === 'connection_request') {
+                const connectionId = notif.data.connection_id
+                const handled = connectionId ? handledConnections[notif.id] : null
+                return (
+                  <div key={notif.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 20px', background: isUnread ? `${meta.color}0a` : 'none', borderLeft: `2px solid ${isUnread ? meta.color + '60' : 'transparent'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 14, background: `${meta.color}18`, border: `1px solid ${meta.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                        {meta.emoji}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: isUnread ? 600 : 400, color: '#EFEFEF', lineHeight: 1.4, marginBottom: 3 }}>{meta.label(notif)}</p>
+                        {notif.data.title && <p style={{ fontSize: 12, color: '#38bdf8', fontWeight: 600, lineHeight: 1.4 }}>{notif.data.title}</p>}
+                        {notif.data.commitment && <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.5, marginTop: 3 }}>{notif.data.commitment}</p>}
+                        <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{timeAgo(notif.created_at)}</p>
+                      </div>
+                    </div>
+                    {connectionId && !handled && (
+                      <div style={{ display: 'flex', gap: 8, paddingLeft: 56 }}>
+                        <button
+                          onClick={() => handleAcceptConnection(connectionId, notif.id)}
+                          style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleDeclineConnection(connectionId, notif.id)}
+                          style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    )}
+                    {handled && (
+                      <p style={{ paddingLeft: 56, fontSize: 12, color: handled === 'accepted' ? '#4ade80' : 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+                        {handled === 'accepted' ? '✓ Accepted' : 'Declined'}
+                      </p>
+                    )}
+                  </div>
+                )
+              }
+
               const href = meta.href(notif)
               return (
                 <Link key={notif.id} href={href} style={{ textDecoration: 'none', display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 20px', background: isUnread ? `${meta.color}0a` : 'none', borderLeft: `2px solid ${isUnread ? meta.color + '60' : 'transparent'}`, transition: 'background 0.12s' }}>

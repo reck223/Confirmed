@@ -1,10 +1,10 @@
 'use client'
 import { useState, useTransition, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { followUser, unfollowUser } from '../../circle/actions'
-import { getPublicFollowCounts } from './actions'
+import { proposeConnection } from '../connection-actions'
 
 type Goal = { id: string; title: string; category: string | null; progress: number; deadline: string | null; status: string; visibility: string }
 type PublicPost = { id: string; content: string; type: string; created_at: string; media_url: string | null; media_type: string | null }
@@ -99,25 +99,24 @@ function progressColor(p: number) {
   return '#f87171'
 }
 
-export function PublicProfileClient({ profile, goals, allGoals, isFollowing: initialFollowing, currentUserId: _currentUserId, followersCount, followingCount, assessmentHistory, posts }: {
+export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _currentUserId, assessmentHistory, posts, existingConnectionStatus }: {
   profile: Profile; goals: Goal[]; allGoals: Goal[]
-  isFollowing: boolean; currentUserId: string
-  followersCount: number; followingCount: number
+  currentUserId: string
   assessmentHistory: AssessmentHistory
   posts: PublicPost[]
+  existingConnectionStatus: 'none' | 'pending' | 'active'
 }) {
-  const [following, setFollowing] = useState(initialFollowing)
   const [, startTransition] = useTransition()
   const router = useRouter()
-  const [liveFollowers, setLiveFollowers] = useState<number | null>(null)
-  const [liveFollowing, setLiveFollowing] = useState<number | null>(null)
+  const [showConnectSheet, setShowConnectSheet] = useState(false)
+  const [connectTitle, setConnectTitle] = useState('')
+  const [connectCommitment, setConnectCommitment] = useState('')
+  const [connectDuration, setConnectDuration] = useState(30)
+  const [connectSending, setConnectSending] = useState(false)
+  const [connectSent, setConnectSent] = useState(existingConnectionStatus !== 'none')
+  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    getPublicFollowCounts(profile.id).then(({ followersCount: f, followingCount: ing }) => {
-      setLiveFollowers(f)
-      setLiveFollowing(ing)
-    })
-  }, [profile.id])
+  useEffect(() => { setMounted(true) }, [])
 
   const badges = getBadges(profile)
   const focusAreas = getFocusAreas(allGoals)
@@ -126,15 +125,16 @@ export function PublicProfileClient({ profile, goals, allGoals, isFollowing: ini
   const doneGoals = goals.filter(g => g.status === 'complete')
   const pinnedGoal = allGoals.find(g => g.id === profile.pinned_goal_id)
 
-  function handleFollow() {
-    const next = !following
-    setFollowing(next)
-    setLiveFollowers(prev => (prev ?? followersCount) + (next ? 1 : -1))
-    startTransition(async () => {
-      if (next) await followUser(profile.id)
-      else await unfollowUser(profile.id)
-      router.refresh()
-    })
+  async function handleConnect() {
+    if (!connectTitle.trim() || !connectCommitment.trim()) return
+    setConnectSending(true)
+    const result = await proposeConnection(profile.id, connectTitle, connectCommitment, connectDuration)
+    setConnectSending(false)
+    if (!result.error) {
+      setConnectSent(true)
+      setShowConnectSheet(false)
+      startTransition(() => { router.refresh() })
+    }
   }
 
   const firstName = profile.full_name?.split(' ')[0] ?? 'They'
@@ -166,8 +166,22 @@ export function PublicProfileClient({ profile, goals, allGoals, isFollowing: ini
             <Link href={`/inbox/${profile.id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', textDecoration: 'none' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </Link>
-            <button onClick={handleFollow} style={{ padding: '8px 20px', borderRadius: 12, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, transition: 'all 0.15s', background: following ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: following ? 'rgba(255,255,255,0.55)' : '#000', border: following ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent' }}>
-              {following ? 'Following' : 'Follow'}
+            <button
+              onClick={() => !connectSent && setShowConnectSheet(true)}
+              disabled={connectSent}
+              style={{
+                padding: '8px 18px', borderRadius: 12, cursor: connectSent ? 'default' : 'pointer',
+                fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 13, transition: 'all 0.15s',
+                background: connectSent
+                  ? 'rgba(56,189,248,0.08)'
+                  : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
+                color: connectSent ? '#38bdf8' : '#fff',
+                border: connectSent ? '1px solid rgba(56,189,248,0.3)' : '1px solid transparent',
+              }}
+            >
+              {connectSent
+                ? existingConnectionStatus === 'active' ? '✓ Connected' : 'Pending...'
+                : '+ Connect'}
             </button>
           </div>
         </div>
@@ -177,11 +191,6 @@ export function PublicProfileClient({ profile, goals, allGoals, isFollowing: ini
         {profile.username && <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', marginBottom: 4 }}>@{profile.username}</p>}
         {profile.tagline && <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.58)', fontWeight: 300, fontStyle: 'italic', marginBottom: 10 }}>{profile.tagline}</p>}
 
-        {/* Follower counts */}
-        <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
-          <div><span style={{ fontSize: 15, fontWeight: 900, color: '#EFEFEF' }}>{liveFollowers ?? followersCount}</span> <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)' }}>followers</span></div>
-          <div><span style={{ fontSize: 15, fontWeight: 900, color: '#EFEFEF' }}>{liveFollowing ?? followingCount}</span> <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)' }}>following</span></div>
-        </div>
       </div>
 
       {/* ── Badges ── */}
@@ -377,6 +386,98 @@ export function PublicProfileClient({ profile, goals, allGoals, isFollowing: ini
           </>
         )}
       </div>
+
+      {/* ── Connect Sheet (portal) ── */}
+      {mounted && showConnectSheet && createPortal(
+        <>
+          <div onClick={() => setShowConnectSheet(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)' }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100000, maxHeight: '85dvh', display: 'flex', flexDirection: 'column', background: '#0E0E0E', borderRadius: '24px 24px 0 0', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            {/* Handle */}
+            <div style={{ flexShrink: 0, padding: '14px 0 0', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
+            </div>
+
+            <div style={{ overflowY: 'auto', padding: '16px 20px 32px', flex: 1 }}>
+              {/* Header */}
+              <div style={{ marginBottom: 20 }}>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#38bdf8', marginBottom: 4 }}>NEW CONNECTION</p>
+                <p style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                  Make a covenant with {firstName}
+                </p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', marginTop: 6, fontWeight: 300 }}>
+                  A time-bound mutual commitment. They can accept or decline.
+                </p>
+              </div>
+
+              {/* Covenant name */}
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.42)', marginBottom: 6 }}>COVENANT NAME</p>
+                <input
+                  value={connectTitle}
+                  onChange={e => setConnectTitle(e.target.value)}
+                  maxLength={80}
+                  placeholder={`e.g. "30-Day Health Pact with ${firstName}"`}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', outline: 'none' }}
+                />
+              </div>
+
+              {/* Commitment text */}
+              <div style={{ marginBottom: 18 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.42)', marginBottom: 6 }}>WHAT WE BOTH COMMIT TO</p>
+                <textarea
+                  value={connectCommitment}
+                  onChange={e => setConnectCommitment(e.target.value)}
+                  maxLength={400}
+                  rows={3}
+                  placeholder="e.g. We both show up to the gym 4x/week and check in every Sunday..."
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', outline: 'none', resize: 'none' }}
+                />
+              </div>
+
+              {/* Duration picker */}
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.42)', marginBottom: 10 }}>DURATION</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[7, 14, 30, 60, 90].map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setConnectDuration(d)}
+                      style={{
+                        padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+                        fontFamily: 'Satoshi,sans-serif', fontSize: 12, fontWeight: 700,
+                        transition: 'all 0.15s',
+                        background: connectDuration === d ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.04)',
+                        color: connectDuration === d ? '#38bdf8' : 'rgba(255,255,255,0.55)',
+                        border: connectDuration === d ? '1px solid rgba(56,189,248,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                      }}
+                    >
+                      {d === 7 ? '1 week' : d === 14 ? '2 weeks' : d === 30 ? '30 days' : d === 60 ? '60 days' : '90 days'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Send button */}
+              <button
+                onClick={handleConnect}
+                disabled={connectSending || !connectTitle.trim() || !connectCommitment.trim()}
+                style={{
+                  width: '100%', padding: '15px', borderRadius: 16, border: 'none', cursor: 'pointer',
+                  background: connectSending || !connectTitle.trim() || !connectCommitment.trim()
+                    ? 'rgba(255,255,255,0.06)'
+                    : 'linear-gradient(135deg,#38bdf8,#0ea5e9)',
+                  color: connectSending || !connectTitle.trim() || !connectCommitment.trim() ? 'rgba(255,255,255,0.3)' : '#fff',
+                  fontSize: 14, fontWeight: 800, fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {connectSending ? 'SENDING...' : `SEND TO ${(firstName).toUpperCase()} →`}
+              </button>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   )
 }

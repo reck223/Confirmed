@@ -9,7 +9,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   if (!user) redirect('/signin')
   if (user.id === targetId) redirect('/profile')
 
-  const [{ data: profileData }, { data: goalRows }, { data: followRow }, { count: followersCount }, { count: followingCount }, { data: assessRows }, { data: postRows }] = await Promise.all([
+  const [{ data: profileData }, { data: goalRows }, { data: connectionRow }, { data: assessRows }, { data: postRows }] = await Promise.all([
     supabase.from('profiles')
       .select('id, full_name, username, bio, tagline, streak, goals_complete, assessments_submitted, avatar_url, cover_url, pinned_goal_id, created_at')
       .eq('id', targetId)
@@ -20,11 +20,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       .neq('goal_type', 'letter')
       .order('created_at', { ascending: false }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('follows') as any).select('id').eq('follower_id', user.id).eq('following_id', targetId).single(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('follows') as any).select('id', { count: 'exact', head: true }).eq('following_id', targetId),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('follows') as any).select('id', { count: 'exact', head: true }).eq('follower_id', targetId),
+    (supabase.from('connections') as any)
+      .select('status')
+      .or(`and(proposer_id.eq.${user.id},receiver_id.eq.${targetId}),and(proposer_id.eq.${targetId},receiver_id.eq.${user.id})`)
+      .in('status', ['pending', 'active'])
+      .maybeSingle(),
     supabase.from('assessments').select('week_start, rating').eq('user_id', targetId).order('week_start', { ascending: false }).limit(26),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('posts') as any).select('id, content, type, created_at, media_url, media_type').eq('user_id', targetId).eq('visibility', 'public').order('created_at', { ascending: false }).limit(30),
@@ -43,17 +43,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const assessmentHistory = (assessRows ?? []) as { week_start: string; rating: number | null }[]
   const posts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; media_url: string | null; media_type: string | null }[]
 
+  const connStatus = connectionRow as { status: string } | null
+  const existingConnectionStatus: 'none' | 'pending' | 'active' =
+    connStatus?.status === 'active' ? 'active' : connStatus?.status === 'pending' ? 'pending' : 'none'
+
   return (
     <PublicProfileClient
       profile={profile}
       goals={publicGoals}
       allGoals={goals}
-      isFollowing={!!followRow}
       currentUserId={user.id}
-      followersCount={followersCount ?? 0}
-      followingCount={followingCount ?? 0}
       assessmentHistory={assessmentHistory}
       posts={posts}
+      existingConnectionStatus={existingConnectionStatus}
     />
   )
 }

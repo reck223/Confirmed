@@ -414,7 +414,7 @@ export default async function CirclePage() {
   })
   const exploreGoals = exploreGoalList.map(g => {
     const p = exploreProfileMap.get(g.user_id)
-    return { id: g.id, title: g.title, category: g.category, progress: g.progress, created_at: g.created_at, user_id: g.user_id, authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1 }
+    return { id: g.id, title: g.title, category: g.category, progress: g.progress, created_at: g.created_at, user_id: g.user_id, authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1, watcherCount: 0, isWatching: false }
   })
 
   // ── New builders spotlight ──

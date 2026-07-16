@@ -20,10 +20,22 @@ export default async function ExplorePage() {
 
   const authorIds = [...new Set(((publicGoalsRaw ?? []) as { user_id: string }[]).map(g => g.user_id))]
 
-  // Profiles of goal authors
-  const { data: profilesRaw } = authorIds.length > 0
-    ? await supabase.from('profiles').select('id, full_name, avatar_url, xp, level').in('id', authorIds)
-    : { data: [] }
+  const goalIds = ((publicGoalsRaw ?? []) as { id: string }[]).map(g => g.id)
+
+  // Profiles of goal authors + watcher data (parallel)
+  const [{ data: profilesRaw }, { data: watchersRaw }, { data: myWatchesRaw }] = await Promise.all([
+    authorIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, avatar_url, xp, level').in('id', authorIds)
+      : Promise.resolve({ data: [] }),
+    goalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_watchers') as any).select('goal_id').in('goal_id', goalIds)
+      : Promise.resolve({ data: [] }),
+    goalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_watchers') as any).select('goal_id').in('goal_id', goalIds).eq('user_id', user.id)
+      : Promise.resolve({ data: [] }),
+  ])
 
   type RawGoal = { id: string; title: string; category: string | null; progress: number; user_id: string; created_at: string }
   type RawProfile = { id: string; full_name: string | null; avatar_url: string | null; xp: number; level: number }
@@ -31,6 +43,12 @@ export default async function ExplorePage() {
   const profileMap = new Map<string, RawProfile>(
     ((profilesRaw ?? []) as RawProfile[]).map(p => [p.id, p])
   )
+
+  const watcherCountMap = new Map<string, number>()
+  for (const w of (watchersRaw ?? []) as { goal_id: string }[]) {
+    watcherCountMap.set(w.goal_id, (watcherCountMap.get(w.goal_id) ?? 0) + 1)
+  }
+  const myWatchSet = new Set(((myWatchesRaw ?? []) as { goal_id: string }[]).map(w => w.goal_id))
 
   // Build builders (grouped by user, sorted by XP)
   const builderMap = new Map<string, {
@@ -58,6 +76,8 @@ export default async function ExplorePage() {
       id: g.id, title: g.title, category: g.category, progress: g.progress,
       created_at: g.created_at, user_id: g.user_id,
       authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1,
+      watcherCount: watcherCountMap.get(g.id) ?? 0,
+      isWatching: myWatchSet.has(g.id),
     }
   })
 
