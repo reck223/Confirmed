@@ -17,6 +17,20 @@ export type LeaderboardEntry = {
   post_count: number; assessment_count: number; streak: number
 }
 
+export type MemberStatus = {
+  user_id: string; full_name: string | null; avatar_url: string | null; username: string | null
+  streak: number; energy_today: number | null
+  active_goal: { title: string; progress: number; category: string | null } | null
+  post_count_week: number; posted_today: boolean; score: number
+}
+
+export type CircleCommitment = {
+  id: string; user_id: string; circle_id: string; week_start: string
+  text: string; status: 'active' | 'done' | 'failed'
+  witness_count: number; full_name: string | null; avatar_url: string | null
+  username: string | null; created_at: string
+}
+
 export default async function CirclePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -128,29 +142,49 @@ export default async function CirclePage() {
     })
   }
 
-  // ── Circle leaderboard (weekly scores) ──
+  // ── Circle leaderboard + member statuses (weekly scores) ──
   let leaderboard: LeaderboardEntry[] = []
+  let memberStatuses: MemberStatus[] = []
   if (circleIds.length > 0) {
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
     const weekStartStr = weekStart.toISOString().split('T')[0]
+    const todayStr = new Date().toISOString().split('T')[0]
 
     const { data: allMemberRows } = await supabase.from('circle_members').select('user_id').in('circle_id', circleIds)
     const allMemberIds = [...new Set(((allMemberRows ?? []) as { user_id: string }[]).map(r => r.user_id))]
 
-    const [{ data: weekPosts }, { data: weekAssessments }, { data: memberProfiles }] = await Promise.all([
-      supabase.from('posts').select('user_id').in('user_id', allMemberIds).gte('created_at', weekStartStr),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [{ data: weekPosts }, { data: weekAssessments }, { data: memberProfiles }, { data: todayCheckins }, { data: memberActiveGoals }] = await Promise.all([
+      supabase.from('posts').select('user_id, created_at').in('user_id', allMemberIds).gte('created_at', weekStartStr),
       supabase.from('assessments').select('user_id').in('user_id', allMemberIds).eq('week_start', weekStartStr),
-      supabase.from('profiles').select('id, full_name, streak').in('id', allMemberIds),
+      supabase.from('profiles').select('id, full_name, streak, avatar_url, username').in('id', allMemberIds),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from('daily_checkins') as any).select('user_id, energy').in('user_id', allMemberIds).eq('date', todayStr),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from('goals') as any).select('user_id, title, progress, category').in('user_id', allMemberIds).eq('status', 'active').neq('goal_type', 'letter').order('created_at', { ascending: false }).limit(allMemberIds.length * 3 + 1),
     ])
 
+    type MemberProfileRow = { id: string; full_name: string | null; streak: number; avatar_url: string | null; username: string | null }
     const profileMap = Object.fromEntries(
-      ((memberProfiles ?? []) as { id: string; full_name: string | null; streak: number }[]).map(p => [p.id, p])
+      ((memberProfiles ?? []) as MemberProfileRow[]).map(p => [p.id, p])
     )
 
     const postCounts: Record<string, number> = {}
-    for (const p of (weekPosts ?? []) as { user_id: string }[]) postCounts[p.user_id] = (postCounts[p.user_id] ?? 0) + 1
+    const postedTodaySet = new Set<string>()
+    for (const p of (weekPosts ?? []) as { user_id: string; created_at: string }[]) {
+      postCounts[p.user_id] = (postCounts[p.user_id] ?? 0) + 1
+      if (p.created_at.startsWith(todayStr)) postedTodaySet.add(p.user_id)
+    }
     const assessCounts: Record<string, number> = {}
     for (const a of (weekAssessments ?? []) as { user_id: string }[]) assessCounts[a.user_id] = (assessCounts[a.user_id] ?? 0) + 1
+
+    const energyMap: Record<string, number> = {}
+    for (const c of (todayCheckins ?? []) as { user_id: string; energy: number }[]) energyMap[c.user_id] = c.energy
+
+    const goalMap: Record<string, { title: string; progress: number; category: string | null }> = {}
+    for (const g of (memberActiveGoals ?? []) as { user_id: string; title: string; progress: number; category: string | null }[]) {
+      if (!goalMap[g.user_id]) goalMap[g.user_id] = { title: g.title, progress: g.progress ?? 0, category: g.category ?? null }
+    }
 
     leaderboard = allMemberIds.map(uid => ({
       user_id: uid,
@@ -158,6 +192,19 @@ export default async function CirclePage() {
       streak: profileMap[uid]?.streak ?? 0,
       post_count: postCounts[uid] ?? 0,
       assessment_count: assessCounts[uid] ?? 0,
+      score: (postCounts[uid] ?? 0) * 2 + (assessCounts[uid] ?? 0) * 5,
+    })).sort((a, b) => b.score - a.score || b.streak - a.streak)
+
+    memberStatuses = allMemberIds.map(uid => ({
+      user_id: uid,
+      full_name: profileMap[uid]?.full_name ?? null,
+      avatar_url: profileMap[uid]?.avatar_url ?? null,
+      username: profileMap[uid]?.username ?? null,
+      streak: profileMap[uid]?.streak ?? 0,
+      energy_today: energyMap[uid] ?? null,
+      active_goal: goalMap[uid] ?? null,
+      post_count_week: postCounts[uid] ?? 0,
+      posted_today: postedTodaySet.has(uid),
       score: (postCounts[uid] ?? 0) * 2 + (assessCounts[uid] ?? 0) * 5,
     })).sort((a, b) => b.score - a.score || b.streak - a.streak)
   }
@@ -394,6 +441,43 @@ export default async function CirclePage() {
     }
   }
 
+  // ── Weekly commitments ──
+  let weekCommitments: CircleCommitment[] = []
+  let myWitnessedIds: string[] = []
+  if (circleIds.length > 0) {
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: commitmentRows } = await (supabase.from('circle_commitments') as any)
+      .select('id, user_id, circle_id, week_start, text, status, created_at')
+      .in('circle_id', circleIds)
+      .eq('week_start', weekStartStr)
+      .order('created_at', { ascending: true })
+
+    const rawCommitments = (commitmentRows ?? []) as { id: string; user_id: string; circle_id: string; week_start: string; text: string; status: string; created_at: string }[]
+
+    if (rawCommitments.length > 0) {
+      const commitmentIds = rawCommitments.map(c => c.id)
+      const authorIds = [...new Set(rawCommitments.map(c => c.user_id))]
+      const [{ data: witnessRows }, { data: profileRows }] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('commitment_witnesses') as any).select('commitment_id, user_id').in('commitment_id', commitmentIds),
+        supabase.from('profiles').select('id, full_name, avatar_url, username').in('id', authorIds),
+      ])
+      const witnesses = (witnessRows ?? []) as { commitment_id: string; user_id: string }[]
+      const profileMap = Object.fromEntries(((profileRows ?? []) as { id: string; full_name: string | null; avatar_url: string | null; username: string | null }[]).map(p => [p.id, p]))
+      myWitnessedIds = witnesses.filter(w => w.user_id === user.id).map(w => w.commitment_id)
+      weekCommitments = rawCommitments.map(c => ({
+        ...c,
+        status: c.status as 'active' | 'done' | 'failed',
+        witness_count: witnesses.filter(w => w.commitment_id === c.id).length,
+        full_name: profileMap[c.user_id]?.full_name ?? null,
+        avatar_url: profileMap[c.user_id]?.avatar_url ?? null,
+        username: profileMap[c.user_id]?.username ?? null,
+      }))
+    }
+  }
+
   return (
     <CircleClient
       posts={circlePosts}
@@ -407,6 +491,7 @@ export default async function CirclePage() {
       followingPosts={followingPosts}
       memberAssessments={memberAssessments}
       leaderboard={leaderboard}
+      memberStatuses={memberStatuses}
       exploreBuilders={exploreBuilders}
       exploreGoals={exploreGoals}
       circleGoals={circleGoals}
@@ -419,6 +504,8 @@ export default async function CirclePage() {
       circleRequested={circleRequested}
       circleApproved={circleApproved}
       birthdayProfiles={birthdayProfiles}
+      weekCommitments={weekCommitments}
+      myWitnessedIds={myWitnessedIds}
     />
   )
 }

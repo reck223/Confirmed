@@ -8,9 +8,10 @@ import { createCircle, joinCircle, createPost, toggleReaction, followUser, unfol
 import { requestCircleAccess } from './module/actions'
 import { createHomePost } from '@/app/(app)/home/actions'
 import { sendMessage } from '@/app/(app)/inbox/actions'
+import { postCommitment, witnessCommitment, updateCommitmentStatus } from './commitment-actions'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { toggleGoalReaction, addGoalComment, removeGoalComment } from '@/app/(app)/goals/actions'
-import type { LeaderboardEntry, MemberStatus } from './page'
+import type { LeaderboardEntry, MemberStatus, CircleCommitment } from './page'
 import { ExploreClient } from '@/app/(app)/explore/ExploreClient'
 import type { Builder, PublicGoal } from '@/app/(app)/explore/ExploreClient'
 
@@ -410,6 +411,8 @@ export function CircleClient({
   circleRequested: boolean
   circleApproved: boolean
   birthdayProfiles: BirthdayProfile[]
+  weekCommitments: CircleCommitment[]
+  myWitnessedIds: string[]
 }) {
   const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions'>('board')
   const [feedFilter, setFeedFilter] = useState<'circle' | 'following'>('circle')
@@ -439,6 +442,10 @@ export function CircleClient({
       if (stored.length) setInviteSent(new Set(stored))
     } catch {}
   }, [])
+  const [commitmentText, setCommitmentText] = useState('')
+  const [submittingCommit, setSubmittingCommit] = useState(false)
+  const [localCommitments, setLocalCommitments] = useState<CircleCommitment[]>(weekCommitments)
+  const [localWitnessed, setLocalWitnessed] = useState<Set<string>>(new Set(myWitnessedIds))
   const router = useRouter()
   const postFileRef = useRef<HTMLInputElement>(null)
 
@@ -447,6 +454,8 @@ export function CircleClient({
   const selectedMeta = TYPE_META[postType]
   const memberIdSet = new Set(memberStatuses.map(s => s.user_id))
   const nonMemberProfiles = discoverProfiles.filter(p => !memberIdSet.has(p.id))
+  const myCommitment = localCommitments.find(c => c.user_id === userId) ?? null
+  const othersCommitments = localCommitments.filter(c => c.user_id !== userId)
 
   function handlePostFileChange(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
@@ -533,6 +542,45 @@ export function CircleClient({
     } else {
       handleCopy()
     }
+  }
+
+  async function handlePostCommitment() {
+    if (!primaryCircle || !commitmentText.trim()) return
+    setSubmittingCommit(true)
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    const optimistic: CircleCommitment = {
+      id: `temp-${Date.now()}`,
+      circle_id: primaryCircle.id,
+      user_id: userId,
+      week_start: weekStart.toISOString().split('T')[0],
+      text: commitmentText.trim(),
+      status: 'active',
+      witness_count: 0,
+      full_name: userName,
+      avatar_url: userAvatar,
+      username: userUsername,
+      created_at: new Date().toISOString(),
+    }
+    const saved = commitmentText.trim()
+    setLocalCommitments(prev => [...prev, optimistic])
+    setCommitmentText('')
+    const result = await postCommitment(primaryCircle.id, saved)
+    if (result?.error) {
+      setLocalCommitments(prev => prev.filter(c => c.id !== optimistic.id))
+      setCommitmentText(saved)
+    }
+    setSubmittingCommit(false)
+  }
+
+  async function handleWitness(commitmentId: string, toUserId: string) {
+    setLocalWitnessed(prev => new Set([...prev, commitmentId]))
+    setLocalCommitments(prev => prev.map(c => c.id === commitmentId ? { ...c, witness_count: c.witness_count + 1 } : c))
+    await witnessCommitment(commitmentId, toUserId)
+  }
+
+  async function handleCommitStatus(commitmentId: string, status: 'done' | 'failed') {
+    setLocalCommitments(prev => prev.map(c => c.id === commitmentId ? { ...c, status } : c))
+    await updateCommitmentStatus(commitmentId, status)
   }
 
   async function handleInviteUser(toId: string, toName: string | null) {
@@ -734,6 +782,59 @@ export function CircleClient({
       {/* ══════════ BOARD TAB (WAR ROOM) ══════════ */}
       {circles.length > 0 && mainTab === 'board' && (
         <>
+          {/* ── Weekly Commitments ── */}
+          <div style={{ marginBottom: 28 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>THIS WEEK&apos;S COMMITMENTS</p>
+
+            {/* My commitment or input */}
+            {myCommitment ? (
+              <CommitmentCard
+                commitment={myCommitment}
+                isOwn
+                witnessed={false}
+                onStatus={handleCommitStatus}
+              />
+            ) : (
+              <div style={{ borderRadius: 16, background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.15)', padding: '14px 16px', marginBottom: 10 }}>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 10 }}>WHAT&apos;S YOUR #1 COMMITMENT?</p>
+                <textarea
+                  value={commitmentText}
+                  onChange={e => setCommitmentText(e.target.value)}
+                  maxLength={200}
+                  placeholder="I commit to _____ by end of week."
+                  rows={2}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', boxSizing: 'border-box', lineHeight: 1.5 }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button
+                    onClick={handlePostCommitment}
+                    disabled={!commitmentText.trim() || submittingCommit}
+                    style={{ padding: '8px 18px', borderRadius: 10, background: commitmentText.trim() ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.06)', border: 'none', color: commitmentText.trim() ? '#000' : 'rgba(255,255,255,0.25)', fontSize: 12, fontWeight: 800, cursor: commitmentText.trim() ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s' }}
+                  >
+                    {submittingCommit ? 'Posting…' : 'Post it →'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Others' commitments */}
+            {othersCommitments.map(c => (
+              <CommitmentCard
+                key={c.id}
+                commitment={c}
+                isOwn={false}
+                witnessed={localWitnessed.has(c.id)}
+                onWitness={handleWitness}
+              />
+            ))}
+
+            {localCommitments.length === 0 && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textAlign: 'center', paddingTop: 4 }}>
+                Be the first to post your commitment this week.
+              </p>
+            )}
+          </div>
+
           {/* Who's Showing Up — member status grid */}
           <div style={{ marginBottom: 28 }}>
             <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>WHO&apos;S SHOWING UP</p>
@@ -1856,6 +1957,63 @@ function FollowBtn({ id, userId, followingIds, isPending, onFollow, onUnfollow, 
     >
       {isFollowing ? '✓ Following' : '+ Follow'}
     </button>
+  )
+}
+
+// ══════════════════════════════════════════════════════
+// Commitment Card
+// ══════════════════════════════════════════════════════
+function CommitmentCard({
+  commitment, isOwn, witnessed, onWitness, onStatus,
+}: {
+  commitment: CircleCommitment; isOwn: boolean; witnessed: boolean
+  onWitness?: (id: string, userId: string) => void
+  onStatus?: (id: string, status: 'done' | 'failed') => void
+}) {
+  const isDone = commitment.status === 'done'
+  const isFailed = commitment.status === 'failed'
+  const profileHref = `/profile/${commitment.user_id}`
+  return (
+    <div style={{ borderRadius: 16, background: isOwn ? 'rgba(212,175,55,0.04)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isOwn ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.07)'}`, padding: '14px 16px', marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <Link href={profileHref} style={{ textDecoration: 'none', flexShrink: 0 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatarGrad(commitment.user_id), overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#fff' }}>
+            {commitment.avatar_url
+              ? <img src={commitment.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              : initials(commitment.full_name)
+            }
+          </div>
+        </Link>
+        <p style={{ flex: 1, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.65)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {isOwn ? 'You' : (commitment.full_name ?? 'Member')}
+        </p>
+        {isDone && <span style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', padding: '2px 8px', borderRadius: 99, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', flexShrink: 0 }}>✓ Done</span>}
+        {isFailed && <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', padding: '2px 8px', borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>Didn&apos;t make it</span>}
+      </div>
+      <p style={{ fontSize: 14, fontWeight: 600, color: isFailed ? 'rgba(255,255,255,0.35)' : '#EFEFEF', lineHeight: 1.5, marginBottom: 12, fontStyle: 'italic' }}>
+        &ldquo;{commitment.text}&rdquo;
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+          {commitment.witness_count > 0 ? `👁 ${commitment.witness_count} witnessing` : '👁 No witnesses yet'}
+        </p>
+        {isOwn && commitment.status === 'active' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => onStatus?.(commitment.id, 'done')} style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✓ Done</button>
+            <button onClick={() => onStatus?.(commitment.id, 'failed')} style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Nope</button>
+          </div>
+        )}
+        {!isOwn && commitment.status === 'active' && (
+          <button
+            onClick={() => { if (!witnessed) onWitness?.(commitment.id, commitment.user_id) }}
+            disabled={witnessed}
+            style={{ padding: '5px 14px', borderRadius: 8, border: `1px solid ${witnessed ? 'rgba(34,197,94,0.3)' : 'rgba(212,175,55,0.35)'}`, background: witnessed ? 'rgba(34,197,94,0.1)' : 'rgba(212,175,55,0.08)', color: witnessed ? '#4ade80' : '#D4AF37', fontSize: 11, fontWeight: 800, cursor: witnessed ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', transition: 'all 0.2s', flexShrink: 0 }}
+          >
+            {witnessed ? '✓ Witnessing' : 'I see you'}
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
