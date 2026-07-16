@@ -1896,11 +1896,6 @@ function MemberStatusCard({ status, userId }: { status: MemberStatus; userId: st
           </div>
         </div>
 
-        {/* Energy */}
-        {energyTxt && (
-          <p style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, marginBottom: 6 }}>{energyTxt}</p>
-        )}
-
         {/* Active goal */}
         {status.active_goal ? (
           <div style={{ marginBottom: 6 }}>
