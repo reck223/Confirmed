@@ -1,10 +1,11 @@
 'use client'
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { updateProfile, signOut, uploadAvatar, uploadCover, setPinnedGoal, getFollowers, getFollowing, getCircleMembers } from './actions'
+import { createHomePost, uploadPostMedia, deletePost, updatePost } from '@/app/(app)/home/actions'
 import { toggleReaction, addComment, deleteComment } from '@/app/(app)/circle/actions'
 import { sendMessage } from '@/app/(app)/inbox/actions'
 import type { Profile } from '@/lib/types/database'
@@ -118,11 +119,78 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
   const [liveFollowing, setLiveFollowing] = useState<number | null>(null)
   const [liveFollowers, setLiveFollowers] = useState<number | null>(null)
   const [liveCircle, setLiveCircle] = useState<number | null>(null)
+  const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null)
+  const [profileTab, setProfileTab] = useState<'posts' | 'saved'>('posts')
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set())
+  const [showCompose, setShowCompose] = useState(false)
+  const [composeType, setComposeType] = useState<'win' | 'progress' | 'lesson' | 'vibe'>('win')
+  const [composeContent, setComposeContent] = useState('')
+  const [composeError, setComposeError] = useState('')
+  const [composePending, startComposePending] = useTransition()
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaFileType, setMediaFileType] = useState<'image' | 'video' | null>(null)
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [showLinkInput, setShowLinkInput] = useState(false)
+  const [ogPreview, setOgPreview] = useState<OGData | null>(null)
+  const [ogFetching, setOgFetching] = useState(false)
+  const ogDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const postListRef = useRef<HTMLDivElement | null>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+    const ids: string[] = JSON.parse(localStorage.getItem('cc_saved_posts') ?? '[]')
+    setSavedPostIds(new Set(ids))
+  }, [])
+
+  // Keep savedPostIds in sync — storage event only fires for other tabs,
+  // so we also listen for a custom event dispatched by ProfilePostCard on same tab
+  useEffect(() => {
+    function sync() {
+      const ids: string[] = JSON.parse(localStorage.getItem('cc_saved_posts') ?? '[]')
+      setSavedPostIds(new Set(ids))
+    }
+    window.addEventListener('storage', sync)
+    window.addEventListener('cc_saves_changed', sync)
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('cc_saves_changed', sync) }
+  }, [])
+
+  // Also re-read after any bookmark toggle (same-tab updates don't fire storage events)
+  function refreshSavedIds() {
+    const ids: string[] = JSON.parse(localStorage.getItem('cc_saved_posts') ?? '[]')
+    setSavedPostIds(new Set(ids))
+  }
+
+  // Fetch OG preview whenever the link URL changes (debounced)
+  useEffect(() => {
+    if (ogDebounceRef.current) clearTimeout(ogDebounceRef.current)
+    const trimmed = linkUrl.trim()
+    if (!showLinkInput || !trimmed.startsWith('http')) { setOgPreview(null); return }
+    setOgFetching(true)
+    ogDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/og-preview?url=${encodeURIComponent(trimmed)}`)
+        const data = await res.json() as OGData
+        setOgPreview(data)
+      } catch { setOgPreview(null) }
+      setOgFetching(false)
+    }, 600)
+    return () => { if (ogDebounceRef.current) clearTimeout(ogDebounceRef.current) }
+  }, [linkUrl, showLinkInput])
+
+  // Scroll the post feed to the tapped post whenever the selection changes
+  useEffect(() => {
+    if (!selectedPost || !postListRef.current) return
+    const container = postListRef.current
+    const el = container.querySelector(`[data-post-id="${selectedPost.id}"]`) as HTMLElement | null
+    if (el) requestAnimationFrame(() => { container.scrollTop = el.offsetTop })
+  }, [selectedPost])
+
   // Sync from server after refresh (fixes mobile stale cache)
   useEffect(() => { if (profile.avatar_url) setAvatarUrl(profile.avatar_url + '?v=' + Date.now()) }, [profile.avatar_url])
   useEffect(() => { if (profile.cover_url)  setCoverUrl(profile.cover_url  + '?v=' + Date.now()) }, [profile.cover_url])
@@ -203,6 +271,55 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
     startTransition(async () => { await signOut(); router.push('/signin') })
   }
 
+  const resetCompose = useCallback(() => {
+    setComposeContent(''); setComposeType('win'); setComposeError('')
+    setMediaPreview(null); setMediaFile(null); setMediaFileType(null)
+    setLinkUrl(''); setShowLinkInput(false); setOgPreview(null); setOgFetching(false)
+  }, [])
+
+  function handleMediaPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    const isImage = file.type.startsWith('image/')
+    const isVideo = file.type.startsWith('video/')
+    if (!isImage && !isVideo) { setComposeError('Only images and videos are supported'); return }
+    setMediaFile(file)
+    setMediaFileType(isImage ? 'image' : 'video')
+    setMediaPreview(URL.createObjectURL(file))
+    setShowLinkInput(false); setLinkUrl('')
+    setComposeError('')
+    e.target.value = ''
+  }
+
+  function handleCompose() {
+    const hasContent = composeContent.trim() || mediaFile || (showLinkInput && linkUrl.trim())
+    if (!hasContent) { setComposeError('Add some content first.'); return }
+    setComposeError('')
+    startComposePending(async () => {
+      let mediaUrl: string | undefined
+      let mediaType: 'image' | 'video' | 'link' | undefined
+
+      if (mediaFile) {
+        setMediaUploading(true)
+        const fd = new FormData(); fd.append('file', mediaFile)
+        const up = await uploadPostMedia(fd)
+        setMediaUploading(false)
+        if (up.error) { setComposeError(up.error); return }
+        mediaUrl = up.url; mediaType = up.mediaType
+      } else if (showLinkInput && linkUrl.trim()) {
+        const url = linkUrl.trim()
+        // Store OG metadata alongside the URL as JSON so we can render a rich preview
+        mediaUrl = (ogPreview && (ogPreview.ogImage || ogPreview.ogTitle))
+          ? JSON.stringify({ url, ...ogPreview })
+          : url
+        mediaType = 'link'
+      }
+
+      const result = await createHomePost({ content: composeContent, type: composeType, mediaUrl, mediaType })
+      if (result.error) { setComposeError(result.error); return }
+      setShowCompose(false); resetCompose(); router.refresh()
+    })
+  }
+
   async function openUsersModal(type: 'followers' | 'following' | 'circle') {
     setUsersModal(type)
     setModalUsers([])
@@ -218,6 +335,16 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', paddingBottom: 100 }} className="view-panel">
+
+      <style>{`
+        @keyframes slideUpSheet {
+          from { transform: translateY(100%); opacity: 0.6; }
+          to   { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .post-grid-cell { transition: opacity 0.12s ease; }
+        .post-grid-cell:active { opacity: 0.72; transform: scale(0.97); }
+      `}</style>
 
       {/* ── Cover ── */}
       <div
@@ -359,7 +486,6 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
           {/* Follower / Circle counts */}
           <div style={{ display: 'flex', gap: 20, paddingBottom: 6 }}>
             {([
-              { label: 'CIRCLE', value: liveCircle ?? circleCount, key: 'circle' },
               { label: 'FOLLOWERS', value: liveFollowers ?? followersCount, key: 'followers' },
               { label: 'FOLLOWING', value: liveFollowing ?? followingCount, key: 'following' },
             ] as { label: string; value: number; key: 'circle' | 'followers' | 'following' }[]).map(({ label, value, key }) => (
@@ -491,24 +617,240 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
         )}
       </div>
 
-      {/* ── Posts feed ── */}
-      {posts.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)', marginBottom: 16, padding: '0 20px' }}>POSTS</p>
-          <div>
-            {posts.map((p, idx) => (
-              <div key={p.id}>
-                <ProfilePostCard
-                  post={p}
-                  avatarUrl={avatarUrl}
-                  displayName={profile.full_name ?? profile.username ?? 'You'}
-                  handle={'@' + (profile.username ?? (profile.full_name ?? 'you').split(' ')[0]).toLowerCase()}
-                  userId={profile.id}
-                />
-                {idx < posts.length - 1 && <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />}
-              </div>
-            ))}
+      {/* ── Active goals compact grid ── */}
+      {activeGoals.filter(g => g.id !== pinnedGoalId).length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)' }}>ALSO IN PROGRESS</p>
+            <a href="/goals" style={{ fontSize: 11, color: '#D4AF37', textDecoration: 'none', fontWeight: 700 }}>See all →</a>
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {activeGoals.filter(g => g.id !== pinnedGoalId).slice(0, 4).map(g => {
+              const m = CAT_META[g.category ?? ''] ?? { color: '#D4AF37', bg: 'rgba(212,175,55,0.1)', emoji: '✦' }
+              return (
+                <a key={g.id} href="/goals" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{m.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                      <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 999, background: m.color, width: `${g.progress}%`, transition: 'width 0.6s ease' }} />
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{g.progress}%</span>
+                    </div>
+                  </div>
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Posts / Saved tab bar ── */}
+      <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.07)', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: 0 }}>
+        {([
+          { key: 'posts' as const, icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> },
+          { key: 'saved' as const, icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> },
+        ] as const).map(({ key, icon }) => {
+          const active = profileTab === key
+          return (
+            <button
+              key={key}
+              onClick={() => setProfileTab(key)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '13px 0', background: 'none', border: 'none', cursor: 'pointer',
+                color: active ? '#EFEFEF' : 'rgba(255,255,255,0.3)',
+                borderBottom: `2px solid ${active ? '#EFEFEF' : 'transparent'}`,
+                marginBottom: -1,
+                transition: 'color 0.18s ease, border-color 0.18s ease',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >{icon}</button>
+          )
+        })}
+      </div>
+
+      {/* ── Posts tab ── */}
+      {profileTab === 'posts' && (
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)' }}>POSTS</p>
+            {posts.length > 0 && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontWeight: 600 }}>{posts.length}</p>}
+          </div>
+          <button
+            onClick={() => setShowCompose(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 14px', borderRadius: 999,
+              background: 'rgba(212,175,55,0.1)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              color: '#D4AF37', fontSize: 11, fontWeight: 800,
+              cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+              letterSpacing: '0.06em',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            NEW POST
+          </button>
+        </div>
+
+        {posts.length === 0 ? (
+          <button
+            onClick={() => setShowCompose(true)}
+            style={{ display: 'block', width: '100%', padding: '32px 20px', textAlign: 'center', background: 'rgba(212,175,55,0.03)', border: '1px dashed rgba(212,175,55,0.15)', borderRadius: 20, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <p style={{ fontSize: 28, marginBottom: 10 }}>✍️</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Share your first win</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginTop: 5 }}>Wins, lessons, progress — your circle wants to know.</p>
+          </button>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 2 }}>
+            {posts.map(post => {
+              const meta = POST_TYPE_LABEL[post.type] ?? { emoji: '✦', color: '#D4AF37' }
+              const hasImage = !!post.media_url && post.media_type === 'image'
+              const hasVideo = !!post.media_url && post.media_type === 'video'
+              // Links stored with media_url set + media_type null (avoids 'link' constraint violation)
+              const hasLink = !!post.media_url && !post.media_type
+              const linkData = hasLink ? parseLinkData(post.media_url!) : null
+              return (
+                <button
+                  key={post.id}
+                  onClick={() => setSelectedPost(post)}
+                  className="post-grid-cell"
+                  style={{ position: 'relative', aspectRatio: '1/1', overflow: 'hidden', background: '#0a0a0a', border: 'none', cursor: 'pointer', padding: 0, display: 'block' }}
+                >
+                  {/* All media absolutely positioned to guarantee full fill inside the square */}
+                  {hasImage && <img src={post.media_url!} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                  {hasVideo && (
+                    <>
+                      <video
+                        src={post.media_url!}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onLoadedMetadata={e => { (e.target as HTMLVideoElement).currentTime = 0.01 }}
+                      />
+                      <div style={{ position: 'absolute', top: 6, right: 7 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white" opacity="0.85"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      </div>
+                    </>
+                  )}
+                  {hasLink && (
+                    linkData?.ogImage ? (
+                      <>
+                        <img src={linkData.ogImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 7px 7px', background: 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,transparent 100%)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            <p style={{ fontSize: 8, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as any}>{linkData.siteName ?? linkData.url}</p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(56,189,248,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 8, gap: 4 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <p style={{ fontSize: 8, color: '#38bdf8', fontWeight: 600, textAlign: 'center', wordBreak: 'break-all', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' } as any}>{linkData?.url ?? post.media_url}</p>
+                      </div>
+                    )
+                  )}
+                  {!hasImage && !hasVideo && !hasLink && (
+                    <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg,${meta.color}1A,${meta.color}06)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 10, gap: 5 }}>
+                      <span style={{ fontSize: 20, lineHeight: 1 }}>{meta.emoji}</span>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      <p style={{ fontSize: 9, fontWeight: 700, color: meta.color, textAlign: 'center', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' } as any}>{post.content}</p>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* ── Saved tab ── */}
+      {profileTab === 'saved' && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ padding: '12px 20px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)' }}>SAVED</p>
+          </div>
+          {(() => {
+            const savedPosts = posts.filter(p => savedPostIds.has(p.id))
+            if (savedPosts.length === 0) {
+              return (
+                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 14px' }}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>No saved posts yet</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)', marginTop: 6, lineHeight: 1.5 }}>Bookmark posts to save them here.</p>
+                </div>
+              )
+            }
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 2 }}>
+                {savedPosts.map(post => {
+                  const meta = POST_TYPE_LABEL[post.type] ?? { emoji: '✦', color: '#D4AF37' }
+                  const hasImage = !!post.media_url && post.media_type === 'image'
+                  const hasVideo = !!post.media_url && post.media_type === 'video'
+                  const hasLink = !!post.media_url && !post.media_type
+                  const linkData = hasLink ? parseLinkData(post.media_url!) : null
+                  return (
+                    <button
+                      key={post.id}
+                      onClick={() => setSelectedPost(post)}
+                      className="post-grid-cell"
+                      style={{ position: 'relative', aspectRatio: '1/1', overflow: 'hidden', background: '#0a0a0a', border: 'none', cursor: 'pointer', padding: 0, display: 'block' }}
+                    >
+                      {hasImage && <img src={post.media_url!} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                      {hasVideo && (
+                        <>
+                          <video src={post.media_url!} preload="metadata" muted playsInline
+                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            onLoadedMetadata={e => { (e.target as HTMLVideoElement).currentTime = 0.01 }}
+                          />
+                          <div style={{ position: 'absolute', top: 6, right: 7 }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="white" opacity="0.85"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          </div>
+                        </>
+                      )}
+                      {hasLink && (
+                        linkData?.ogImage ? (
+                          <>
+                            <img src={linkData.ogImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 7px 7px', background: 'linear-gradient(to top,rgba(0,0,0,0.72) 0%,transparent 100%)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                <p style={{ fontSize: 8, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as any}>{linkData.siteName ?? linkData.url}</p>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(56,189,248,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 8, gap: 4 }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            <p style={{ fontSize: 8, color: '#38bdf8', fontWeight: 600, textAlign: 'center', wordBreak: 'break-all', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' } as any}>{linkData?.url ?? post.media_url}</p>
+                          </div>
+                        )
+                      )}
+                      {!hasImage && !hasVideo && !hasLink && (
+                        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg,${meta.color}1A,${meta.color}06)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 10, gap: 5 }}>
+                          <span style={{ fontSize: 20, lineHeight: 1 }}>{meta.emoji}</span>
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          <p style={{ fontSize: 9, fontWeight: 700, color: meta.color, textAlign: 'center', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' } as any}>{post.content}</p>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -551,6 +893,191 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
             {isPending ? 'SAVING…' : 'SAVE PROFILE'}
           </button>
         </form>
+      )}
+
+      {/* ── Post feed modal — shows all posts; scrolls to tapped one, portal escapes stacking context ── */}
+      {mounted && selectedPost && createPortal(
+        <>
+          <div
+            className="modal-open"
+            onClick={() => setSelectedPost(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.85)', touchAction: 'none' }}
+          />
+          <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 560, zIndex: 10002 }}>
+            <div
+              ref={postListRef}
+              onClick={e => e.stopPropagation()}
+              style={{ height: '92dvh', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', background: '#0D0D0D', borderRadius: '22px 22px 0 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none', animation: 'slideUpSheet 0.3s cubic-bezier(0.22,1,0.36,1) both', touchAction: 'pan-y' } as React.CSSProperties}
+            >
+              {/* Sticky handle + close */}
+              <div style={{ position: 'sticky', top: 0, zIndex: 2, background: '#0D0D0D', borderRadius: '22px 22px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }} />
+                <p style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em', marginTop: 2 }}>
+                  {posts.indexOf(posts.find(p => p.id === selectedPost.id)!) + 1} / {posts.length}
+                </p>
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.55)', fontSize: 18, lineHeight: 1, fontFamily: 'Satoshi,sans-serif' }}
+                >×</button>
+              </div>
+
+              {/* All posts stacked — same layout as IG grid → feed */}
+              {posts.map((post, i) => (
+                <div
+                  key={post.id}
+                  data-post-id={post.id}
+                  style={{ borderBottom: i < posts.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}
+                >
+                  <ProfilePostCard
+                    post={post}
+                    avatarUrl={avatarUrl}
+                    displayName={profile.full_name ?? profile.username ?? 'You'}
+                    handle={'@' + (profile.username ?? (profile.full_name ?? 'you').split(' ')[0]).toLowerCase()}
+                    userId={profile.id}
+                    onDelete={() => { setSelectedPost(null); router.refresh() }}
+                  />
+                </div>
+              ))}
+              <div style={{ height: 'max(env(safe-area-inset-bottom, 0px), 32px)' }} />
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ── Compose sheet ── */}
+      {mounted && showCompose && createPortal(
+        <>
+          <div onClick={() => { setShowCompose(false); resetCompose() }} style={{ position: 'fixed', inset: 0, zIndex: 10010, background: 'rgba(0,0,0,0.88)', touchAction: 'none' }} className="modal-open" />
+          <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 560, zIndex: 10011 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#0E0E0E', borderRadius: '24px 24px 0 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none', animation: 'slideUpSheet 0.3s cubic-bezier(0.22,1,0.36,1) both', overflow: 'hidden' } as React.CSSProperties}>
+
+              {/* Handle + close */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }} />
+                <button onClick={() => { setShowCompose(false); resetCompose() }} style={{ position: 'absolute', right: 16, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.55)', fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
+
+              <div style={{ padding: '18px 20px 0', maxHeight: '82dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+                {/* Post type pills */}
+                <div style={{ display: 'flex', gap: 7, marginBottom: 16 }}>
+                  {(['win', 'progress', 'lesson', 'vibe'] as const).map(t => {
+                    const m = PROFILE_TYPE_META[t]; const active = composeType === t
+                    return (
+                      <button key={t} onClick={() => setComposeType(t)} style={{ flex: 1, padding: '8px 4px', borderRadius: 12, background: active ? m.bg : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? m.border : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, transition: 'all 0.15s' }}>
+                        <span style={{ fontSize: 17, lineHeight: 1 }}>{m.emoji}</span>
+                        <span style={{ fontSize: 8, fontWeight: 800, color: active ? m.color : 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>{m.label.toUpperCase()}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Media preview */}
+                {mediaPreview && mediaFileType === 'image' && (
+                  <div style={{ position: 'relative', marginBottom: 12, borderRadius: 14, overflow: 'hidden', maxHeight: 260 }}>
+                    <img src={mediaPreview} alt="" style={{ width: '100%', display: 'block', objectFit: 'cover', maxHeight: 260 }} />
+                    <button onClick={() => { setMediaFile(null); setMediaPreview(null); setMediaFileType(null) }} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                  </div>
+                )}
+                {mediaPreview && mediaFileType === 'video' && (
+                  <div style={{ position: 'relative', marginBottom: 12, borderRadius: 14, overflow: 'hidden', background: '#111' }}>
+                    <video src={mediaPreview} controls playsInline style={{ width: '100%', display: 'block', maxHeight: 260, background: '#000' }} />
+                    <button onClick={() => { setMediaFile(null); setMediaPreview(null); setMediaFileType(null) }} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                  </div>
+                )}
+
+                {/* Link input + OG preview */}
+                {showLinkInput && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: ogPreview?.ogImage ? '12px 12px 0 0' : 12, background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.2)', borderBottom: ogPreview?.ogImage ? 'none' : undefined }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={e => setLinkUrl(e.target.value)}
+                        placeholder="https://..."
+                        autoFocus
+                        style={{ flex: 1, background: 'none', border: 'none', color: '#38bdf8', fontSize: 13, fontFamily: 'Satoshi,sans-serif', outline: 'none' }}
+                      />
+                      {ogFetching && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(56,189,248,0.3)', borderTopColor: '#38bdf8', animation: 'spin 0.7s linear infinite' }} />}
+                      <button onClick={() => { setShowLinkInput(false); setLinkUrl(''); setOgPreview(null) }} style={{ color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+                    </div>
+                    {/* OG preview card */}
+                    {ogPreview && (ogPreview.ogImage || ogPreview.ogTitle) && (
+                      <div style={{ borderRadius: '0 0 12px 12px', overflow: 'hidden', border: '1px solid rgba(56,189,248,0.2)', borderTop: 'none', background: 'rgba(56,189,248,0.04)' }}>
+                        {ogPreview.ogImage && <img src={ogPreview.ogImage} alt="" style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />}
+                        <div style={{ padding: '10px 14px 12px' }}>
+                          {ogPreview.siteName && <p style={{ fontSize: 9, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.08em', marginBottom: 4 }}>{ogPreview.siteName.toUpperCase()}</p>}
+                          {ogPreview.ogTitle && <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', lineHeight: 1.3, marginBottom: ogPreview.ogDesc ? 4 : 0 }}>{ogPreview.ogTitle}</p>}
+                          {ogPreview.ogDesc && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>{ogPreview.ogDesc}</p>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Caption textarea */}
+                <textarea
+                  value={composeContent}
+                  onChange={e => { setComposeContent(e.target.value); if (composeError) setComposeError('') }}
+                  placeholder={mediaFile ? 'Add a caption…' : composeType === 'win' ? 'What did you crush today?' : composeType === 'progress' ? 'What progress did you make?' : composeType === 'lesson' ? 'What did you learn?' : "What's the energy right now?"}
+                  rows={4}
+                  maxLength={500}
+                  style={{ width: '100%', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#EFEFEF', fontSize: 15, fontFamily: 'Satoshi,sans-serif', lineHeight: 1.6, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+                />
+
+                {/* Bottom toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '10px 0 4px' }}>
+                  {/* Media buttons */}
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => { mediaInputRef.current!.accept = 'image/*'; mediaInputRef.current!.click() }}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: mediaFileType === 'image' ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${mediaFileType === 'image' ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Add photo"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={mediaFileType === 'image' ? '#4ade80' : 'rgba(255,255,255,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    </button>
+                    <button
+                      onClick={() => { mediaInputRef.current!.accept = 'video/*'; mediaInputRef.current!.click() }}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: mediaFileType === 'video' ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${mediaFileType === 'video' ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Add video"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={mediaFileType === 'video' ? '#a78bfa' : 'rgba(255,255,255,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    </button>
+                    <button
+                      onClick={() => { setShowLinkInput(l => !l); setMediaFile(null); setMediaPreview(null); setMediaFileType(null) }}
+                      style={{ width: 36, height: 36, borderRadius: 10, background: showLinkInput ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showLinkInput ? 'rgba(56,189,248,0.3)' : 'rgba(255,255,255,0.08)'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Add link"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showLinkInput ? '#38bdf8' : 'rgba(255,255,255,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    </button>
+                  </div>
+
+                  <span style={{ fontSize: 10, color: composeContent.length > 450 ? '#f97316' : 'rgba(255,255,255,0.2)', fontWeight: 600, marginLeft: 'auto', marginRight: 12 }}>
+                    {composeContent.length}/500
+                  </span>
+
+                  <button
+                    onClick={handleCompose}
+                    disabled={composePending || mediaUploading}
+                    style={{ padding: '10px 22px', borderRadius: 999, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', cursor: 'pointer', color: '#000', fontSize: 12, fontWeight: 900, fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.08em', opacity: composePending || mediaUploading ? 0.6 : 1, transition: 'opacity 0.2s' }}
+                  >
+                    {mediaUploading ? 'UPLOADING…' : composePending ? 'POSTING…' : 'POST'}
+                  </button>
+                </div>
+
+                {composeError && <p style={{ fontSize: 12, color: '#f87171', paddingBottom: 12 }}>{composeError}</p>}
+
+                {/* Safe area bottom padding */}
+                <div style={{ height: 'max(env(safe-area-inset-bottom,0px),16px)' }} />
+              </div>
+
+              {/* Hidden file input */}
+              <input ref={mediaInputRef} type="file" style={{ display: 'none' }} onChange={handleMediaPick} />
+            </div>
+          </div>
+        </>,
+        document.body
       )}
 
       {/* ── Pin picker modal ── */}
@@ -656,11 +1183,11 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
       , document.body)}
 
       {/* ── Lightbox ── */}
-      {lightbox && (
+      {mounted && lightbox && createPortal(
         <div
           onClick={() => setLightbox(null)}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: 'fixed', inset: 0, zIndex: 99999,
             background: 'rgba(0,0,0,0.92)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -674,7 +1201,6 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
             @keyframes lbZoomIn { from { opacity:0; transform:scale(0.88) } to { opacity:1; transform:scale(1) } }
           `}</style>
 
-          {/* Close button */}
           <button
             onClick={() => setLightbox(null)}
             style={{
@@ -687,10 +1213,8 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
             }}
           >×</button>
 
-          {/* Label */}
           <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.4)', marginBottom: 20, textTransform: 'uppercase' }}>{lightbox.label}</p>
 
-          {/* Image */}
           <div
             onClick={e => e.stopPropagation()}
             style={{
@@ -702,7 +1226,8 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
           >
             <Image src={lightbox.src} alt={lightbox.label} fill style={{ objectFit: 'cover', objectPosition: 'center' }} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -870,6 +1395,15 @@ const PROFILE_TYPE_META: Record<string, { emoji: string; label: string; color: s
   progress:  { emoji: '📈', label: 'Progress',  color: '#a78bfa', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.3)'  },
   milestone: { emoji: '🎯', label: 'Milestone', color: '#7dd3fc', bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)'  },
   question:  { emoji: '❓', label: 'Support',   color: '#f472b6', bg: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.3)' },
+  vibe:      { emoji: '🔥', label: 'Vibe',      color: '#f97316', bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.3)'  },
+}
+
+type OGData = { url?: string; ogImage?: string | null; ogTitle?: string | null; ogDesc?: string | null; siteName?: string | null }
+function parseLinkData(mediaUrl: string): OGData & { url: string } {
+  if (mediaUrl.startsWith('{')) {
+    try { return JSON.parse(mediaUrl) as OGData & { url: string } } catch {}
+  }
+  return { url: mediaUrl }
 }
 
 function pTimeAgo(iso: string) {
@@ -886,13 +1420,41 @@ function pInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
+function ProfilePostCard({ post, avatarUrl, displayName, handle, userId, onDelete }: {
   post: ProfilePost; avatarUrl: string | null; displayName: string; handle: string; userId: string
+  onDelete?: () => void
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const meta = PROFILE_TYPE_META[post.type] ?? { emoji: '✦', label: post.type, color: '#D4AF37', bg: 'rgba(212,175,55,0.12)', border: 'rgba(212,175,55,0.3)' }
-  const hasMedia = !!post.media_url
+  const hasMedia = !!post.media_url && !!post.media_type
+  const hasLink = !!post.media_url && !post.media_type
+  const linkData = hasLink ? parseLinkData(post.media_url!) : null
+
+  const [showOptions, setShowOptions] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editContent, setEditContent] = useState(post.content)
+  const [editSaving, setEditSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Hydrate bookmark state from localStorage after mount
+  useEffect(() => {
+    const saves: string[] = JSON.parse(localStorage.getItem('cc_saved_posts') ?? '[]')
+    setSaved(saves.includes(post.id))
+  }, [post.id])
+
+  function handleSave() {
+    const saves: string[] = JSON.parse(localStorage.getItem('cc_saved_posts') ?? '[]')
+    const next = !saved
+    setSaved(next)
+    localStorage.setItem(
+      'cc_saved_posts',
+      JSON.stringify(next ? [...saves, post.id] : saves.filter(id => id !== post.id))
+    )
+    window.dispatchEvent(new Event('cc_saves_changed'))
+  }
 
   const [fireActive, setFireActive] = useState(post.my_reactions.fire)
   const [fireCount, setFireCount] = useState(post.reactions.fire)
@@ -954,12 +1516,19 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
     setTimeout(() => { setShowShare(false); setShareSent(false); setSelected(new Set()) }, 1500)
   }
 
+  async function handleSaveEdit() {
+    setEditSaving(true)
+    const result = await updatePost(post.id, editContent)
+    setEditSaving(false)
+    if (!result.error) { setEditing(false); router.refresh() }
+  }
+
   const initials = pInitials(displayName)
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px 10px' }}>
+      {/* Header — position:relative so the options dropdown can anchor to it */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px 10px' }}>
         <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#D4AF37,#a78bfa)', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {avatarUrl
             ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0A0A0A' }} />
@@ -973,44 +1542,163 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
           </div>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{pTimeAgo(post.created_at)}</span>
         </div>
+
+        {/* ⋯ More options */}
+        {onDelete && (
+          <button
+            onClick={() => setShowOptions(o => !o)}
+            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.55)">
+              <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Options dropdown */}
+        {showOptions && (
+          <>
+            {/* invisible tap-away layer */}
+            <div onClick={() => setShowOptions(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />
+            <div style={{
+              position: 'absolute', top: '100%', right: 20, zIndex: 11,
+              background: '#1C1C1E', borderRadius: 14,
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
+              overflow: 'hidden', minWidth: 180,
+            }}>
+              <button
+                onClick={() => { setEditing(true); setShowOptions(false) }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Edit Caption</span>
+              </button>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 12px' }} />
+              <button
+                onClick={() => { setConfirmDelete(true); setShowOptions(false) }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'Satoshi,sans-serif', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                <span style={{ fontSize: 14, color: '#f87171', fontWeight: 600 }}>Delete Post</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Media */}
-      {hasMedia && post.media_type === 'image' && <img src={post.media_url!} alt="" style={{ width: '100%', display: 'block', objectFit: 'cover' }} />}
-      {hasMedia && post.media_type === 'video' && <video src={post.media_url!} controls playsInline style={{ width: '100%', display: 'block', background: '#000' }} />}
+      {hasMedia && post.media_type === 'image' && <img src={post.media_url!} alt="" style={{ width: '100%', display: 'block', maxHeight: '52dvh', objectFit: 'cover' }} />}
+      {hasMedia && post.media_type === 'video' && <video src={post.media_url!} controls playsInline style={{ width: '100%', display: 'block', maxHeight: '52dvh', background: '#000' }} />}
+      {hasLink && linkData && (
+        <a href={linkData.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', margin: '0 20px 10px', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(56,189,248,0.18)', background: 'rgba(56,189,248,0.04)', textDecoration: 'none' }}>
+          {linkData.ogImage && (
+            <img src={linkData.ogImage} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+          )}
+          <div style={{ padding: '10px 14px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {linkData.siteName && <p style={{ fontSize: 9, fontWeight: 800, color: '#38bdf8', letterSpacing: '0.08em', marginBottom: 4 }}>{linkData.siteName.toUpperCase()}</p>}
+              {linkData.ogTitle
+                ? <p style={{ fontSize: 14, fontWeight: 700, color: '#EFEFEF', lineHeight: 1.3, marginBottom: linkData.ogDesc ? 4 : 0 }}>{linkData.ogTitle}</p>
+                : <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{linkData.url}</p>
+              }
+              {linkData.ogDesc && (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as any}>{linkData.ogDesc}</p>
+              )}
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(56,189,248,0.5)" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </div>
+        </a>
+      )}
 
-      {/* Text-only */}
-      {!hasMedia && post.content && (
-        <div style={{ padding: '0 20px 10px' }}>
-          <p style={{ fontSize: 14, color: '#C8C8C8', fontWeight: 400, lineHeight: 1.65, margin: 0 }}>
-            <span style={{ fontWeight: 800, color: '#EFEFEF', marginRight: 5 }}>{handle}</span>{post.content}
-          </p>
+      {/* Caption / Edit mode */}
+      {editing ? (
+        <div style={{ padding: '4px 20px 10px' }}>
+          <textarea
+            value={editContent}
+            onChange={e => setEditContent(e.target.value)}
+            maxLength={500}
+            rows={4}
+            autoFocus
+            style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', lineHeight: 1.6, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+          />
         </div>
+      ) : (
+        post.content && (
+          <div style={{ padding: '0 20px 10px' }}>
+            <p style={{ fontSize: 14, color: '#C8C8C8', fontWeight: 400, lineHeight: 1.65, margin: 0 }}>
+              <span style={{ fontWeight: 800, color: '#EFEFEF', marginRight: 5 }}>{handle}</span>{post.content}
+            </p>
+          </div>
+        )
       )}
 
       {/* Action bar */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 6px' }}>
-        <button onClick={handleFire} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px 4px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '8px 20px 8px' }}>
+        <button onClick={handleFire} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 0', WebkitTapHighlightColor: 'transparent' }}>
           <span style={{ fontSize: 22, lineHeight: 1, filter: fireActive ? 'drop-shadow(0 0 8px rgba(212,175,55,1)) drop-shadow(0 0 16px rgba(212,175,55,0.7))' : 'grayscale(1) opacity(0.35)', transition: 'filter 0.2s' }}>🤝</span>
           {fireCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: fireActive ? '#D4AF37' : 'rgba(255,255,255,0.55)', fontFamily: 'Satoshi,sans-serif', transition: 'color 0.2s' }}>{fireCount}</span>}
         </button>
-        <button onClick={() => { setShowComments(o => !o); setTimeout(() => inputRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
+        <button onClick={() => { setShowComments(o => !o); setTimeout(() => inputRef.current?.focus(), 100) }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           {commentCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>{commentCount}</span>}
         </button>
-        <button onClick={openShare} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
+        <button onClick={openShare} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
-        <button style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 4px 8px', marginLeft: 'auto' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        {/* Bookmark — far right like IG */}
+        <button
+          onClick={handleSave}
+          style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0 4px 8px', marginLeft: 'auto', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <svg
+            width="22" height="22" viewBox="0 0 24 24"
+            fill={saved ? '#D4AF37' : 'none'}
+            stroke={saved ? '#D4AF37' : 'rgba(255,255,255,0.55)'}
+            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+            style={{ transition: 'fill 0.18s ease, stroke 0.18s ease', filter: saved ? 'drop-shadow(0 0 6px rgba(212,175,55,0.6))' : 'none' }}
+          >
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
         </button>
       </div>
 
-      {/* Caption for media */}
-      {hasMedia && post.content && (
-        <p style={{ fontSize: 14, lineHeight: 1.65, padding: '4px 20px 10px', color: '#C8C8C8', margin: 0 }}>
-          <span style={{ fontWeight: 800, color: '#EFEFEF', marginRight: 5 }}>{handle}</span>{post.content}
-        </p>
+      {/* Edit save/cancel bar */}
+      {editing && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '4px 20px 14px' }}>
+          <span style={{ fontSize: 11, color: editContent.length > 450 ? '#f97316' : 'rgba(255,255,255,0.28)', marginRight: 'auto' }}>{editContent.length}/500</span>
+          <button
+            onClick={() => { setEditing(false); setEditContent(post.content) }}
+            style={{ padding: '8px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+          >Cancel</button>
+          <button
+            onClick={handleSaveEdit}
+            disabled={editSaving}
+            style={{ padding: '8px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', color: '#000', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', opacity: editSaving ? 0.6 : 1 }}
+          >{editSaving ? 'Saving…' : 'Save'}</button>
+        </div>
+      )}
+
+      {/* Delete confirmation bar */}
+      {confirmDelete && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px 12px', borderTop: '1px solid rgba(248,113,113,0.1)', background: 'rgba(248,113,113,0.04)' }}>
+          <p style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.55)', fontFamily: 'Satoshi,sans-serif' }}>Delete this post?</p>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+          >Cancel</button>
+          <button
+            onClick={async () => {
+              setDeleting(true)
+              const result = await deletePost(post.id)
+              setDeleting(false)
+              if (!result.error) onDelete?.()
+            }}
+            disabled={deleting}
+            style={{ padding: '7px 16px', borderRadius: 10, background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', opacity: deleting ? 0.6 : 1 }}
+          >{deleting ? 'Deleting…' : 'Delete'}</button>
+        </div>
       )}
 
       {/* Comments */}
@@ -1052,7 +1740,7 @@ function ProfilePostCard({ post, avatarUrl, displayName, handle, userId }: {
 
       {/* Share sheet */}
       {showShare && (
-        <div className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', padding: '20px 16px' }} onClick={() => { setShowShare(false); setSelected(new Set()); setShareSent(false) }}>
+        <div className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', padding: '20px 16px' }} onClick={() => { setShowShare(false); setSelected(new Set()); setShareSent(false) }}>
           <div style={{ width: '100%', maxWidth: 520, background: '#111', borderRadius: 24, border: '1px solid rgba(255,255,255,0.08)', maxHeight: '85dvh', display: 'flex', flexDirection: 'column', animation: 'scaleIn 0.2s ease both', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)', margin: '16px auto 16px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
