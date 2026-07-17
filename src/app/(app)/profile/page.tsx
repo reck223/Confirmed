@@ -39,16 +39,27 @@ export default async function ProfilePage() {
   const assessmentHistory = (assessRows ?? []) as { week_start: string; rating: number | null }[]
   const achievements = (achievementRows ?? []) as { type: string; earned_at: string }[]
   const rawPosts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; media_url: string | null; media_type: string | null; visibility: string }[]
-  // Count OTHER members across all the user's circles (matches what the modal shows)
   const myCircleIds = (circleMemberRows ?? []).map((r: { circle_id: string }) => r.circle_id)
   let circleCount = 0
+  let myCircles: { id: string; name: string; memberCount: number }[] = []
   if (myCircleIds.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { count } = await (supabase.from('circle_members') as any)
-      .select('user_id', { count: 'exact', head: true })
-      .in('circle_id', myCircleIds)
-      .neq('user_id', user.id)
+    const [{ count }, { data: circleRows }, { data: allMemberRows }] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from('circle_members') as any)
+        .select('user_id', { count: 'exact', head: true })
+        .in('circle_id', myCircleIds)
+        .neq('user_id', user.id),
+      supabase.from('circles').select('id, name').in('id', myCircleIds),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from('circle_members') as any).select('circle_id, user_id').in('circle_id', myCircleIds),
+    ])
     circleCount = count ?? 0
+    const rawMemberRows = (allMemberRows ?? []) as { circle_id: string; user_id: string }[]
+    myCircles = ((circleRows ?? []) as { id: string; name: string }[]).map(c => ({
+      id: c.id,
+      name: c.name,
+      memberCount: rawMemberRows.filter(r => r.circle_id === c.id).length,
+    }))
   }
 
   // Build connections with partner profiles
@@ -125,6 +136,7 @@ export default async function ProfilePage() {
       posts={posts}
       connections={connections}
       currentUserId={user.id}
+      myCircles={myCircles}
     />
   )
 }

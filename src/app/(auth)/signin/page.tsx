@@ -36,7 +36,8 @@ function SignInInner() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/home')
+      const joinCode = searchParams.get('joinCode')
+      router.push(joinCode ? `/join/${joinCode}` : '/home')
       router.refresh()
     }
   }

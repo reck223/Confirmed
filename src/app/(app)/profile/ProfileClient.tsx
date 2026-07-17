@@ -101,8 +101,9 @@ type Connection = {
   partnerName: string | null; partnerAvatar: string | null
 }
 
-export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts, connections, currentUserId }: {
+export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts, connections, currentUserId, myCircles }: {
   profile: Profile; goals: Goal[]; followersCount: number; followingCount: number; circleCount: number
+  myCircles?: { id: string; name: string; memberCount: number }[]
   assessmentHistory: AssessmentHistory
   achievements: { type: string; earned_at: string }[]
   posts: ProfilePost[]
@@ -551,6 +552,25 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
           )}
         </div>
       </div>
+
+      {/* ── Circles ── */}
+      {myCircles && myCircles.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 20 }}>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37', marginBottom: 10 }}>CIRCLE</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {myCircles.map(c => (
+              <a key={c.id} href="/circle" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.18)' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg,#D4AF37,#9A7010)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>⚔️</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>{c.memberCount} {c.memberCount === 1 ? 'member' : 'members'}</p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,0.5)" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Active Connections ── */}
       {connections.length > 0 && (

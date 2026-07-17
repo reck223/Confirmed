@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { createNotification } from '@/lib/notifications'
 
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
@@ -41,6 +42,12 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
     if (!alreadyMember) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase.from('circle_members') as any).insert({ circle_id: circle.id, user_id: user.id })
+      // Notify existing members
+      const { data: members } = await supabase.from('circle_members').select('user_id').eq('circle_id', circle.id).neq('user_id', user.id)
+      const { data: joinerProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+      const joinerName = (joinerProfile as { full_name: string | null } | null)?.full_name ?? 'Someone'
+      const memberIds = ((members ?? []) as { user_id: string }[]).map(m => m.user_id)
+      await Promise.all(memberIds.map(id => createNotification(id, 'circle_join', { circle_name: circle.name, joiner_name: joinerName })))
     }
     redirect('/circle')
   }
