@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { markAllNotifsRead } from './actions'
 import { acceptConnection, declineConnection } from '@/app/(app)/profile/connection-actions'
-import { acceptCircleInvite } from '@/app/(app)/circle/actions'
 
 type Conversation = {
   otherId: string
@@ -196,10 +195,7 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
 
   function handleJoinCircle(code: string, notifId: string) {
     setHandledInvites(prev => ({ ...prev, [notifId]: 'joining' }))
-    startTransition(async () => {
-      await acceptCircleInvite(code)
-      window.location.href = '/circle'
-    })
+    window.location.href = `/join/${code}`
   }
 
   return (
