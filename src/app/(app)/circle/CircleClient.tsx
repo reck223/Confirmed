@@ -366,11 +366,11 @@ type CircleEligibility = {
 type BirthdayProfile = { id: string; full_name: string | null; date_of_birth: string | null }
 
 export function CircleClient({
-  posts, circles, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
+  posts, circles, isCircleMember, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
   circleEligibility, circleRequested, circleApproved, birthdayProfiles,
   weekCommitments, myWitnessedIds, myActiveGoals,
 }: {
-  posts: PostWithMeta[]; circles: CircleInfo[]; userId: string
+  posts: PostWithMeta[]; circles: CircleInfo[]; isCircleMember?: boolean; userId: string
   discoverProfiles: DiscoverProfile[]
   followingIds: string[]
   followingPosts: PostWithMeta[]
@@ -422,6 +422,7 @@ export function CircleClient({
   const postFileRef = useRef<HTMLInputElement>(null)
 
   const primaryCircle = circles[0]
+  const hasCircle = isCircleMember || circles.length > 0
   const filteredPosts = filter === 'all' ? posts : posts.filter(p => p.type === filter)
   const selectedMeta = TYPE_META[postType]
   const memberIdSet = new Set(memberStatuses.map(s => s.user_id))
@@ -681,13 +682,13 @@ export function CircleClient({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>
-            {circles.length > 0 ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
+            {hasCircle ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
           </p>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-            {circles.length > 0 ? '⚔️ War Room' : 'Find Your\nPeople.'}
+            {hasCircle ? '⚔️ War Room' : 'Find Your\nPeople.'}
           </h1>
         </div>
-        {circles.length > 0 && (
+        {hasCircle && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setShowInvite(true)} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
             <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ Share</button>
@@ -696,7 +697,7 @@ export function CircleClient({
       </div>
 
       {/* ── Tab bar ── */}
-      {circles.length > 0 && (
+      {hasCircle && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
           {TABS.map(t => (
             <button key={t.k} onClick={() => setMainTab(t.k)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', fontWeight: 700, fontSize: 12, background: mainTab === t.k ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)', color: mainTab === t.k ? '#EFEFEF' : 'rgba(255,255,255,0.35)', transition: 'all 0.2s', boxShadow: mainTab === t.k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none' }}>
@@ -707,7 +708,7 @@ export function CircleClient({
       )}
 
       {/* ══════════ NO CIRCLE ══════════ */}
-      {circles.length === 0 && (
+      {!hasCircle && (
         <>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Most people fail alone. The ones who don&apos;t have a Circle.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
@@ -736,7 +737,7 @@ export function CircleClient({
       )}
 
       {/* ══════════ BOARD TAB (WAR ROOM) ══════════ */}
-      {circles.length > 0 && mainTab === 'board' && (
+      {hasCircle && mainTab === 'board' && (
         <>
           {/* ── Weekly Commitments ── */}
           <div style={{ marginBottom: 28 }}>
@@ -927,7 +928,7 @@ export function CircleClient({
       )}
 
       {/* ══════════ FEED TAB ══════════ */}
-      {circles.length > 0 && mainTab === 'feed' && (
+      {hasCircle && mainTab === 'feed' && (
         <>
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1077,7 +1078,7 @@ export function CircleClient({
       )}
 
       {/* ══════════ SESSIONS TAB ══════════ */}
-      {circles.length > 0 && mainTab === 'sessions' && (
+      {hasCircle && mainTab === 'sessions' && (
         <SessionsTab
           sessions={sessions}
           rsvps={rsvps}

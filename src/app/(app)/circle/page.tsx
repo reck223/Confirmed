@@ -493,6 +493,7 @@ export default async function CirclePage() {
     <CircleClient
       posts={circlePosts}
       circles={circles}
+      isCircleMember={circleIds.length > 0}
       userId={user.id}
       sessions={sessions}
       rsvps={rsvps}
