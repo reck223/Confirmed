@@ -87,6 +87,41 @@ export async function joinCircle(formData: FormData) {
   return { success: true }
 }
 
+export async function acceptCircleInvite(code: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { data: circle } = await supabase
+    .from('circles')
+    .select('id, name, created_by')
+    .eq('code', code.trim().toUpperCase())
+    .single()
+
+  if (!circle) return { error: 'Circle not found' }
+  const c = circle as { id: string; name: string; created_by: string | null }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('circle_members') as any)
+    .insert({ circle_id: c.id, user_id: user.id })
+
+  if (error?.code === '23505') return { success: true }
+  if (error) return { error: error.message }
+
+  const { data: members } = await supabase.from('circle_members').select('user_id').eq('circle_id', c.id).neq('user_id', user.id)
+  const { data: joinerProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+  const joinerName = (joinerProfile as { full_name: string | null } | null)?.full_name ?? 'Someone'
+  const memberIds = ((members ?? []) as { user_id: string }[]).map(m => m.user_id)
+
+  await Promise.all(memberIds.map(memberId =>
+    createNotification(memberId, 'circle_join', { circle_name: c.name, joiner_name: joinerName })
+  ))
+
+  revalidatePath('/circle')
+  revalidatePath('/profile')
+  return { success: true }
+}
+
 export async function createPost(circleId: string, formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { createCircle, joinCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
 import { requestCircleAccess } from './module/actions'
 import { createHomePost } from '@/app/(app)/home/actions'
+import { createNotification } from '@/lib/notifications'
 import { sendMessage } from '@/app/(app)/inbox/actions'
 import { postCommitment, witnessCommitment, updateCommitmentStatus } from './commitment-actions'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
@@ -550,9 +551,12 @@ export function CircleClient({
 
   async function handleInviteUser(toId: string, toName: string | null) {
     if (!primaryCircle) return
-    const firstName = toName?.split(' ')[0]
-    const msg = `👋 Hey${firstName ? ` ${firstName}` : ''}! ${userName ?? 'Someone'} wants you to join their accountability circle "${primaryCircle.name}". Use code **${primaryCircle.code}** or join here: ${inviteLink}`
-    await sendMessage(toId, msg)
+    void toName
+    await createNotification(toId, 'circle_invite', {
+      circle_code: primaryCircle.code,
+      circle_name: primaryCircle.name,
+      inviter_name: userName ?? 'Someone',
+    })
     setInviteSent(prev => {
       const next = new Set([...prev, toId])
       try {
