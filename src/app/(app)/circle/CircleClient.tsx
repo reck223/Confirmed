@@ -547,9 +547,9 @@ export function CircleClient({
     if (!primaryCircle) return
     void toName
     await createNotification(toId, 'circle_invite', {
-      circle_code: primaryCircle.code,
+      circle_id: primaryCircle.id,
       circle_name: primaryCircle.name,
-      inviter_name: userName ?? 'Someone',
+      ...(userName ? { inviter_name: userName } : {}),
     })
     setInviteSent(prev => new Set([...prev, toId]))
     setTimeout(() => setInviteSent(prev => { const next = new Set(prev); next.delete(toId); return next }), 2500)

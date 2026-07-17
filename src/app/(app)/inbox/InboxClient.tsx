@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { markAllNotifsRead } from './actions'
 import { acceptConnection, declineConnection } from '@/app/(app)/profile/connection-actions'
+import { joinCircleById } from '@/app/(app)/circle/actions'
 
 type Conversation = {
   otherId: string
@@ -193,9 +194,12 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
     })
   }
 
-  function handleJoinCircle(code: string, notifId: string) {
+  function handleJoinCircle(circleId: string, notifId: string) {
     setHandledInvites(prev => ({ ...prev, [notifId]: 'joining' }))
-    window.location.href = `/join/${code}`
+    startTransition(async () => {
+      await joinCircleById(circleId)
+      window.location.href = '/circle'
+    })
   }
 
   return (
@@ -323,13 +327,13 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
 
               // Circle invites get an inline Join button
               if (notif.type === 'circle_invite') {
-                const code = notif.data.circle_code
+                const circleId = notif.data.circle_id
                 const circleName = notif.data.circle_name
-                const inviterName = notif.data.inviter_name ?? notif.from_name ?? 'Someone'
+                const inviterName = notif.data.inviter_name || notif.from_name || 'A circle member'
                 const inviterAvatar = notif.from_avatar
                 const inviterInitials = inviterName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-                const alreadyIn = code ? myCircleCodes.includes(code) : false
-                const inviteState = code ? handledInvites[notif.id] : null
+                const alreadyIn = circleId ? myCircleCodes.some(c => c === circleId) : false
+                const inviteState = circleId ? handledInvites[notif.id] : null
                 const isJoining = inviteState === 'joining'
                 return (
                   <div key={notif.id} style={{ margin: '8px 16px', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(212,175,55,0.3)', background: 'linear-gradient(145deg,#18140A,#0F0C03)', boxShadow: isUnread ? '0 0 24px rgba(212,175,55,0.12)' : 'none' }}>
@@ -370,9 +374,9 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
                           <span style={{ fontSize: 16 }}>✓</span>
                           <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>You&apos;re in the circle</p>
                         </div>
-                      ) : code && (
+                      ) : circleId && (
                         <button
-                          onClick={() => handleJoinCircle(code, notif.id)}
+                          onClick={() => handleJoinCircle(circleId, notif.id)}
                           disabled={isJoining}
                           style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: isJoining ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: isJoining ? 'rgba(255,255,255,0.4)' : '#000', fontSize: 14, fontWeight: 800, cursor: isJoining ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}
                         >

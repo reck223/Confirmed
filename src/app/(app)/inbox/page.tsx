@@ -28,14 +28,8 @@ export default async function InboxPage() {
 
   const messages = (msgResult.data ?? []) as RawMessage[]
   const notifications = (notifResult.data ?? []) as RawNotif[]
-  const myCircleIds = new Set(((memberResult.data ?? []) as { circle_id: string }[]).map(r => r.circle_id))
-
-  // Resolve circle codes for circles the user is already in (used to mark invite buttons as joined)
-  let myCircleCodes: string[] = []
-  if (myCircleIds.size > 0) {
-    const { data: circleRows } = await supabase.from('circles').select('code').in('id', [...myCircleIds])
-    myCircleCodes = ((circleRows ?? []) as { code: string }[]).map(c => c.code)
-  }
+  // Circle IDs the user is already in — used to mark invite buttons as joined
+  const myCircleCodes = ((memberResult.data ?? []) as { circle_id: string }[]).map(r => r.circle_id)
 
   // Build conversation list
   const convMap = new Map<string, { msg: RawMessage; unread: number }>()
