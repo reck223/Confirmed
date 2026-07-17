@@ -156,11 +156,12 @@ const NOTIF_META: Record<string, { emoji: string; color: string; label: (n: Noti
   },
 }
 
-export function InboxClient({ conversations, notifications, currentUserId: _currentUserId, unreadNotifs }: {
+export function InboxClient({ conversations, notifications, currentUserId: _currentUserId, unreadNotifs, myCircleCodes = [] }: {
   conversations: Conversation[]
   notifications: Notification[]
   currentUserId: string
   unreadNotifs: number
+  myCircleCodes?: string[]
 }) {
   const [tab, setTab] = useState<'messages' | 'activity'>('messages')
   const [, startTransition] = useTransition()
@@ -197,8 +198,7 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
     setHandledInvites(prev => ({ ...prev, [notifId]: 'joining' }))
     startTransition(async () => {
       await acceptCircleInvite(code)
-      setHandledInvites(prev => ({ ...prev, [notifId]: 'joined' }))
-      router.refresh()
+      router.push('/circle')
     })
   }
 
@@ -328,7 +328,9 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
               // Circle invites get an inline Join button
               if (notif.type === 'circle_invite') {
                 const code = notif.data.circle_code
+                const alreadyIn = code ? myCircleCodes.includes(code) : false
                 const inviteState = code ? handledInvites[notif.id] : null
+                const isJoining = inviteState === 'joining'
                 return (
                   <div key={notif.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 20px', background: isUnread ? `${meta.color}0a` : 'none', borderLeft: `2px solid ${isUnread ? meta.color + '60' : 'transparent'}` }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -341,19 +343,18 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
                         <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{timeAgo(notif.created_at)}</p>
                       </div>
                     </div>
-                    {code && inviteState !== 'joined' && (
+                    {alreadyIn ? (
+                      <p style={{ paddingLeft: 56, fontSize: 12, color: '#4ade80', fontWeight: 600 }}>✓ Joined</p>
+                    ) : code && (
                       <div style={{ paddingLeft: 56 }}>
                         <button
                           onClick={() => handleJoinCircle(code, notif.id)}
-                          disabled={inviteState === 'joining'}
-                          style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: inviteState === 'joining' ? 'rgba(212,175,55,0.3)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: inviteState === 'joining' ? 'rgba(255,255,255,0.5)' : '#000', fontSize: 12, fontWeight: 700, cursor: inviteState === 'joining' ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                          disabled={isJoining}
+                          style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: isJoining ? 'rgba(212,175,55,0.3)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: isJoining ? 'rgba(255,255,255,0.5)' : '#000', fontSize: 12, fontWeight: 700, cursor: isJoining ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                         >
-                          {inviteState === 'joining' ? 'Joining…' : '✦ Join Circle'}
+                          {isJoining ? 'Joining…' : '✦ Join Circle'}
                         </button>
                       </div>
-                    )}
-                    {inviteState === 'joined' && (
-                      <p style={{ paddingLeft: 56, fontSize: 12, color: '#4ade80', fontWeight: 600 }}>✓ Joined</p>
                     )}
                   </div>
                 )

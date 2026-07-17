@@ -11,7 +11,7 @@ export default async function InboxPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  const [msgResult, notifResult] = await Promise.all([
+  const [msgResult, notifResult, memberResult] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('messages') as any)
       .select('id, sender_id, recipient_id, content, created_at, read_at')
@@ -23,10 +23,19 @@ export default async function InboxPage() {
       .eq('to_user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50),
+    supabase.from('circle_members').select('circle_id').eq('user_id', user.id),
   ])
 
   const messages = (msgResult.data ?? []) as RawMessage[]
   const notifications = (notifResult.data ?? []) as RawNotif[]
+  const myCircleIds = new Set(((memberResult.data ?? []) as { circle_id: string }[]).map(r => r.circle_id))
+
+  // Resolve circle codes for circles the user is already in (used to mark invite buttons as joined)
+  let myCircleCodes: string[] = []
+  if (myCircleIds.size > 0) {
+    const { data: circleRows } = await supabase.from('circles').select('code').in('id', [...myCircleIds])
+    myCircleCodes = ((circleRows ?? []) as { code: string }[]).map(c => c.code)
+  }
 
   // Build conversation list
   const convMap = new Map<string, { msg: RawMessage; unread: number }>()
@@ -71,6 +80,7 @@ export default async function InboxPage() {
       }))}
       currentUserId={user.id}
       unreadNotifs={unreadNotifs}
+      myCircleCodes={myCircleCodes}
     />
   )
 }
