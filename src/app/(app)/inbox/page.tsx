@@ -57,10 +57,10 @@ export default async function InboxPage() {
   // Fetch from_user profiles for notifications
   const fromIds = [...new Set(notifications.map(n => n.from_user_id).filter(Boolean))] as string[]
   const { data: fromProfiles } = fromIds.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', fromIds)
+    ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', fromIds)
     : { data: [] }
   const fromProfileMap = Object.fromEntries(
-    ((fromProfiles ?? []) as { id: string; full_name: string | null }[]).map(p => [p.id, p.full_name])
+    ((fromProfiles ?? []) as { id: string; full_name: string | null; avatar_url: string | null }[]).map(p => [p.id, { name: p.full_name, avatar: p.avatar_url }])
   )
 
   const unreadNotifs = notifications.filter(n => !n.read_at).length
@@ -76,7 +76,8 @@ export default async function InboxPage() {
       }))}
       notifications={notifications.map(n => ({
         ...n,
-        from_name: n.from_user_id ? (fromProfileMap[n.from_user_id] ?? null) : null,
+        from_name: n.from_user_id ? (fromProfileMap[n.from_user_id]?.name ?? null) : null,
+        from_avatar: n.from_user_id ? (fromProfileMap[n.from_user_id]?.avatar ?? null) : null,
       }))}
       currentUserId={user.id}
       unreadNotifs={unreadNotifs}

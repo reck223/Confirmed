@@ -15,7 +15,7 @@ type Conversation = {
 }
 
 type Notification = {
-  id: string; type: string; from_user_id: string | null; from_name: string | null
+  id: string; type: string; from_user_id: string | null; from_name: string | null; from_avatar: string | null
   data: Record<string, string>; read_at: string | null; created_at: string; ref_id?: string | null
 }
 
@@ -328,34 +328,62 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
               // Circle invites get an inline Join button
               if (notif.type === 'circle_invite') {
                 const code = notif.data.circle_code
+                const circleName = notif.data.circle_name
+                const inviterName = notif.data.inviter_name ?? notif.from_name ?? 'Someone'
+                const inviterAvatar = notif.from_avatar
+                const inviterInitials = inviterName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
                 const alreadyIn = code ? myCircleCodes.includes(code) : false
                 const inviteState = code ? handledInvites[notif.id] : null
                 const isJoining = inviteState === 'joining'
                 return (
-                  <div key={notif.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 20px', background: isUnread ? `${meta.color}0a` : 'none', borderLeft: `2px solid ${isUnread ? meta.color + '60' : 'transparent'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                      <div style={{ width: 42, height: 42, borderRadius: 14, background: `${meta.color}18`, border: `1px solid ${meta.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                        {meta.emoji}
+                  <div key={notif.id} style={{ margin: '8px 16px', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(212,175,55,0.3)', background: 'linear-gradient(145deg,#18140A,#0F0C03)', boxShadow: isUnread ? '0 0 24px rgba(212,175,55,0.12)' : 'none' }}>
+                    {/* Gold top bar */}
+                    <div style={{ height: 3, background: 'linear-gradient(90deg,#D4AF37,#9A7010,#D4AF37)' }} />
+                    <div style={{ padding: '16px 18px 18px' }}>
+                      {/* Header row: avatar + who + time */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: avatarGrad(notif.from_user_id ?? notif.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden', border: '2px solid rgba(212,175,55,0.4)' }}>
+                          {inviterAvatar
+                            ? <img src={inviterAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : inviterInitials}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.2 }}>{inviterName}</p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>{timeAgo(notif.created_at)}</p>
+                        </div>
+                        {isUnread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#D4AF37', boxShadow: '0 0 8px #D4AF37', flexShrink: 0 }} />}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-                        <p style={{ fontSize: 13.5, fontWeight: isUnread ? 600 : 400, color: '#EFEFEF', lineHeight: 1.4, marginBottom: 3 }}>{meta.label(notif)}</p>
-                        {notif.data.circle_name && <p style={{ fontSize: 12, color: '#D4AF37', fontWeight: 600, lineHeight: 1.4 }}>{notif.data.circle_name}</p>}
-                        <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{timeAgo(notif.created_at)}</p>
-                      </div>
-                    </div>
-                    {alreadyIn ? (
-                      <p style={{ paddingLeft: 56, fontSize: 12, color: '#4ade80', fontWeight: 600 }}>✓ Joined</p>
-                    ) : code && (
-                      <div style={{ paddingLeft: 56 }}>
+
+                      {/* Invite headline */}
+                      <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>PRIVATE CIRCLE INVITATION</p>
+                      <p style={{ fontSize: 17, fontWeight: 900, color: '#EFEFEF', lineHeight: 1.3, letterSpacing: '-0.01em', marginBottom: 4 }}>
+                        You&apos;ve been personally selected to join
+                      </p>
+                      {circleName && (
+                        <p style={{ fontSize: 22, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 14, textShadow: '0 0 24px rgba(212,175,55,0.4)' }}>
+                          {circleName}
+                        </p>
+                      )}
+                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.6, marginBottom: 16 }}>
+                        {inviterName.split(' ')[0]} chose you. This circle is private — a small group of people committed to holding each other accountable.
+                      </p>
+
+                      {/* CTA */}
+                      {alreadyIn ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderRadius: 12, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
+                          <span style={{ fontSize: 16 }}>✓</span>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>You&apos;re in the circle</p>
+                        </div>
+                      ) : code && (
                         <button
                           onClick={() => handleJoinCircle(code, notif.id)}
                           disabled={isJoining}
-                          style={{ padding: '9px 20px', borderRadius: 10, border: 'none', background: isJoining ? 'rgba(212,175,55,0.3)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: isJoining ? 'rgba(255,255,255,0.5)' : '#000', fontSize: 12, fontWeight: 700, cursor: isJoining ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                          style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: isJoining ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', color: isJoining ? 'rgba(255,255,255,0.4)' : '#000', fontSize: 14, fontWeight: 800, cursor: isJoining ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}
                         >
-                          {isJoining ? 'Joining…' : '✦ Join Circle'}
+                          {isJoining ? 'Joining…' : '✦ Accept Invitation'}
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )
               }
