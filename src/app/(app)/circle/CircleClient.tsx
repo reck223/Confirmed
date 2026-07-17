@@ -587,7 +587,20 @@ export function CircleClient({
               {/* Header */}
               <div style={{ background: 'linear-gradient(135deg,#18120A,#0F0C03)', borderBottom: '1px solid rgba(212,175,55,0.15)', padding: '20px 24px 20px', position: 'relative', flexShrink: 0 }}>
                 <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.12)', borderRadius: 2, margin: '0 auto 16px' }} />
-                <button onClick={() => { setShowInvite(false); setInviteSearch('') }} style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#EFEFEF', fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
+                <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {inviteSent.size > 0 && (
+                    <button
+                      onClick={() => {
+                        setInviteSent(new Set())
+                        try { localStorage.removeItem(`manifest_invites_${primaryCircle.code}`) } catch {}
+                      }}
+                      style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em' }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <button onClick={() => { setShowInvite(false); setInviteSearch('') }} style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#EFEFEF', fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
+                </div>
                 <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 4 }}>INVITE TO {primaryCircle.name.toUpperCase()}</p>
                 <p style={{ fontSize: 20, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                   {userName ? `${userName.split(' ')[0]} is building.` : 'Join the Circle.'}
