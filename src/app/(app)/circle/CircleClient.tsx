@@ -390,7 +390,7 @@ export function CircleClient({
   myWitnessedIds: string[]
   myActiveGoals: { id: string; title: string; category: string | null; progress: number }[]
 }) {
-  const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions'>('board')
+  const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions' | 'discover'>('board')
   const [showPost, setShowPost] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
@@ -491,6 +491,7 @@ export function CircleClient({
     { k: 'board' as const,    l: '⚔️ Board' },
     { k: 'feed' as const,     l: '💬 Feed' },
     { k: 'sessions' as const, l: '📅 Sessions' },
+    { k: 'discover' as const, l: '🔍 Discover' },
   ]
 
   const inviteLink = primaryCircle ? `https://confirmedcreations.com/join/${primaryCircle.code}` : ''
@@ -1093,6 +1094,19 @@ export function CircleClient({
           userId={userId}
           primaryCircle={primaryCircle ?? null}
         />
+      )}
+
+      {/* ══════════ DISCOVER TAB ══════════ */}
+      {mainTab === 'discover' && (
+        <div style={{ padding: '0 0 20px' }}>
+          <ExploreClient
+            builders={exploreBuilders}
+            goals={exploreGoals}
+            currentUserId={userId}
+            circleCode={primaryCircle?.code ?? null}
+            embedded
+          />
+        </div>
       )}
 
       {/* ══ Share Modal ══ */}
