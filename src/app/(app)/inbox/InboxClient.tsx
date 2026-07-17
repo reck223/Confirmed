@@ -198,7 +198,7 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
     setHandledInvites(prev => ({ ...prev, [notifId]: 'joining' }))
     startTransition(async () => {
       await acceptCircleInvite(code)
-      router.push('/circle')
+      window.location.href = '/circle'
     })
   }
 
