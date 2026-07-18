@@ -132,7 +132,19 @@ export default async function CirclePage() {
       .order('created_at', { ascending: false })
       .limit(50)
 
-    circles = circleRows ?? []
+    // Merge covenant from circle_settings (overrides circles.covenant if present)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: settingsRows } = await (supabase.from('circle_settings') as any)
+      .select('circle_id, covenant')
+      .in('circle_id', circleIds)
+    const settingsMap = Object.fromEntries(
+      ((settingsRows ?? []) as { circle_id: string; covenant: string | null }[]).map(s => [s.circle_id, s.covenant])
+    )
+    circles = (circleRows ?? []).map(c => ({
+      ...c,
+      covenant: settingsMap[c.id] !== undefined ? settingsMap[c.id] : c.covenant,
+    }))
+
     const posts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; user_id: string; circle_id: string | null; media_url: string | null; media_type: string | null }[]
 
     const authorIds = [...new Set(posts.map(p => p.user_id))]

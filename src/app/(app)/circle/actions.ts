@@ -63,7 +63,7 @@ export async function updateCircle(circleId: string, formData: FormData) {
   if (!name) return { error: 'Circle name is required' }
   const covenant = (formData.get('covenant') as string)?.trim() || null
 
-  // Verify ownership first
+  // Verify ownership (reads only base columns — no schema cache issues)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: existing } = await (supabase.from('circles') as any)
     .select('id')
@@ -72,15 +72,20 @@ export async function updateCircle(circleId: string, formData: FormData) {
     .single()
   if (!existing) return { error: 'Not authorized' }
 
-  // Use RPC to bypass PostgREST schema cache issues with new columns
+  // Update name on circles (base column, always works)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.rpc as any)('update_circle_info', {
-    p_id: circleId,
-    p_name: name,
-    p_covenant: covenant,
-  })
+  const { error: nameErr } = await (supabase.from('circles') as any)
+    .update({ name })
+    .eq('id', circleId)
+    .eq('created_by', user.id)
+  if (nameErr) return { error: nameErr.message }
 
-  if (error) return { error: error.message }
+  // Upsert covenant into circle_settings (fresh table, no schema cache issues)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: covErr } = await (supabase.from('circle_settings') as any)
+    .upsert({ circle_id: circleId, covenant, updated_at: new Date().toISOString() })
+  if (covErr) return { error: covErr.message }
+
   revalidatePath('/circle')
   return { success: true }
 }
