@@ -7,6 +7,7 @@ import { XP_EVENTS } from '@/lib/xp'
 import { awardXP } from '@/lib/xp-server'
 import { awardAchievement } from '@/lib/achievements-server'
 import { sendPushToUser } from '@/lib/push'
+import postgres from 'postgres'
 
 function randomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -80,15 +81,24 @@ export async function updateCircle(circleId: string, formData: FormData) {
     .eq('created_by', user.id)
   if (nameErr) return { error: nameErr.message }
 
-  // Upsert covenant into circle_settings (fresh table, no schema cache issues)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: covErr } = await (supabase.from('circle_settings') as any)
-    .upsert({ circle_id: circleId, covenant, updated_at: new Date().toISOString() })
-  if (covErr) {
-    if (covErr.code === '42P01' || covErr.message?.includes('does not exist')) {
-      return { error: 'circle_settings table not found — run the setup SQL in Supabase first.' }
-    }
-    return { error: covErr.message }
+  // Save covenant — bypass PostgREST (schema cache never sees new tables reliably)
+  const dbUrl = process.env.DATABASE_URL
+  if (!dbUrl) {
+    return { error: 'DATABASE_URL is not set — add it to your Vercel environment variables to save the covenant.' }
+  }
+  const sql = postgres(dbUrl, { max: 1, ssl: 'require' })
+  try {
+    await sql`
+      INSERT INTO circle_settings (circle_id, covenant, updated_at)
+      VALUES (${circleId}, ${covenant}, NOW())
+      ON CONFLICT (circle_id)
+      DO UPDATE SET covenant = ${covenant}, updated_at = NOW()
+    `
+  } catch (e: unknown) {
+    const msg = (e as { message?: string }).message ?? 'Failed to save covenant'
+    return { error: msg }
+  } finally {
+    await sql.end({ timeout: 5 })
   }
 
   revalidatePath('/circle')
