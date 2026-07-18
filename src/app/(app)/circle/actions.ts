@@ -84,7 +84,12 @@ export async function updateCircle(circleId: string, formData: FormData) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: covErr } = await (supabase.from('circle_settings') as any)
     .upsert({ circle_id: circleId, covenant, updated_at: new Date().toISOString() })
-  if (covErr) return { error: covErr.message }
+  if (covErr) {
+    if (covErr.code === '42P01' || covErr.message?.includes('does not exist')) {
+      return { error: 'circle_settings table not found — run the setup SQL in Supabase first.' }
+    }
+    return { error: covErr.message }
+  }
 
   revalidatePath('/circle')
   return { success: true }

@@ -734,7 +734,7 @@ export function CircleClient({
                   {isCreator && (
                     <>
                       <button onClick={fetchCoachInsights} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
-                      <button onClick={() => setShowEdit(true)} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Edit</button>
+                      <button onClick={() => { setShowEdit(true); setError('') }} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Edit</button>
                     </>
                   )}
                   <button onClick={() => setShowInvite(true)} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
@@ -1544,22 +1544,15 @@ export function CircleClient({
         </form>
       </CCModal>
 
-      {/* ══ Edit Circle Modal ══ */}
-      <CCModal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Circle">
-        <form autoComplete="off" action={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div>
-            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 8 }}>CIRCLE NAME</label>
-            <input name="name" required defaultValue={primaryCircle?.name ?? ''} className="cc-input" />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 4 }}>THE COVENANT</label>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>What does this circle commit to? This is what everyone signs when they join.</p>
-            <CovenantField defaultValue={primaryCircle?.covenant ?? ''} circleName={primaryCircle?.name} />
-          </div>
-          {error && <p style={{ color: '#f87171', fontSize: 13 }}>{error}</p>}
-          <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'SAVING...' : 'SAVE CHANGES →'}</button>
-        </form>
-      </CCModal>
+      {/* ══ Edit Circle Sheet ══ */}
+      <EditCircleSheet
+        show={showEdit}
+        onClose={() => { setShowEdit(false); setError('') }}
+        circle={primaryCircle}
+        isPending={isPending}
+        onSubmit={handleUpdate}
+        error={error}
+      />
 
       {/* ══ Join Circle Modal ══ */}
       <CCModal show={showJoin} onClose={() => setShowJoin(false)} title="Join a Circle">
@@ -2653,6 +2646,138 @@ function Reaction({ emoji, count, active, activeColor, activeBg, activeBorder, o
     <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'Satoshi,sans-serif', background: active ? activeBg : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${activeBorder}` : '1px solid rgba(255,255,255,0.07)', color: active ? activeColor : 'rgba(255,255,255,0.52)' }}>
       {emoji} <span style={{ fontWeight: 700 }}>{count}</span>
     </button>
+  )
+}
+
+// ══════════════════════════════════════════════════════
+// Edit Circle Sheet — professional bottom sheet for circle settings
+// ══════════════════════════════════════════════════════
+function EditCircleSheet({ show, onClose, circle, isPending, onSubmit, error }: {
+  show: boolean
+  onClose: () => void
+  circle: { id: string; name: string; covenant: string | null } | null
+  isPending: boolean
+  onSubmit: (formData: FormData) => void
+  error: string
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 490,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          opacity: show ? 1 : 0,
+          pointerEvents: show ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+        }}
+      />
+
+      {/* Sheet */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 500,
+        background: 'linear-gradient(170deg, #15100a 0%, #0d0d0d 55%)',
+        borderRadius: '24px 24px 0 0',
+        maxHeight: 'calc(100dvh - 64px)',
+        overflowY: 'auto',
+        transform: show ? 'translateY(0)' : 'translateY(110%)',
+        transition: 'transform 0.38s cubic-bezier(0.34, 1.1, 0.64, 1)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
+      }}>
+        {/* Gold hairline */}
+        <div style={{ height: 2, background: 'linear-gradient(90deg, transparent 0%, #D4AF37 35%, #9A7010 65%, transparent 100%)' }} />
+
+        {/* Drag handle */}
+        <div style={{ paddingTop: 14, paddingBottom: 2, display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(212,175,55,0.2)' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ padding: '14px 24px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: '#D4AF37', marginBottom: 5 }}>✦ CIRCLE SETTINGS</p>
+            <h2 style={{ fontSize: 22, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {circle?.name ?? 'Your Circle'}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ marginTop: 4, width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: 'Satoshi,sans-serif', lineHeight: 1 }}
+          >×</button>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.15) 20%, rgba(212,175,55,0.15) 80%, transparent)', margin: '20px 0 0' }} />
+
+        {/* Form */}
+        <form action={onSubmit} style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+          {/* Circle Name */}
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>CIRCLE NAME</p>
+            <input
+              name="name"
+              required
+              defaultValue={circle?.name ?? ''}
+              className="cc-input"
+              placeholder="e.g. The Builders"
+              style={{ fontSize: 15, fontWeight: 600 }}
+            />
+          </div>
+
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
+
+          {/* Covenant */}
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>THE COVENANT</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', lineHeight: 1.55, marginBottom: 12 }}>
+              The commitment your circle makes together. Every member sees this when they join.
+            </p>
+            <CovenantField
+              key={circle?.id ?? 'edit'}
+              defaultValue={circle?.covenant ?? ''}
+              circleName={circle?.name}
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.22)' }}>
+              <p style={{ fontSize: 13, color: '#f87171', fontWeight: 600, lineHeight: 1.5 }}>⚠ {error}</p>
+              {(error.toLowerCase().includes('circle_settings') || error.toLowerCase().includes('relation') || error.toLowerCase().includes('does not exist')) && (
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', marginTop: 6, lineHeight: 1.5 }}>
+                  Run the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>circle_settings</code> SQL in your Supabase dashboard, then try again.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em' }}
+            >Cancel</button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="btn-gold"
+              style={{ flex: 2 }}
+            >{isPending ? 'Saving…' : 'Save Changes →'}</button>
+          </div>
+        </form>
+      </div>
+    </>,
+    document.body
   )
 }
 
