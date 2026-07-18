@@ -521,93 +521,170 @@ function Modal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ── Goal Templates ─────────────────────────────────────────────────────────
+// ── Goal Intent + AI Suggestions ────────────────────────────────────────────
 type GoalTemplateItem = {
   id: string; emoji: string; title: string; category: string
   goalType: 'standard' | 'habit' | 'savings'
   milestones: string[]; deadlineWeeks: number
 }
-const GOAL_TEMPLATES: GoalTemplateItem[] = [
-  { id: 'h1', emoji: '🏃', title: 'Run a 5K', category: 'health', goalType: 'standard', deadlineWeeks: 10,
-    milestones: ['Register for a race', 'Run 1 mile without stopping', 'Complete a 3-mile run', 'Full practice 5K run', 'Race day'] },
-  { id: 'h2', emoji: '💪', title: 'Build a workout habit', category: 'health', goalType: 'habit', deadlineWeeks: 13, milestones: [] },
-  { id: 'h3', emoji: '🥗', title: 'Clean up my diet', category: 'health', goalType: 'habit', deadlineWeeks: 8, milestones: [] },
-  { id: 'c1', emoji: '💼', title: 'Land a new job', category: 'career', goalType: 'standard', deadlineWeeks: 12,
-    milestones: ['Update resume and LinkedIn', 'Apply to 20 positions', 'Land 3 interviews', 'Receive an offer', 'Start new role'] },
-  { id: 'c2', emoji: '🚀', title: 'Launch a side project', category: 'career', goalType: 'standard', deadlineWeeks: 8,
-    milestones: ['Define scope and MVP', 'Build v0.1', 'Get feedback from 5 people', 'Ship publicly'] },
-  { id: 'c3', emoji: '📈', title: 'Get a promotion', category: 'career', goalType: 'standard', deadlineWeeks: 26,
-    milestones: ['Talk to manager about growth path', 'Lead 2 high-impact projects', 'Deliver measurable results', 'Have the promotion conversation'] },
-  { id: 'f1', emoji: '💰', title: 'Build a savings fund', category: 'finance', goalType: 'savings', deadlineWeeks: 26, milestones: [] },
-  { id: 'f2', emoji: '💳', title: 'Pay off credit card debt', category: 'finance', goalType: 'standard', deadlineWeeks: 26,
-    milestones: ['List all debts and minimums', 'Create a payoff plan', 'Pay off first card', '50% of debt cleared', 'Debt-free'] },
-  { id: 'f3', emoji: '📊', title: 'Build a monthly budget', category: 'finance', goalType: 'standard', deadlineWeeks: 12,
-    milestones: ['Track spending for 2 weeks', 'Set category budgets', 'Complete first month on budget', 'Review and refine'] },
-  { id: 'l1', emoji: '💻', title: 'Learn to code', category: 'learning', goalType: 'standard', deadlineWeeks: 16,
-    milestones: ['Finish an intro course', 'Build first project', 'Complete 50 coding challenges', 'Ship a real project'] },
-  { id: 'l2', emoji: '🗣️', title: 'Learn a new language', category: 'learning', goalType: 'standard', deadlineWeeks: 26,
-    milestones: ['Complete a 30-day beginner streak', 'Hold a basic conversation', 'Understand a podcast episode', 'Have a fluent 10-min conversation'] },
-  { id: 'cr1', emoji: '✍️', title: 'Write and publish something', category: 'creative', goalType: 'standard', deadlineWeeks: 8,
-    milestones: ['Brainstorm and outline', 'Write first draft', 'Edit and revise', 'Publish or submit'] },
-  { id: 'cr2', emoji: '🎨', title: 'Build a creative portfolio', category: 'creative', goalType: 'standard', deadlineWeeks: 8,
-    milestones: ['Pick 3–5 pieces to feature', 'Create or polish 2 new pieces', 'Set up portfolio site', 'Share it publicly'] },
-  { id: 'b1', emoji: '🏢', title: 'Launch a business', category: 'business', goalType: 'standard', deadlineWeeks: 26,
-    milestones: ['Validate idea with 10 people', 'Build MVP', 'Get first paying customer', 'Hit $1,000 in revenue', 'Reach $10k MRR'] },
-  { id: 'b2', emoji: '🎯', title: 'Get first 10 customers', category: 'business', goalType: 'standard', deadlineWeeks: 12,
-    milestones: ['Define ideal customer profile', 'Reach out to 50 prospects', 'Close first sale', '5 customers', '10 customers'] },
-  { id: 'm1', emoji: '🧘', title: 'Daily meditation habit', category: 'mindset', goalType: 'habit', deadlineWeeks: 13, milestones: [] },
-  { id: 'm2', emoji: '📓', title: 'Daily gratitude journal', category: 'mindset', goalType: 'habit', deadlineWeeks: 5, milestones: [] },
-  { id: 'r1', emoji: '❤️', title: 'Deepen relationships', category: 'relationships', goalType: 'standard', deadlineWeeks: 12,
-    milestones: ['Schedule weekly connection time', 'Plan 1 group activity per month', 'Quality 1-on-1 time with each person', 'Take a trip together'] },
-  { id: 'p1', emoji: '🌅', title: 'Build a morning routine', category: 'personal', goalType: 'habit', deadlineWeeks: 8, milestones: [] },
-  { id: 'p2', emoji: '🏠', title: 'Declutter and organize home', category: 'personal', goalType: 'standard', deadlineWeeks: 6,
-    milestones: ['Tackle bedroom', 'Clear out kitchen', 'Sort and donate clothes', 'Organize storage'] },
-  { id: 'a1', emoji: '🌍', title: 'Plan and take a trip', category: 'adventure', goalType: 'standard', deadlineWeeks: 16,
-    milestones: ['Choose destination and budget', 'Book flights and accommodation', 'Plan itinerary', 'Take the trip'] },
-  { id: 's1', emoji: '🙏', title: 'Daily spiritual practice', category: 'spiritual', goalType: 'habit', deadlineWeeks: 13, milestones: [] },
+
+const INTENT_CATS = [
+  { key: 'health', emoji: '💪', label: 'Health & Fitness' },
+  { key: 'career', emoji: '🚀', label: 'Career' },
+  { key: 'business', emoji: '🏢', label: 'Business' },
+  { key: 'finance', emoji: '💰', label: 'Finance' },
+  { key: 'learning', emoji: '📚', label: 'Learning' },
+  { key: 'creative', emoji: '🎨', label: 'Creative' },
+  { key: 'relationships', emoji: '❤️', label: 'Relationships' },
+  { key: 'mindset', emoji: '🧘', label: 'Mindset' },
+  { key: 'personal', emoji: '🌅', label: 'Personal' },
+  { key: 'adventure', emoji: '🌍', label: 'Adventure' },
+  { key: 'spiritual', emoji: '🙏', label: 'Spiritual' },
 ]
-const TEMPLATE_CAT_ORDER = ['health','career','finance','learning','creative','business','mindset','relationships','personal','adventure','spiritual']
+
+const CAT_EMOJI: Record<string, string> = {
+  health: '💪', career: '🚀', business: '🏢', finance: '💰',
+  learning: '📚', creative: '🎨', relationships: '❤️', mindset: '🧘',
+  personal: '🌅', adventure: '🌍', spiritual: '🙏',
+}
+
+type AISuggestion = { title: string; category: string; deadlineWeeks: number; milestones: string[] }
 
 function GoalTemplatePicker({ onSelect, onSkip }: { onSelect: (t: GoalTemplateItem) => void; onSkip: () => void }) {
+  const [step, setStep] = useState<'intent' | 'suggestions'>('intent')
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
-  const cats = TEMPLATE_CAT_ORDER.filter(c => GOAL_TEMPLATES.some(t => t.category === c))
-  const visible = selectedCat ? GOAL_TEMPLATES.filter(t => t.category === selectedCat) : GOAL_TEMPLATES
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 14, lineHeight: 1.5 }}>
-        Start from a proven template or build your own.
-      </p>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button type="button" onClick={() => setSelectedCat(null)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', background: !selectedCat ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: !selectedCat ? '#D4AF37' : 'rgba(255,255,255,0.42)', border: !selectedCat ? '1px solid rgba(212,175,55,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>All</button>
-        {cats.map(cat => {
-          const color = cc(cat).accent
-          const active = selectedCat === cat
-          return (
-            <button key={cat} type="button" onClick={() => setSelectedCat(active ? null : cat)} style={{ padding: '5px 11px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : 'rgba(255,255,255,0.42)', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.08)' }}>{cat}</button>
-          )
-        })}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {visible.map(tpl => {
-          const color = cc(tpl.category).accent
-          const typeLabel = tpl.goalType === 'habit' ? '🔄 Habit' : tpl.goalType === 'savings' ? '💰 Savings' : `${tpl.milestones.length} milestones`
-          return (
-            <button key={tpl.id} type="button" onClick={() => onSelect(tpl)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 15px', borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textAlign: 'left', transition: 'background 0.15s' }}>
-              <span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>{tpl.emoji}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: '#EFEFEF', marginBottom: 3, lineHeight: 1.2 }}>{tpl.title}</p>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}30`, borderRadius: 5, padding: '1px 6px', textTransform: 'capitalize' }}>{tpl.category}</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{typeLabel}</span>
+  const [intent, setIntent] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [suggestions, setSuggestions] = useState<AISuggestion[]>([])
+  const [error, setError] = useState('')
+
+  async function handleGetSuggestions() {
+    if (intent.trim().length < 8) return
+    setLoading(true); setError('')
+    try {
+      const res = await fetch('/api/goal-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent: intent.trim(), category: selectedCat }),
+      })
+      const data = await res.json()
+      if (!data.suggestions?.length) throw new Error('No suggestions')
+      setSuggestions(data.suggestions)
+      setStep('suggestions')
+    } catch {
+      setError('Could not generate suggestions. Try again or start from scratch.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleSelect(s: AISuggestion) {
+    onSelect({
+      id: `ai-${Date.now()}`,
+      emoji: CAT_EMOJI[s.category] ?? '🎯',
+      title: s.title,
+      category: s.category,
+      goalType: 'standard',
+      milestones: s.milestones,
+      deadlineWeeks: s.deadlineWeeks,
+    })
+  }
+
+  if (step === 'suggestions') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <button type="button" onClick={() => setStep('intent')} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'rgba(255,255,255,0.42)', fontSize: 13, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', padding: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          ← Back
+        </button>
+        <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37', marginBottom: 4 }}>YOUR GOAL OPTIONS</p>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginBottom: 16, lineHeight: 1.5 }}>
+          Pick the one that fits. You can edit the details after.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {suggestions.map((s, i) => {
+            const color = cc(s.category).accent
+            return (
+              <div key={i} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 16px 12px' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 22, lineHeight: 1 }}>{CAT_EMOJI[s.category] ?? '🎯'}</span>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}18`, border: `1px solid ${color}30`, borderRadius: 5, padding: '2px 7px', textTransform: 'capitalize' }}>{s.category}</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)', borderRadius: 5, padding: '2px 7px' }}>{s.deadlineWeeks}w</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.35, marginBottom: 12, letterSpacing: '-0.01em' }}>{s.title}</p>
+                  {s.milestones.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                      {s.milestones.slice(0, 3).map((m, j) => (
+                        <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${color}50`, flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 8, color, fontWeight: 800 }}>{j + 1}</span>
+                          </div>
+                          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>{m}</p>
+                        </div>
+                      ))}
+                      {s.milestones.length > 3 && (
+                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', paddingLeft: 24 }}>+{s.milestones.length - 3} more milestones</p>
+                      )}
+                    </div>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleSelect(s)}
+                  style={{ width: '100%', padding: '12px', background: `${color}12`, border: 'none', borderTop: `1px solid ${color}20`, color, fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em' }}
+                >
+                  Choose this goal →
+                </button>
               </div>
-              <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.28)', flexShrink: 0 }}>›</span>
+            )
+          })}
+        </div>
+        <button type="button" onClick={onSkip} style={{ marginTop: 14, width: '100%', padding: '12px', borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+          None of these — start from scratch
+        </button>
+      </div>
+    )
+  }
+
+  // Step 1: intent screen
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37', marginBottom: 4 }}>WHAT AREA?</p>
+      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginBottom: 12, lineHeight: 1.5 }}>
+        Pick a life area, then describe what you want in your own words.
+      </p>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+        {INTENT_CATS.map(c => {
+          const active = selectedCat === c.key
+          const color = cc(c.key).accent
+          return (
+            <button key={c.key} type="button" onClick={() => setSelectedCat(active ? null : c.key)} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, fontFamily: 'Satoshi,sans-serif', cursor: 'pointer', transition: 'all 0.15s', background: active ? `${color}18` : 'rgba(255,255,255,0.03)', color: active ? color : 'rgba(255,255,255,0.42)', border: active ? `1px solid ${color}44` : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>{c.emoji}</span> {c.label}
             </button>
           )
         })}
       </div>
-      <button type="button" onClick={onSkip} style={{ marginTop: 16, width: '100%', padding: '13px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
-        Start from scratch →
+      <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>WHAT DO YOU WANT TO ACCOMPLISH?</p>
+      <textarea
+        value={intent}
+        onChange={e => setIntent(e.target.value)}
+        placeholder="Be specific. e.g. I want to lose weight and feel better in my body, I want to grow my clothing brand to 10K followers, I want to pay off my $8K car loan..."
+        rows={4}
+        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#EFEFEF', fontSize: 13, fontFamily: 'Satoshi,sans-serif', resize: 'none', outline: 'none', lineHeight: 1.55, boxSizing: 'border-box' }}
+      />
+      {error && <p style={{ fontSize: 12, color: '#f87171', marginTop: 8 }}>{error}</p>}
+      <button
+        type="button"
+        onClick={handleGetSuggestions}
+        disabled={intent.trim().length < 8 || loading}
+        style={{ marginTop: 12, width: '100%', padding: '14px', borderRadius: 14, border: 'none', fontSize: 14, fontWeight: 800, cursor: intent.trim().length >= 8 && !loading ? 'pointer' : 'default', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.02em', background: intent.trim().length >= 8 && !loading ? 'linear-gradient(135deg,#D4AF37,#9A7010)' : 'rgba(255,255,255,0.05)', color: intent.trim().length >= 8 && !loading ? '#000' : 'rgba(255,255,255,0.25)', transition: 'all 0.2s' }}
+      >
+        {loading ? 'Building your goals…' : 'Get my suggestions →'}
+      </button>
+      <button type="button" onClick={onSkip} style={{ marginTop: 10, width: '100%', padding: '12px', borderRadius: 12, background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+        Skip — start from scratch
       </button>
     </div>
   )
