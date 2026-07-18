@@ -551,7 +551,7 @@ export function CircleClient({
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px 20px' }} className="view-panel">
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 20px 100px' }} className="view-panel">
 
 
       {/* ── Invite modal (portal) ── */}
@@ -2670,9 +2670,11 @@ function Reaction({ emoji, count, active, activeColor, activeBg, activeBorder, o
 }
 
 function CCModal({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!show) return null
-  return (
-    <div className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '20px 16px' }} onClick={onClose}>
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!show || !mounted) return null
+  return createPortal(
+    <div className="modal-open" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '20px 16px' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 520, borderRadius: 24, background: '#111', border: '1px solid rgba(255,255,255,0.08)', padding: 24, maxHeight: '85dvh', overflowY: 'auto', animation: 'scaleIn 0.2s ease both' }} onClick={e => e.stopPropagation()}>
         <div style={{ width: 32, height: 3, borderRadius: 2, background: '#222', margin: '0 auto 20px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -2681,7 +2683,8 @@ function CCModal({ show, onClose, title, children }: { show: boolean; onClose: (
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

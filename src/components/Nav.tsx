@@ -201,7 +201,7 @@ export function Nav({ userName, userStreak, unreadCount }: { userName?: string |
       className="mobile-nav"
       style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        zIndex: 30,
+        zIndex: 300,
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translate3d(0,0,0)' : 'translate3d(0,22px,0)',
