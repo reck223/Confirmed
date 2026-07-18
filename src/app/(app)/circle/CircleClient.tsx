@@ -691,87 +691,179 @@ export function CircleClient({
         document.body
       )}
 
-      {/* ── Page header ── */}
+      {/* ── War Room Hero ── */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: hasCircle && primaryCircle?.covenant ? 12 : 0 }}>
-          <div>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>
-              {hasCircle ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
-            </p>
-            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-              {hasCircle ? (isExpired ? '⚔️ Season Ended' : '⚔️ War Room') : 'Find Your\nPeople.'}
-            </h1>
-          </div>
-          {hasCircle && !isExpired && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {isCreator && (
-                <button onClick={fetchCoachInsights} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
+
+        {/* ── Active circle hero card ── */}
+        {hasCircle && !isExpired && primaryCircle && (
+          <div style={{
+            borderRadius: 24, overflow: 'hidden',
+            background: 'linear-gradient(160deg, #100d02 0%, #18130a 60%, #0d0d0d 100%)',
+            border: '1px solid rgba(212,175,55,0.2)',
+            boxShadow: healthScore >= 70
+              ? '0 8px 40px rgba(74,222,128,0.08)'
+              : healthScore >= 40
+              ? '0 8px 40px rgba(212,175,55,0.08)'
+              : '0 8px 40px rgba(248,113,113,0.08)',
+          }}>
+            {/* Gold hairline top */}
+            <div style={{ height: 2, background: 'linear-gradient(90deg, transparent 0%, #D4AF37 40%, #9A7010 70%, transparent 100%)' }} />
+
+            <div style={{ padding: '20px 20px 16px' }}>
+              {/* Name + action buttons */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.16em', color: '#D4AF37', marginBottom: 5 }}>
+                    {primaryCircle.name.toUpperCase()}
+                  </p>
+                  <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>⚔️ War Room</h1>
+                </div>
+                <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
+                  {isCreator && (
+                    <button onClick={fetchCoachInsights} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
+                  )}
+                  <button onClick={() => setShowInvite(true)} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
+                  <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '9px 15px', fontSize: 11 }}>+ Share</button>
+                </div>
+              </div>
+
+              {/* Covenant pull quote */}
+              {primaryCircle.covenant && (
+                <div style={{ borderLeft: '2px solid rgba(212,175,55,0.45)', paddingLeft: 14, marginBottom: 18 }}>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', lineHeight: 1.6 }}>
+                    &ldquo;{primaryCircle.covenant}&rdquo;
+                  </p>
+                </div>
               )}
-              <button onClick={() => setShowInvite(true)} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
-              <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ Share</button>
+
+              {/* Member avatar cluster */}
+              {memberStatuses.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ display: 'flex' }}>
+                    {memberStatuses.slice(0, 7).map((m, i) => {
+                      const active = (m.post_count_week ?? 0) > 0
+                      return (
+                        <div key={m.user_id} style={{
+                          width: 36, height: 36, borderRadius: '50%',
+                          border: `2px solid ${active ? '#D4AF37' : 'rgba(255,255,255,0.07)'}`,
+                          boxShadow: active ? '0 0 10px rgba(212,175,55,0.45)' : 'none',
+                          marginLeft: i > 0 ? -10 : 0,
+                          zIndex: 10 - i, position: 'relative',
+                          background: m.avatar_url ? '#000' : avatarGrad(m.user_id),
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          overflow: 'hidden', flexShrink: 0,
+                          opacity: active ? 1 : 0.35,
+                          fontSize: 11, fontWeight: 900, color: '#fff',
+                        }}>
+                          {m.avatar_url
+                            ? <img src={m.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : initials(m.full_name)
+                          }
+                        </div>
+                      )
+                    })}
+                    {memberStatuses.length > 7 && (
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(255,255,255,0.07)', marginLeft: -10, zIndex: 2, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                        +{memberStatuses.length - 7}
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ marginLeft: 14, fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.4 }}>
+                    <span style={{ color: '#D4AF37', fontWeight: 800 }}>{memberStatuses.filter(m => (m.post_count_week ?? 0) > 0).length}</span>
+                    <span> of {memberStatuses.length} showed up this week</span>
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Covenant */}
-        {hasCircle && primaryCircle?.covenant && (
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 12 }}>
-            &ldquo;{primaryCircle.covenant}&rdquo;
-          </p>
-        )}
-
-        {/* Season + health strip */}
-        {hasCircle && !isExpired && daysLeft !== null && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: 11, color: daysLeft <= 7 ? '#f97316' : 'rgba(255,255,255,0.42)', fontWeight: 700 }}>
-                {daysLeft === 0 ? 'Last day' : `${daysLeft}d left`}
-              </span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>in season</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: `1px solid ${healthColor}22` }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: healthColor }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: healthColor }}>{healthScore}%</span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>health</span>
-            </div>
-          </div>
-        )}
-
-        {/* Warning banner */}
-        {hasCircle && isWarning && (
-          <div style={{ marginTop: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', marginBottom: 2 }}>⚠️ Circle health is low</p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Fewer than half your members are showing up this week. Post first — leaders set the tone.</p>
-          </div>
-        )}
-
-        {/* Expired banner */}
-        {hasCircle && isExpired && (
-          <div style={{ marginTop: 12, padding: 20, borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>This season has ended.</p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 16, lineHeight: 1.5 }}>
-              {primaryCircle?.covenant ? `"${primaryCircle.covenant}"` : 'Your circle ran its course.'} Ready for another season?
-            </p>
-            {isCreator && (
-              <button onClick={fetchRecap} style={{ width: '100%', padding: '11px 0', borderRadius: 12, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)', color: '#D4AF37', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 14 }}>
-                ✦ View Season Recap
-              </button>
-            )}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-              {[30, 60, 90].map(d => (
-                <button key={d} onClick={() => setRenewDuration(d)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${renewDuration === d ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: renewDuration === d ? 'rgba(212,175,55,0.1)' : 'transparent', color: renewDuration === d ? '#D4AF37' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>{d}d</button>
+            {/* This week stats strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              {[
+                { label: 'POSTS', value: memberStatuses.reduce((s, m) => s + (m.post_count_week ?? 0), 0) },
+                { label: 'ACTIVE', value: memberStatuses.filter(m => (m.post_count_week ?? 0) > 0).length },
+                { label: 'COMMITTED', value: new Set(weekCommitments.map(c => c.user_id)).size },
+              ].map((stat, i) => (
+                <div key={i} style={{ padding: '14px 0', textAlign: 'center', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                  <p style={{ fontSize: 26, fontWeight: 900, color: '#EFEFEF', lineHeight: 1, marginBottom: 4, letterSpacing: '-0.02em' }}>{stat.value}</p>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)' }}>{stat.label}</p>
+                </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => primaryCircle && handleRenew(primaryCircle.id)} disabled={renewPending} style={{ flex: 2, padding: '12px 0', borderRadius: 12, background: renewPending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', fontSize: 13, fontWeight: 800, color: renewPending ? 'rgba(255,255,255,0.4)' : '#000', cursor: renewPending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
-                {renewPending ? 'Renewing…' : `Renew — ${renewDuration} days →`}
-              </button>
-              <button onClick={() => primaryCircle && handleDissolve(primaryCircle.id)} disabled={dissolvePending} style={{ flex: 1, padding: '12px 0', borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', cursor: dissolvePending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
-                Dissolve
-              </button>
+
+            {/* Health bar */}
+            <div style={{ padding: '14px 20px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)' }}>CIRCLE HEALTH</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>
+                    {healthScore >= 70 ? 'Thriving' : healthScore >= 40 ? 'Drifting' : 'At risk'}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: healthColor }}>{healthScore}%</span>
+                </div>
+              </div>
+              <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${healthScore}%`, background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`, borderRadius: 99, boxShadow: `0 0 8px ${healthColor}55`, transition: 'width 1.2s cubic-bezier(0.4,0,0.2,1)' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
+                  {daysLeft === 0 ? 'Last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`} · {primaryCircle.season_duration}d season
+                </span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
+                  Ends {new Date(primaryCircle.season_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Warning inside card */}
+            {isWarning && (
+              <div style={{ margin: '0 16px 16px', padding: '11px 15px', borderRadius: 12, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', marginBottom: 2 }}>⚠️ Circle health is low</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 }}>Fewer than half your members are showing up. Post first — leaders set the tone.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── No circle header ── */}
+        {!hasCircle && (
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>YOUR CIRCLE</p>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>Find Your<br />People.</h1>
+          </div>
+        )}
+
+        {/* ── Expired header ── */}
+        {hasCircle && isExpired && (
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>{primaryCircle?.name.toUpperCase()}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 16 }}>⚔️ Season Ended</h1>
+            <div style={{ padding: 20, borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>This season has ended.</p>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 16, lineHeight: 1.5 }}>
+                {primaryCircle?.covenant ? `"${primaryCircle.covenant}"` : 'Your circle ran its course.'} Ready for another season?
+              </p>
+              {isCreator && (
+                <button onClick={fetchRecap} style={{ width: '100%', padding: '11px 0', borderRadius: 12, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)', color: '#D4AF37', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 14 }}>
+                  ✦ View Season Recap
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                {[30, 60, 90].map(d => (
+                  <button key={d} onClick={() => setRenewDuration(d)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${renewDuration === d ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: renewDuration === d ? 'rgba(212,175,55,0.1)' : 'transparent', color: renewDuration === d ? '#D4AF37' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>{d}d</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => primaryCircle && handleRenew(primaryCircle.id)} disabled={renewPending} style={{ flex: 2, padding: '12px 0', borderRadius: 12, background: renewPending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', fontSize: 13, fontWeight: 800, color: renewPending ? 'rgba(255,255,255,0.4)' : '#000', cursor: renewPending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                  {renewPending ? 'Renewing…' : `Renew — ${renewDuration} days →`}
+                </button>
+                <button onClick={() => primaryCircle && handleDissolve(primaryCircle.id)} disabled={dissolvePending} style={{ flex: 1, padding: '12px 0', borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', cursor: dissolvePending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                  Dissolve
+                </button>
+              </div>
             </div>
           </div>
         )}
+
       </div>
 
       {/* ── Tab bar ── */}
