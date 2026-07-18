@@ -28,7 +28,7 @@ type PostWithMeta = {
   my_reactions: { fire: boolean; strong: boolean; relate: boolean }
   comments: PostComment[]
 }
-type CircleInfo = { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }
+type CircleInfo = { id: string; name: string; code: string; covenant: string | null; season_duration: number | null; season_start: string | null; season_end: string | null; status: string | null; created_by: string | null }
 type CalGoal = { id: string; title: string; category: string | null; deadline: string }
 type DiscoverProfile = { id: string; full_name: string | null; username: string | null; streak: number; tagline: string | null; goals_complete: number; avatar_url?: string | null }
 type MemberAssessment = { user_id: string; week_start: string; week_title: string | null; rating: number | null; full_name: string | null }
@@ -338,7 +338,7 @@ export function CircleClient({
 
   // Season + health derived values
   const today = new Date()
-  const seasonEnd = primaryCircle ? new Date(primaryCircle.season_end) : null
+  const seasonEnd = primaryCircle?.season_end ? new Date(primaryCircle.season_end) : null
   const daysLeft = seasonEnd ? Math.max(0, Math.ceil((seasonEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))) : null
   const isExpired = primaryCircle ? (primaryCircle.status === 'expired' || (seasonEnd !== null && seasonEnd < today)) : false
   const isWarning = !isExpired && healthScore < 40 && memberStatuses.length > 1
@@ -821,10 +821,10 @@ export function CircleClient({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7 }}>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
-                  {daysLeft === 0 ? 'Last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`} · {primaryCircle.season_duration}d season
+                  {daysLeft === null ? 'Season active' : daysLeft === 0 ? 'Last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}{primaryCircle.season_duration ? ` · ${primaryCircle.season_duration}d season` : ''}
                 </span>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
-                  Ends {new Date(primaryCircle.season_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {primaryCircle.season_end ? `Ends ${new Date(primaryCircle.season_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
                 </span>
               </div>
             </div>
@@ -1395,7 +1395,7 @@ export function CircleClient({
                 <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 4 }}>SEASON RECAP</p>
                 <p style={{ fontSize: 19, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{primaryCircle?.name}</p>
                 {primaryCircle && (
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{primaryCircle.season_duration}-day season · {memberStatuses.length} members</p>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{primaryCircle.season_duration ? `${primaryCircle.season_duration}-day season · ` : ''}{memberStatuses.length} members</p>
                 )}
               </div>
               {/* Body */}

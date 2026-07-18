@@ -93,7 +93,7 @@ export default async function CirclePage() {
 
   // ── Circle posts ──
   let circlePosts: PostWithMeta[] = []
-  let circles: { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }[] = []
+  let circles: { id: string; name: string; code: string; covenant: string | null; season_duration: number | null; season_start: string | null; season_end: string | null; status: string | null; created_by: string | null }[] = []
 
   // ── Circle member assessments (for Reflections section) ──
   type MemberAssessment = { user_id: string; week_start: string; week_title: string | null; rating: number | null; full_name: string | null }
@@ -115,15 +115,24 @@ export default async function CirclePage() {
   }
 
   if (circleIds.length > 0) {
-    const [{ data: circleRows }, { data: postRows }] = await Promise.all([
-      supabase.from('circles').select('id, name, code, covenant, season_duration, season_start, season_end, status, created_by').in('id', circleIds),
-      supabase.from('posts')
-        .select('id, content, type, created_at, user_id, circle_id, media_url, media_type')
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ])
+    // Try full select first; fall back to base columns if season fields don't exist yet
+    let circleRows: { id: string; name: string; code: string; covenant: string | null; season_duration: number | null; season_start: string | null; season_end: string | null; status: string | null; created_by: string | null }[] | null = null
+    const { data: fullRows, error: fullErr } = await supabase.from('circles').select('id, name, code, covenant, season_duration, season_start, season_end, status, created_by').in('id', circleIds)
+    if (fullErr || !fullRows) {
+      const { data: baseRows } = await supabase.from('circles').select('id, name, code, created_by').in('id', circleIds)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      circleRows = ((baseRows ?? []) as any[]).map(c => ({ ...c, covenant: null, season_duration: null, season_start: null, season_end: null, status: 'active' }))
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      circleRows = fullRows as any
+    }
 
-    circles = ((circleRows ?? []) as { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }[])
+    const { data: postRows } = await supabase.from('posts')
+      .select('id, content, type, created_at, user_id, circle_id, media_url, media_type')
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    circles = circleRows ?? []
     const posts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; user_id: string; circle_id: string | null; media_url: string | null; media_type: string | null }[]
 
     const authorIds = [...new Set(posts.map(p => p.user_id))]
