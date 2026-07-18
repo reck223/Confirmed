@@ -175,9 +175,11 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const qod = getTodayQod()
 
-  const todayEntries = entries.filter(e => e.created_at.startsWith(todayKey))
-  const morningDone  = todayEntries.some(e => e.content.checkin_type === 'morning')
-  const eveningDone  = todayEntries.some(e => e.content.checkin_type === 'evening')
+  const todayEntries      = entries.filter(e => e.created_at.startsWith(todayKey))
+  const todayMorningFocus = todayEntries.find(e => e.content.checkin_type === 'morning_focus')
+  const todayEveningRef   = todayEntries.find(e => e.content.checkin_type === 'evening_reflection')
+  const morningDone = todayEntries.some(e => e.content.checkin_type === 'morning' || e.content.checkin_type === 'morning_focus')
+  const eveningDone = todayEntries.some(e => e.content.checkin_type === 'evening' || e.content.checkin_type === 'evening_reflection')
 
   // Default to evening if morning is done but evening isn't; otherwise morning
   const yesterdayKey = new Date(Date.now() - 86400000).toISOString().split('T')[0]
@@ -290,6 +292,69 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
           <MoodPicker value={mood} onChange={handleMoodSelect} />
         </div>
 
+        {/* ── Home ritual card (morning_focus) ── */}
+        {section === 'morning' && todayMorningFocus && (
+          <div style={{ borderRadius: 18, overflow: 'hidden', background: '#0c0c0c', border: '1px solid rgba(212,175,55,0.2)', marginBottom: 20 }}>
+            <div style={{ height: 2, background: 'linear-gradient(90deg,#D4AF37,#D4AF3744)' }} />
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 14 }}>⚔️</span>
+                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37' }}>LOCKED IN FROM HOME</p>
+              </div>
+              {todayMorningFocus.content.intention && (
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: 1.55, paddingLeft: 12, borderLeft: '2px solid rgba(212,175,55,0.3)', marginBottom: 12 }}>&ldquo;{todayMorningFocus.content.intention}&rdquo;</p>
+              )}
+              {[todayMorningFocus.content.task1, todayMorningFocus.content.task2, todayMorningFocus.content.task3].filter(Boolean).map((t, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(212,175,55,0.5)', flexShrink: 0, minWidth: 14 }}>{i + 1}</span>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{t}</p>
+                </div>
+              ))}
+              {todayMorningFocus.content.qod_answer && (
+                <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(212,175,55,0.05)', borderLeft: '2px solid rgba(212,175,55,0.25)' }}>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 4 }}>Q OF THE DAY · {qod.label.toUpperCase()}</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: 1.5 }}>&ldquo;{todayMorningFocus.content.qod_answer}&rdquo;</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Evening reflection card (evening_reflection) ── */}
+        {section === 'evening' && todayEveningRef && (
+          <div style={{ borderRadius: 18, overflow: 'hidden', background: '#0c0c0c', border: '1px solid rgba(167,139,250,0.2)', marginBottom: 20 }}>
+            <div style={{ height: 2, background: 'linear-gradient(90deg,#a78bfa,#a78bfa44)' }} />
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>🌙</span>
+                  <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#a78bfa' }}>DAY CLOSED OUT</p>
+                </div>
+                {todayEveningRef.content.score !== undefined && (
+                  <span style={{ fontSize: 11, fontWeight: 900, color: '#a78bfa', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.25)', borderRadius: 999, padding: '3px 10px' }}>{todayEveningRef.content.score}/3 tasks</span>
+                )}
+              </div>
+              {[{ key: 'task1_done', label: 'Task 1' }, { key: 'task2_done', label: 'Task 2' }, { key: 'task3_done', label: 'Task 3' }].filter(({ key }) => todayEveningRef.content[key]).map(({ key, label }) => {
+                const status = todayEveningRef.content[key]
+                const c = status === 'done' ? '#4ade80' : status === 'partial' ? '#fbbf24' : '#f87171'
+                const icon = status === 'done' ? '✓' : status === 'partial' ? '~' : '✗'
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: c, fontWeight: 900, width: 14, flexShrink: 0 }}>{icon}</span>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{label}</p>
+                  </div>
+                )
+              })}
+              {todayEveningRef.content.reflection && (
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55, marginTop: 10, fontStyle: 'italic' }}>&ldquo;{todayEveningRef.content.reflection}&rdquo;</p>
+              )}
+              {todayEveningRef.content.tomorrow && (
+                <p style={{ fontSize: 11, color: 'rgba(167,139,250,0.6)', marginTop: 6 }}>→ Tomorrow: {todayEveningRef.content.tomorrow}</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {section === 'morning' ? (
           <>
             {/* QOD */}
@@ -389,8 +454,8 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
 
         function renderCheckinDay(date: string) {
           const dayEntries = grouped[date]
-          const morning = dayEntries.find(e => e.content.checkin_type === 'morning')
-          const evening = dayEntries.find(e => e.content.checkin_type === 'evening')
+          const morning = dayEntries.find(e => e.content.checkin_type === 'morning' || e.content.checkin_type === 'morning_focus')
+          const evening = dayEntries.find(e => e.content.checkin_type === 'evening' || e.content.checkin_type === 'evening_reflection')
           return (
             <div key={date}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -400,7 +465,8 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[morning, evening].filter(Boolean).map(e => {
                   const c = e!.content
-                  const isMorning = c.checkin_type === 'morning'
+                  const isMorning = c.checkin_type === 'morning' || c.checkin_type === 'morning_focus'
+                  const isEveningReflection = c.checkin_type === 'evening_reflection'
                   const accent = isMorning ? '#38bdf8' : '#a78bfa'
                   const moodNum = c.mood ? parseInt(c.mood) : null
                   const validMood = moodNum && moodNum >= 1 && moodNum <= 5
@@ -437,7 +503,7 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
                             {c.excited && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontStyle: 'italic' }}>Looking forward to: {c.excited}</p>}
                           </div>
                         )}
-                        {!isMorning && (
+                        {!isMorning && !isEveningReflection && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {c.win && <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}><span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>🏆</span><p style={{ fontSize: 13, fontWeight: 600, color: '#4ade80', lineHeight: 1.4 }}>{c.win}</p></div>}
                             {c.challenge && <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.58)', fontWeight: 300 }}>⚡ {c.challenge}</p>}
@@ -450,6 +516,24 @@ function CheckinTab({ entries }: { entries: JournalEntry[] }) {
                                 <span style={{ fontSize: 10, fontWeight: 800, color: parseInt(c.energy) <= 3 ? '#f87171' : parseInt(c.energy) <= 6 ? '#fbbf24' : '#4ade80', flexShrink: 0 }}>{c.energy}/10</span>
                               </div>
                             )}
+                          </div>
+                        )}
+                        {isEveningReflection && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {[{ key: 'task1_done', num: '1' }, { key: 'task2_done', num: '2' }, { key: 'task3_done', num: '3' }].filter(({ key }) => c[key]).map(({ key, num }) => {
+                              const status = c[key]
+                              const col = status === 'done' ? '#4ade80' : status === 'partial' ? '#fbbf24' : '#f87171'
+                              const icon = status === 'done' ? '✓' : status === 'partial' ? '~' : '✗'
+                              return (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 11, color: col, fontWeight: 900, width: 14, flexShrink: 0 }}>{icon}</span>
+                                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Task {num}</p>
+                                </div>
+                              )
+                            })}
+                            {c.reflection && <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', borderLeft: '2px solid rgba(167,139,250,0.3)', marginTop: 2 }}><p style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic', lineHeight: 1.5 }}>&ldquo;{c.reflection}&rdquo;</p></div>}
+                            {c.tomorrow && <p style={{ fontSize: 11, color: 'rgba(167,139,250,0.6)', marginTop: 2 }}>→ Tomorrow: {c.tomorrow}</p>}
+                            {c.score !== undefined && <p style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{c.score}/3 tasks done</p>}
                           </div>
                         )}
                       </div>

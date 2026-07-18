@@ -54,20 +54,39 @@ export function TopBar({ unreadCount, isCreator }: { unreadCount: number; isCrea
         pointerEvents: scrolled ? 'none' : 'auto',
       }}>
         {isCreator && (
-          <Link href="/creator" style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'rgba(212,175,55,0.08)',
-            border: '1px solid rgba(212,175,55,0.2)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            textDecoration: 'none',
-            boxShadow: 'inset 0 1px 0 rgba(212,175,55,0.1)',
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-          </Link>
+          <>
+            <Link href="/trading" style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(74,222,128,0.07)',
+              border: '1px solid rgba(74,222,128,0.18)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              textDecoration: 'none',
+              boxShadow: 'inset 0 1px 0 rgba(74,222,128,0.08)',
+            }}>
+              {/* candlestick chart icon */}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 20V10"/><path d="M18 6V4"/><path d="M6 20v-4"/><path d="M6 12V4"/>
+                <rect x="14" y="6" width="8" height="12" rx="1"/>
+                <rect x="2" y="4" width="8" height="12" rx="1"/>
+              </svg>
+            </Link>
+            <Link href="/creator" style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(212,175,55,0.08)',
+              border: '1px solid rgba(212,175,55,0.2)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              textDecoration: 'none',
+              boxShadow: 'inset 0 1px 0 rgba(212,175,55,0.1)',
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </Link>
+          </>
         )}
 
         <Link href="/settings" style={{

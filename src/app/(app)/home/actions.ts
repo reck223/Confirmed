@@ -5,6 +5,71 @@ import { awardXP } from '@/lib/xp-server'
 import { awardAchievement } from '@/lib/achievements-server'
 import { XP_EVENTS } from '@/lib/xp'
 
+export async function saveMorningFocus(data: {
+  qodQuestion: string
+  qodAnswer: string
+  intention: string
+  task1: string
+  task2: string
+  task3: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('journal_entries') as any).insert({
+    user_id: user.id,
+    type: 'checkin',
+    content: {
+      checkin_type: 'morning_focus',
+      qod_question: data.qodQuestion,
+      qod_answer: data.qodAnswer,
+      intention: data.intention,
+      task1: data.task1,
+      task2: data.task2,
+      task3: data.task3,
+    },
+  })
+  if (error) return { error: error.message }
+
+  await awardXP(user.id, XP_EVENTS.CHECKIN).catch(() => {})
+  revalidatePath('/home')
+  return { success: true }
+}
+
+export async function saveEveningReflection(data: {
+  task1Done: string
+  task2Done: string
+  task3Done: string
+  reflection: string
+  tomorrow: string
+  score: number
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('journal_entries') as any).insert({
+    user_id: user.id,
+    type: 'checkin',
+    content: {
+      checkin_type: 'evening_reflection',
+      task1_done: data.task1Done,
+      task2_done: data.task2Done,
+      task3_done: data.task3Done,
+      reflection: data.reflection,
+      tomorrow: data.tomorrow,
+      score: data.score,
+    },
+  })
+  if (error) return { error: error.message }
+
+  revalidatePath('/home')
+  return { success: true }
+}
+
 export async function markMissionDone() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
