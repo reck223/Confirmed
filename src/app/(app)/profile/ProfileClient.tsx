@@ -101,9 +101,10 @@ type Connection = {
   partnerName: string | null; partnerAvatar: string | null
 }
 
-export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts, connections, currentUserId, myCircles }: {
+export function ProfileClient({ profile, goals, followersCount, followingCount, circleCount, assessmentHistory, achievements, posts, connections, currentUserId, myCircles, activityGrid }: {
   profile: Profile; goals: Goal[]; followersCount: number; followingCount: number; circleCount: number
   myCircles?: { id: string; name: string; memberCount: number }[]
+  activityGrid?: { date: string; level: number }[]
   assessmentHistory: AssessmentHistory
   achievements: { type: string; earned_at: string }[]
   posts: ProfilePost[]
@@ -552,6 +553,44 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
           )}
         </div>
       </div>
+
+      {/* ── Activity Calendar ── */}
+      {activityGrid && activityGrid.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>90-DAY ACTIVITY</p>
+            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>
+              {activityGrid.filter(d => d.level > 0).length} active days
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gridTemplateRows: 'repeat(7, 1fr)', gap: 3, direction: 'ltr' }}>
+            {(() => {
+              // Pad start so first column aligns to Sunday
+              const firstDay = new Date(activityGrid[0].date + 'T12:00:00').getDay()
+              const padded = [...Array(firstDay).fill(null), ...activityGrid]
+              return padded.map((cell, i) => {
+                if (!cell) return <div key={`pad-${i}`} style={{ aspectRatio: '1', borderRadius: 2 }} />
+                const level = cell.level as number
+                const bg = level === 0 ? 'rgba(255,255,255,0.05)' : level === 1 ? 'rgba(212,175,55,0.22)' : level === 2 ? 'rgba(212,175,55,0.45)' : level === 3 ? 'rgba(212,175,55,0.68)' : '#D4AF37'
+                return (
+                  <div
+                    key={cell.date}
+                    title={`${cell.date}${level > 0 ? ` · ${level} activit${level === 1 ? 'y' : 'ies'}` : ''}`}
+                    style={{ aspectRatio: '1', borderRadius: 2, background: bg, boxShadow: level === 4 ? '0 0 4px rgba(212,175,55,0.5)' : 'none' }}
+                  />
+                )
+              })
+            })()}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, justifyContent: 'flex-end' }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginRight: 4 }}>Less</span>
+            {[0,1,2,3,4].map(l => (
+              <div key={l} style={{ width: 9, height: 9, borderRadius: 2, background: l === 0 ? 'rgba(255,255,255,0.05)' : l === 1 ? 'rgba(212,175,55,0.22)' : l === 2 ? 'rgba(212,175,55,0.45)' : l === 3 ? 'rgba(212,175,55,0.68)' : '#D4AF37' }} />
+            ))}
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 4 }}>More</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Circles ── */}
       {myCircles && myCircles.length > 0 && (

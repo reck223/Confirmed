@@ -63,9 +63,37 @@ export default async function CirclePage() {
   // ── Circle membership ──
   const circleIds = ((memberRows ?? []) as { circle_id: string }[]).map(r => r.circle_id)
 
+  // ── Pending circle invitations (shown on no-circle screen) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: inviteNotifRows } = await (supabase.from('notifications') as any)
+    .select('id, from_user_id, data')
+    .eq('to_user_id', user.id)
+    .eq('type', 'circle_invite')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const rawInviteNotifs = (inviteNotifRows ?? []) as { id: string; from_user_id: string | null; data: Record<string, string> }[]
+  const unacceptedInvites = rawInviteNotifs.filter(n => n.data?.circle_id && !circleIds.includes(n.data.circle_id))
+
+  const inviterIds = [...new Set(unacceptedInvites.map(n => n.from_user_id).filter(Boolean))] as string[]
+  const { data: inviterRows } = inviterIds.length
+    ? await supabase.from('profiles').select('id, full_name, avatar_url').in('id', inviterIds)
+    : { data: [] }
+  const inviterMap = Object.fromEntries(
+    ((inviterRows ?? []) as { id: string; full_name: string | null; avatar_url: string | null }[]).map(p => [p.id, p])
+  )
+
+  const pendingInvites = unacceptedInvites.map(n => ({
+    notifId: n.id,
+    circleId: n.data.circle_id,
+    circleName: n.data.circle_name ?? 'A Circle',
+    inviterName: n.from_user_id ? (inviterMap[n.from_user_id]?.full_name ?? n.data.inviter_name ?? null) : (n.data.inviter_name ?? null),
+    inviterAvatar: n.from_user_id ? (inviterMap[n.from_user_id]?.avatar_url ?? null) : null,
+  }))
+
   // ── Circle posts ──
   let circlePosts: PostWithMeta[] = []
-  let circles: { id: string; name: string; code: string }[] = []
+  let circles: { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }[] = []
 
   // ── Circle member assessments (for Reflections section) ──
   type MemberAssessment = { user_id: string; week_start: string; week_title: string | null; rating: number | null; full_name: string | null }
@@ -88,14 +116,14 @@ export default async function CirclePage() {
 
   if (circleIds.length > 0) {
     const [{ data: circleRows }, { data: postRows }] = await Promise.all([
-      supabase.from('circles').select('id, name, code').in('id', circleIds),
+      supabase.from('circles').select('id, name, code, covenant, season_duration, season_start, season_end, status, created_by').in('id', circleIds),
       supabase.from('posts')
         .select('id, content, type, created_at, user_id, circle_id, media_url, media_type')
         .order('created_at', { ascending: false })
         .limit(50),
     ])
 
-    circles = ((circleRows ?? []) as { id: string; name: string; code: string }[])
+    circles = ((circleRows ?? []) as { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }[])
     const posts = (postRows ?? []) as { id: string; content: string; type: string; created_at: string; user_id: string; circle_id: string | null; media_url: string | null; media_type: string | null }[]
 
     const authorIds = [...new Set(posts.map(p => p.user_id))]
@@ -243,32 +271,13 @@ export default async function CirclePage() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [{ data: myProfile }, { count: journalCount }] = await Promise.all([
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('profiles') as any)
-      .select('full_name, streak, avatar_url, username, goals_complete, circle_module_complete, circle_creator_approved, circle_creator_requested')
-      .eq('id', user.id)
-      .single(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('journal_entries') as any)
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id),
-  ])
+  const { data: myProfile } = await (supabase.from('profiles') as any)
+    .select('full_name, streak, avatar_url, username, goals_complete, circle_module_complete')
+    .eq('id', user.id)
+    .single()
 
-  type MyProfile = { full_name: string | null; streak: number; avatar_url: string | null; username: string | null; goals_complete: number; circle_module_complete: boolean; circle_creator_approved: boolean; circle_creator_requested: boolean }
+  type MyProfile = { full_name: string | null; streak: number; avatar_url: string | null; username: string | null; goals_complete: number; circle_module_complete: boolean }
   const prof = myProfile as MyProfile | null
-
-  const circleEligibility = {
-    goalsComplete:   (prof?.goals_complete ?? 0) >= 1,
-    journalEntries:  (journalCount ?? 0) >= 10,
-    streakReached:   (prof?.streak ?? 0) >= 7,
-    moduleComplete:  prof?.circle_module_complete ?? false,
-    goalsCompleteCount: prof?.goals_complete ?? 0,
-    journalCount:    journalCount ?? 0,
-    streakCount:     prof?.streak ?? 0,
-  }
-  const circleRequested = prof?.circle_creator_requested ?? false
-  const circleApproved  = prof?.circle_creator_approved  ?? false
 
   // ── Circle goals (members' active goals with reactions + comments) ──
   type CircleGoal = {
@@ -489,6 +498,16 @@ export default async function CirclePage() {
     }
   }
 
+  // ── Circle health score (0–100) ──
+  const totalMembers = memberStatuses.length
+  const healthScore = totalMembers === 0 ? 100 : Math.min(100, Math.round(
+    (memberStatuses.filter(s => s.post_count_week > 0).length / totalMembers) * 60 +
+    (new Set(weekCommitments.map(c => c.user_id)).size / totalMembers) * 40
+  ))
+
+  // ── Can this user create a circle? ──
+  const canCreateCircle = !!(prof?.circle_module_complete && (prof?.goals_complete ?? 0) >= 1)
+
   return (
     <CircleClient
       posts={circlePosts}
@@ -512,13 +531,15 @@ export default async function CirclePage() {
       userStreak={prof?.streak ?? 0}
       userAvatar={prof?.avatar_url ?? null}
       userUsername={prof?.username ?? null}
-      circleEligibility={circleEligibility}
-      circleRequested={circleRequested}
-      circleApproved={circleApproved}
       birthdayProfiles={birthdayProfiles}
       weekCommitments={weekCommitments}
       myWitnessedIds={myWitnessedIds}
       myActiveGoals={myActiveGoals}
+      pendingInvites={pendingInvites}
+      healthScore={healthScore}
+      canCreateCircle={canCreateCircle}
+      moduleComplete={prof?.circle_module_complete ?? false}
+      goalsComplete={prof?.goals_complete ?? 0}
     />
   )
 }

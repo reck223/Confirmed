@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { InboxClient } from './InboxClient'
 
 type RawMessage = { id: string; sender_id: string; recipient_id: string; content: string; created_at: string; read_at: string | null }
-type RawNotif = { id: string; type: string; from_user_id: string | null; data: Record<string, string>; read_at: string | null; created_at: string }
+type RawNotif = { id: string; type: string; from_user_id: string | null; data: Record<string, string> | null; read_at: string | null; created_at: string }
 
 export default async function InboxPage() {
   const supabase = await createClient()
@@ -70,6 +70,7 @@ export default async function InboxPage() {
       }))}
       notifications={notifications.map(n => ({
         ...n,
+        data: n.data ?? {},
         from_name: n.from_user_id ? (fromProfileMap[n.from_user_id]?.name ?? null) : null,
         from_avatar: n.from_user_id ? (fromProfileMap[n.from_user_id]?.avatar ?? null) : null,
       }))}

@@ -4,6 +4,7 @@ import { Nav } from '@/components/Nav'
 import { TopBar } from '@/components/TopBar'
 import { AnimationObserver } from '@/components/AnimationObserver'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
+import { PushRegistrar } from '@/components/PushRegistrar'
 import type { Profile } from '@/lib/types/database'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen" style={{ background: '#080808', color: '#EFEFEF' }}>
+      <PushRegistrar />
       <AnimationObserver />
       <TopBar unreadCount={unreadCount ?? 0} isCreator={user.email === 'graysdarius@gmail.com'} />
       <Nav

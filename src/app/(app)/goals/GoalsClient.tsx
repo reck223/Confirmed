@@ -19,7 +19,7 @@ type CeremonyData = {
   earnedAchievements: { type: string; emoji: string; title: string; desc: string; color: string }[]
 }
 
-function CeremonyModal({ data, onClose }: { data: CeremonyData; onClose: () => void }) {
+function CeremonyModal({ data, onClose, firstName }: { data: CeremonyData; onClose: () => void; firstName?: string }) {
   const router = useRouter()
   const [visible, setVisible] = useState(false)
   const levelInfo = getLevelInfo(data.newXP)
@@ -36,6 +36,97 @@ function CeremonyModal({ data, onClose }: { data: CeremonyData; onClose: () => v
     burst()
     return () => clearTimeout(t)
   }, [])
+
+  function downloadWinCard() {
+    const W = 1080, H = 1080
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')!
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, '#0a0a14')
+    bg.addColorStop(1, '#14100a')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    // Gold border ring
+    ctx.strokeStyle = 'rgba(212,175,55,0.35)'
+    ctx.lineWidth = 3
+    ctx.strokeRect(32, 32, W - 64, H - 64)
+
+    // Corner accents
+    const accentSize = 60
+    ctx.strokeStyle = '#D4AF37'
+    ctx.lineWidth = 4
+    // top-left
+    ctx.beginPath(); ctx.moveTo(32, 32 + accentSize); ctx.lineTo(32, 32); ctx.lineTo(32 + accentSize, 32); ctx.stroke()
+    // top-right
+    ctx.beginPath(); ctx.moveTo(W - 32 - accentSize, 32); ctx.lineTo(W - 32, 32); ctx.lineTo(W - 32, 32 + accentSize); ctx.stroke()
+    // bottom-left
+    ctx.beginPath(); ctx.moveTo(32, H - 32 - accentSize); ctx.lineTo(32, H - 32); ctx.lineTo(32 + accentSize, H - 32); ctx.stroke()
+    // bottom-right
+    ctx.beginPath(); ctx.moveTo(W - 32 - accentSize, H - 32); ctx.lineTo(W - 32, H - 32); ctx.lineTo(W - 32, H - 32 - accentSize); ctx.stroke()
+
+    // Trophy emoji
+    ctx.font = '140px serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('🏆', W / 2, 300)
+
+    // GOAL ACHIEVED label
+    ctx.font = '700 28px sans-serif'
+    ctx.fillStyle = '#D4AF37'
+    ctx.letterSpacing = '0.14em'
+    ctx.fillText('GOAL ACHIEVED', W / 2, 380)
+    ctx.letterSpacing = '0'
+
+    // Goal title — wrap at ~30 chars
+    ctx.font = '800 58px sans-serif'
+    ctx.fillStyle = '#FFFFFF'
+    const words = data.goalTitle.split(' ')
+    const lines: string[] = []
+    let cur = ''
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w
+      if (ctx.measureText(test).width > W - 160) { lines.push(cur); cur = w }
+      else cur = test
+    }
+    if (cur) lines.push(cur)
+    const lineH = 70
+    const titleY = 480 - ((lines.length - 1) * lineH) / 2
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, titleY + i * lineH))
+
+    // Name tag
+    if (firstName) {
+      ctx.font = '600 30px sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'
+      ctx.fillText(firstName, W / 2, titleY + lines.length * lineH + 40)
+    }
+
+    // XP badge strip
+    const badgeY = titleY + lines.length * lineH + (firstName ? 120 : 80)
+    ctx.fillStyle = 'rgba(74,222,128,0.15)'
+    const bx = W / 2 - 130, bw = 260, bh = 60
+    ctx.beginPath()
+    ctx.roundRect(bx, badgeY, bw, bh, 30)
+    ctx.fill()
+    ctx.font = '800 32px sans-serif'
+    ctx.fillStyle = '#4ade80'
+    ctx.fillText(`+${data.xpGained} XP`, W / 2, badgeY + 40)
+
+    // Footer watermark
+    ctx.font = '600 22px sans-serif'
+    ctx.fillStyle = 'rgba(212,175,55,0.4)'
+    ctx.fillText('confirmedcreations.com', W / 2, H - 54)
+
+    canvas.toBlob(blob => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'win-card.png'; a.click()
+      URL.revokeObjectURL(url)
+    })
+  }
 
   function handleShare() {
     onClose()
@@ -159,28 +250,41 @@ function CeremonyModal({ data, onClose }: { data: CeremonyData; onClose: () => v
         </div>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={handleShare}
+              style={{
+                flex: 1, padding: '13px', borderRadius: 14,
+                background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)',
+                color: '#D4AF37', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                fontFamily: 'Satoshi,sans-serif',
+              }}
+            >
+              Share Win 🎉
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1, padding: '13px', borderRadius: 14,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.58)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                fontFamily: 'Satoshi,sans-serif',
+              }}
+            >
+              Done
+            </button>
+          </div>
           <button
-            onClick={handleShare}
+            onClick={downloadWinCard}
             style={{
-              flex: 1, padding: '13px', borderRadius: 14,
-              background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)',
-              color: '#D4AF37', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              width: '100%', padding: '12px', borderRadius: 14,
+              background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)',
+              color: '#a78bfa', fontWeight: 700, fontSize: 13, cursor: 'pointer',
               fontFamily: 'Satoshi,sans-serif',
             }}
           >
-            Share Win 🎉
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1, padding: '13px', borderRadius: 14,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'rgba(255,255,255,0.58)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-              fontFamily: 'Satoshi,sans-serif',
-            }}
-          >
-            Done
+            ↓ Save Win Card
           </button>
         </div>
       </div>
@@ -1881,6 +1985,7 @@ export function GoalsClient({ goals, milestones, books: allBooks, entries: allEn
         <CeremonyModal
           data={ceremony}
           onClose={() => { setCeremony(null); router.refresh() }}
+          firstName={firstName}
         />
       )}
     </Modal>

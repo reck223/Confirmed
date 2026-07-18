@@ -44,6 +44,7 @@ export default async function HomePage() {
     { data: assessmentData },
     { data: journalToday },
     { data: energyRow },
+    { data: morningPostRow },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name, streak, xp, level, pinned_goal_id, assessment_day').eq('id', user.id).single(),
     supabase.from('goals')
@@ -59,6 +60,8 @@ export default async function HomePage() {
     supabase.from('journal_entries').select('id').eq('user_id', user.id).gte('created_at', today).limit(1),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('daily_checkins') as any).select('energy').eq('user_id', user.id).eq('date', today).maybeSingle(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('posts') as any).select('content').eq('user_id', user.id).eq('type', 'lock_in').gte('created_at', today + 'T00:00:00').maybeSingle(),
   ])
 
   type ProfileRow = Pick<Profile, 'full_name' | 'streak' | 'xp' | 'level' | 'pinned_goal_id'> & { assessment_day?: string }
@@ -111,6 +114,7 @@ export default async function HomePage() {
   const qodAnswered  = (journalToday ?? []).length > 0
   const missionDone  = checkedDates.has(today)
   const energyToday  = (energyRow as { energy: number } | null)?.energy ?? null
+  const morningDone  = (morningPostRow as { content: string } | null)?.content ?? null
 
   return (
     <HomeClient
@@ -129,6 +133,7 @@ export default async function HomePage() {
       qodAnswered={qodAnswered}
       missionDone={missionDone}
       energyToday={energyToday}
+      morningDone={morningDone}
     />
   )
 }

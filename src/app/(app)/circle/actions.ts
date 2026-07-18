@@ -6,6 +6,7 @@ import { createNotification } from '@/lib/notifications'
 import { XP_EVENTS } from '@/lib/xp'
 import { awardXP } from '@/lib/xp-server'
 import { awardAchievement } from '@/lib/achievements-server'
+import { sendPushToUser } from '@/lib/push'
 
 function randomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -19,12 +20,27 @@ export async function createCircle(formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
   if (!name) return { error: 'Circle name is required' }
 
+  const covenant = (formData.get('covenant') as string)?.trim() || null
+  const rawDuration = parseInt(formData.get('season_duration') as string ?? '30', 10)
+  const seasonDuration = [30, 60, 90].includes(rawDuration) ? rawDuration : 30
+
+  const today = new Date()
+  const seasonStart = today.toISOString().split('T')[0]
+  const seasonEnd = new Date(today)
+  seasonEnd.setDate(seasonEnd.getDate() + seasonDuration)
+  const seasonEndStr = seasonEnd.toISOString().split('T')[0]
+
   const code = randomCode()
   const circleId = randomUUID()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: circleErr } = await (supabase.from('circles') as any)
-    .insert({ id: circleId, name, code, created_by: user.id })
+    .insert({
+      id: circleId, name, code, created_by: user.id,
+      covenant, season_duration: seasonDuration,
+      season_start: seasonStart, season_end: seasonEndStr,
+      status: 'active',
+    })
 
   if (circleErr) return { error: circleErr.message }
 
@@ -36,6 +52,49 @@ export async function createCircle(formData: FormData) {
 
   revalidatePath('/circle')
   return { success: true, code }
+}
+
+export async function renewCircle(circleId: string, seasonDuration: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const duration = [30, 60, 90].includes(seasonDuration) ? seasonDuration : 30
+  const today = new Date()
+  const seasonStart = today.toISOString().split('T')[0]
+  const seasonEnd = new Date(today)
+  seasonEnd.setDate(seasonEnd.getDate() + duration)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('circles') as any)
+    .update({
+      season_duration: duration,
+      season_start: seasonStart,
+      season_end: seasonEnd.toISOString().split('T')[0],
+      status: 'active',
+    })
+    .eq('id', circleId)
+    .eq('created_by', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/circle')
+  return { success: true }
+}
+
+export async function dissolveCircle(circleId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('circles') as any)
+    .update({ status: 'expired' })
+    .eq('id', circleId)
+    .eq('created_by', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/circle')
+  return { success: true }
 }
 
 export async function joinCircle(formData: FormData) {
@@ -182,13 +241,19 @@ export async function createPost(circleId: string, formData: FormData) {
   ])
   const posterName = (poster as { full_name: string | null } | null)?.full_name ?? 'Someone'
   const postType = (formData.get('type') as string) || 'win'
-  await Promise.all(((members ?? []) as { user_id: string }[]).map(m =>
+  const typeLabel: Record<string, string> = { win: 'Win', lesson: 'Lesson', progress: 'Progress', milestone: 'Milestone', question: 'Support' }
+  await Promise.all(((members ?? []) as { user_id: string }[]).flatMap(m => [
     createNotification(m.user_id, 'win_posted', {
       poster_name: posterName,
       post_type: postType,
       preview: content.slice(0, 60),
-    })
-  ))
+    }),
+    sendPushToUser(supabase, m.user_id, {
+      title: `${posterName} shared a ${typeLabel[postType] ?? 'post'}`,
+      body: content.slice(0, 80),
+      url: '/circle',
+    }),
+  ]))
 
   revalidatePath('/circle')
   return { success: true }

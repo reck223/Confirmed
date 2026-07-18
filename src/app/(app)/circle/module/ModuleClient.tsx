@@ -51,6 +51,42 @@ const STEPS = [
     ],
   },
   {
+    emoji: '📜',
+    title: 'Writing Your Covenant',
+    body: "Every circle runs on a covenant — a shared commitment that every member agrees to when they join. It's not a mission statement. It's a promise. The best covenants are specific, honest, and slightly uncomfortable to break. Vague covenants create vague accountability.",
+    bullets: [
+      'Bad: "We support each other." Good: "We each ship something real this season — no half-finished projects."',
+      'Name what you\'re actually committing to, not how you\'ll feel about each other',
+      'If a member goes quiet for two weeks, the covenant is what you point to — not vibes',
+      'Write it in first person plural: "We finish what we start." Not "Members should try to."',
+      'It should feel like something worth keeping — because it is',
+    ],
+  },
+  {
+    emoji: '📅',
+    title: 'The Season Model',
+    body: "A Circle doesn't run forever. It runs for a season — 30, 60, or 90 days. At the end, the circle either renews or it doesn't. That's not failure. That's honest. Seasons create urgency. Urgency creates action. Open-ended groups drift; circles with a deadline focus.",
+    bullets: [
+      '30 days: High intensity. Best for a focused sprint — launch something, hit a specific goal.',
+      '60 days: The sweet spot. Enough time to build rhythm, short enough to stay sharp.',
+      '90 days: For circles with strong momentum. Plan for a mid-season check-in at day 45.',
+      'At season end: renew with the same people, or dissolve and let members carry what they built.',
+      'A dissolved circle isn\'t a failure. A circle that limped along for months with no one showing up is.',
+    ],
+  },
+  {
+    emoji: '❤️',
+    title: 'Keeping It Alive',
+    body: "Every circle has a health score — a live measure of whether your members are actually showing up. It's built from posts, weekly commitments, and check-ins. Watch it. When it drops, something is wrong. The first week of silence is a warning. The second week is the end.",
+    bullets: [
+      'Health ≥ 70%: Your circle is thriving — most members are showing up weekly',
+      'Health 40–70%: Some members are drifting. Name it publicly. "Who\'s posting this week?"',
+      'Health < 40%: Your circle is at risk. Reach out to quiet members directly — one message pulls people back',
+      'Health tracks posts + commitments. More activity = higher score. It\'s that simple.',
+      'If you go two weeks without posting as a leader, your circle will follow you into silence',
+    ],
+  },
+  {
     emoji: '🤝',
     title: 'Before You Lead',
     body: "A Circle isn't a feature you unlock — it's a responsibility you take on. The people who join you will invest their honesty, their time, and their trust. They deserve a leader who takes that seriously.",
@@ -108,7 +144,7 @@ export function ModuleClient({ alreadyComplete }: { alreadyComplete: boolean }) 
         <div style={{ margin: '0 20px', borderRadius: 24, background: 'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.04))', border: '1px solid rgba(212,175,55,0.3)', padding: 32, textAlign: 'center', animation: 'fadeUp 0.4s ease both' }}>
           <p style={{ fontSize: 48, marginBottom: 16 }}>🏆</p>
           <p style={{ fontSize: 20, fontWeight: 900, color: '#D4AF37', marginBottom: 8 }}>Module Complete</p>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, marginBottom: 28 }}>You've completed the Circle Creator Module. Head back to your Circle tab to check your remaining requirements and request access.</p>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6, marginBottom: 28 }}>You know what it takes to lead. Now complete your first goal, then head to the Circle tab to start yours.</p>
           <button onClick={() => router.push('/circle')} style={{ width: '100%', padding: '14px 0', borderRadius: 14, background: 'linear-gradient(135deg,#D4AF37,#f97316)', border: 'none', fontSize: 14, fontWeight: 800, color: '#0A0A0A', cursor: 'pointer', letterSpacing: '0.04em' }}>
             GO TO CIRCLE →
           </button>

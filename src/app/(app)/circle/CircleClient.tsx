@@ -4,8 +4,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
-import { createCircle, joinCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
-import { requestCircleAccess } from './module/actions'
+import { createCircle, joinCircle, joinCircleById, renewCircle, dissolveCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
 import { createHomePost } from '@/app/(app)/home/actions'
 import { createNotification } from '@/lib/notifications'
 import { sendMessage } from '@/app/(app)/inbox/actions'
@@ -29,7 +28,7 @@ type PostWithMeta = {
   my_reactions: { fire: boolean; strong: boolean; relate: boolean }
   comments: PostComment[]
 }
-type CircleInfo = { id: string; name: string; code: string }
+type CircleInfo = { id: string; name: string; code: string; covenant: string | null; season_duration: number; season_start: string; season_end: string; status: string; created_by: string | null }
 type CalGoal = { id: string; title: string; category: string | null; deadline: string }
 type DiscoverProfile = { id: string; full_name: string | null; username: string | null; streak: number; tagline: string | null; goals_complete: number; avatar_url?: string | null }
 type MemberAssessment = { user_id: string; week_start: string; week_title: string | null; rating: number | null; full_name: string | null }
@@ -251,124 +250,17 @@ function BuilderSpotlight({ builders, circleCode }: { builders: NewBuilder[]; ci
 }
 
 // ══════════════════════════════════════════════════════
-// Circle unlock / progress card
-// ══════════════════════════════════════════════════════
-function CircleUnlockCard({ eligibility, requested }: { eligibility: CircleEligibility; requested: boolean }) {
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(requested)
-
-  const allMet = eligibility.goalsComplete && eligibility.journalEntries && eligibility.streakReached && eligibility.moduleComplete
-  const metCount = [eligibility.goalsComplete, eligibility.journalEntries, eligibility.streakReached, eligibility.moduleComplete].filter(Boolean).length
-
-  async function handleRequest() {
-    setSending(true)
-    await requestCircleAccess()
-    setSent(true)
-    setSending(false)
-  }
-
-  const REQ = [
-    {
-      done: eligibility.goalsComplete,
-      label: 'Complete 1 goal',
-      sub: eligibility.goalsComplete ? 'Done' : `${eligibility.goalsCompleteCount} of 1`,
-      link: null,
-    },
-    {
-      done: eligibility.journalEntries,
-      label: '10 journal entries',
-      sub: eligibility.journalEntries ? 'Done' : `${eligibility.journalCount} of 10`,
-      link: null,
-    },
-    {
-      done: eligibility.streakReached,
-      label: '7-day streak',
-      sub: eligibility.streakReached ? 'Done' : `${eligibility.streakCount}-day streak`,
-      link: null,
-    },
-    {
-      done: eligibility.moduleComplete,
-      label: 'Complete the Circle Module',
-      sub: eligibility.moduleComplete ? 'Done' : 'Start the module →',
-      link: eligibility.moduleComplete ? null : '/circle/module',
-    },
-  ]
-
-  return (
-    <div style={{ borderRadius: 20, border: '1px solid rgba(212,175,55,0.2)', background: 'linear-gradient(135deg,rgba(212,175,55,0.06),rgba(212,175,55,0.02))', padding: 22 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>⭕</div>
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', marginBottom: 2 }}>Earn Your Circle</p>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontWeight: 400 }}>Prove you&apos;re ready to lead — {metCount} of 4 done</p>
-        </div>
-        <div style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 99, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)' }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.06em' }}>{metCount}/4</span>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.05)', marginBottom: 18, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${(metCount / 4) * 100}%`, background: 'linear-gradient(90deg,#D4AF37,#f97316)', borderRadius: 99, transition: 'width 0.4s ease' }} />
-      </div>
-
-      {/* Requirements list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-        {REQ.map((r, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: r.done ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${r.done ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {r.done
-                ? <span style={{ fontSize: 12, color: '#4ade80' }}>✓</span>
-                : <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>○</span>
-              }
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: r.done ? '#EFEFEF' : 'rgba(255,255,255,0.42)', margin: 0 }}>{r.label}</p>
-            </div>
-            {r.link ? (
-              <Link href={r.link} style={{ fontSize: 11, color: '#D4AF37', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>{r.sub}</Link>
-            ) : (
-              <span style={{ fontSize: 11, color: r.done ? '#4ade80' : 'rgba(255,255,255,0.28)', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.sub}</span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* CTA */}
-      {sent ? (
-        <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', textAlign: 'center' }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#4ade80', margin: 0 }}>✓ Request sent — we&apos;ll review and get back to you</p>
-        </div>
-      ) : allMet ? (
-        <button
-          onClick={handleRequest}
-          disabled={sending}
-          style={{ width: '100%', padding: '13px 0', borderRadius: 13, background: sending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#f97316)', border: 'none', fontSize: 13, fontWeight: 800, color: sending ? 'rgba(255,255,255,0.55)' : '#0A0A0A', cursor: sending ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
-        >
-          {sending ? 'SENDING...' : 'REQUEST CIRCLE ACCESS →'}
-        </button>
-      ) : (
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', textAlign: 'center', margin: 0 }}>Finish the remaining requirements to unlock Circle access.</p>
-      )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════
 // Main component
 // ══════════════════════════════════════════════════════
-type CircleEligibility = {
-  goalsComplete: boolean; journalEntries: boolean; streakReached: boolean; moduleComplete: boolean
-  goalsCompleteCount: number; journalCount: number; streakCount: number
-}
 
 type BirthdayProfile = { id: string; full_name: string | null; date_of_birth: string | null }
+type PendingInvite = { notifId: string; circleId: string; circleName: string; inviterName: string | null; inviterAvatar: string | null }
 
 export function CircleClient({
   posts, circles, isCircleMember, userId, discoverProfiles, followingIds, followingPosts, memberAssessments, leaderboard, memberStatuses, userName, userStreak, userAvatar, userUsername, sessions, rsvps, rsvpProfiles, exploreBuilders, exploreGoals, circleGoals, newBuilders,
-  circleEligibility, circleRequested, circleApproved, birthdayProfiles,
+  birthdayProfiles, pendingInvites,
   weekCommitments, myWitnessedIds, myActiveGoals,
+  healthScore, canCreateCircle, moduleComplete, goalsComplete,
 }: {
   posts: PostWithMeta[]; circles: CircleInfo[]; isCircleMember?: boolean; userId: string
   discoverProfiles: DiscoverProfile[]
@@ -383,13 +275,15 @@ export function CircleClient({
   exploreGoals: PublicGoal[]
   circleGoals: CircleGoal[]
   newBuilders: NewBuilder[]
-  circleEligibility: CircleEligibility
-  circleRequested: boolean
-  circleApproved: boolean
   birthdayProfiles: BirthdayProfile[]
+  pendingInvites: PendingInvite[]
   weekCommitments: CircleCommitment[]
   myWitnessedIds: string[]
   myActiveGoals: { id: string; title: string; category: string | null; progress: number }[]
+  healthScore: number
+  canCreateCircle: boolean
+  moduleComplete: boolean
+  goalsComplete: number
 }) {
   const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions' | 'discover'>('board')
   const [showPost, setShowPost] = useState(false)
@@ -418,6 +312,17 @@ export function CircleClient({
   const [submittingCommit, setSubmittingCommit] = useState(false)
   const [localCommitments, setLocalCommitments] = useState<CircleCommitment[]>(weekCommitments)
   const [localWitnessed, setLocalWitnessed] = useState<Set<string>>(new Set(myWitnessedIds))
+  const [joiningInviteId, setJoiningInviteId] = useState<string | null>(null)
+  const [renewDuration, setRenewDuration] = useState(30)
+  const [renewPending, setRenewPending] = useState(false)
+  const [dissolvePending, setDissolvePending] = useState(false)
+  const [seasonDuration, setSeasonDuration] = useState(30)
+  const [showCoach, setShowCoach] = useState(false)
+  const [coachText, setCoachText] = useState<string | null>(null)
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [showRecap, setShowRecap] = useState(false)
+  const [recapText, setRecapText] = useState<string | null>(null)
+  const [recapLoading, setRecapLoading] = useState(false)
   const router = useRouter()
   const postFileRef = useRef<HTMLInputElement>(null)
 
@@ -429,6 +334,15 @@ export function CircleClient({
   const nonMemberProfiles = discoverProfiles.filter(p => !memberIdSet.has(p.id))
   const myCommitment = localCommitments.find(c => c.user_id === userId) ?? null
   const othersCommitments = localCommitments.filter(c => c.user_id !== userId)
+
+  // Season + health derived values
+  const today = new Date()
+  const seasonEnd = primaryCircle ? new Date(primaryCircle.season_end) : null
+  const daysLeft = seasonEnd ? Math.max(0, Math.ceil((seasonEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))) : null
+  const isExpired = primaryCircle ? (primaryCircle.status === 'expired' || (seasonEnd !== null && seasonEnd < today)) : false
+  const isWarning = !isExpired && healthScore < 40 && memberStatuses.length > 1
+  const isCreator = primaryCircle?.created_by === userId
+  const healthColor = healthScore >= 70 ? '#4ade80' : healthScore >= 40 ? '#D4AF37' : '#f87171'
 
   function handlePostFileChange(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
@@ -455,6 +369,74 @@ export function CircleClient({
       setShowJoin(false)
       router.refresh()
     })
+  }
+
+  async function handleAcceptInvite(circleId: string, notifId: string) {
+    setJoiningInviteId(notifId)
+    const result = await joinCircleById(circleId)
+    if (result.error) { setJoiningInviteId(null); setError(result.error); return }
+    window.location.href = '/circle'
+  }
+
+  async function handleRenew(circleId: string) {
+    setRenewPending(true)
+    await renewCircle(circleId, renewDuration)
+    window.location.href = '/circle'
+  }
+
+  async function handleDissolve(circleId: string) {
+    if (!confirm('This will permanently end your circle. Members will no longer have access. Are you sure?')) return
+    setDissolvePending(true)
+    await dissolveCircle(circleId)
+    window.location.href = '/circle'
+  }
+
+  async function fetchCoachInsights() {
+    if (!primaryCircle) return
+    setCoachLoading(true); setShowCoach(true); setCoachText(null)
+    const res = await fetch('/api/circle-coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        circleName: primaryCircle.name,
+        covenant: primaryCircle.covenant,
+        healthScore,
+        daysLeft,
+        seasonDuration: primaryCircle.season_duration,
+        members: memberStatuses,
+        commitments: weekCommitments.map(c => ({ full_name: c.full_name, text: c.text })),
+        recentPosts: posts.slice(0, 8).map(p => ({ author_name: p.author_name, type: p.type, content: p.content })),
+        creatorName: userName,
+      }),
+    })
+    const data = await res.json()
+    setCoachText(data.text ?? 'Unable to generate insights right now.')
+    setCoachLoading(false)
+  }
+
+  async function fetchRecap() {
+    if (!primaryCircle) return
+    setRecapLoading(true); setShowRecap(true); setRecapText(null)
+    const totalPosts = posts.length
+    const sorted = [...memberStatuses].sort((a, b) => (b.post_count_week ?? 0) - (a.post_count_week ?? 0))
+    const topContributors = sorted.slice(0, 3).map(m => m.full_name ?? 'Member')
+    const res = await fetch('/api/circle-recap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        circleName: primaryCircle.name,
+        covenant: primaryCircle.covenant,
+        seasonDuration: primaryCircle.season_duration,
+        members: memberStatuses.map(m => ({ full_name: m.full_name, post_count_total: m.post_count_week, streak: m.streak })),
+        totalPosts,
+        topContributors,
+        weeklyHighs: [],
+        creatorName: userName,
+      }),
+    })
+    const data = await res.json()
+    setRecapText(data.text ?? 'Unable to generate recap right now.')
+    setRecapLoading(false)
   }
 
   function handlePost() {
@@ -617,6 +599,37 @@ export function CircleClient({
                   Share Invite ↗
                 </button>
 
+                {/* Current members */}
+                {memberStatuses.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>
+                      IN YOUR CIRCLE — {memberStatuses.length} {memberStatuses.length === 1 ? 'MEMBER' : 'MEMBERS'}
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {memberStatuses.map(s => (
+                        <div key={s.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.1)' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarGrad(s.user_id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+                            {s.avatar_url
+                              ? <img src={s.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                              : initials(s.full_name)
+                            }
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.user_id === userId ? `${s.full_name ?? 'You'} (you)` : (s.full_name ?? 'Anonymous')}
+                            </p>
+                            {s.username && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>@{s.username}</p>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {s.streak > 0 && <span style={{ fontSize: 11, color: '#D4AF37' }}>🔥{s.streak}w</span>}
+                            <span style={{ fontSize: 10, fontWeight: 800, color: '#4ade80', padding: '3px 8px', borderRadius: 99, background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)' }}>IN</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* In-app invite */}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
                   <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginBottom: 12 }}>OR SEND DIRECTLY IN THE APP</p>
@@ -679,19 +692,84 @@ export function CircleClient({
       )}
 
       {/* ── Page header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>
-            {hasCircle ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
-          </p>
-          <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-            {hasCircle ? '⚔️ War Room' : 'Find Your\nPeople.'}
-          </h1>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: hasCircle && primaryCircle?.covenant ? 12 : 0 }}>
+          <div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>
+              {hasCircle ? (primaryCircle?.name.toUpperCase() ?? 'YOUR CIRCLE') : 'YOUR CIRCLE'}
+            </p>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
+              {hasCircle ? (isExpired ? '⚔️ Season Ended' : '⚔️ War Room') : 'Find Your\nPeople.'}
+            </h1>
+          </div>
+          {hasCircle && !isExpired && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {isCreator && (
+                <button onClick={fetchCoachInsights} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
+              )}
+              <button onClick={() => setShowInvite(true)} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
+              <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ Share</button>
+            </div>
+          )}
         </div>
-        {hasCircle && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setShowInvite(true)} style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
-            <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '10px 18px', fontSize: 11 }}>+ Share</button>
+
+        {/* Covenant */}
+        {hasCircle && primaryCircle?.covenant && (
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 12 }}>
+            &ldquo;{primaryCircle.covenant}&rdquo;
+          </p>
+        )}
+
+        {/* Season + health strip */}
+        {hasCircle && !isExpired && daysLeft !== null && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: 11, color: daysLeft <= 7 ? '#f97316' : 'rgba(255,255,255,0.42)', fontWeight: 700 }}>
+                {daysLeft === 0 ? 'Last day' : `${daysLeft}d left`}
+              </span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>in season</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(255,255,255,0.04)', border: `1px solid ${healthColor}22` }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: healthColor }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: healthColor }}>{healthScore}%</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>health</span>
+            </div>
+          </div>
+        )}
+
+        {/* Warning banner */}
+        {hasCircle && isWarning && (
+          <div style={{ marginTop: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', marginBottom: 2 }}>⚠️ Circle health is low</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>Fewer than half your members are showing up this week. Post first — leaders set the tone.</p>
+          </div>
+        )}
+
+        {/* Expired banner */}
+        {hasCircle && isExpired && (
+          <div style={{ marginTop: 12, padding: 20, borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>This season has ended.</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 16, lineHeight: 1.5 }}>
+              {primaryCircle?.covenant ? `"${primaryCircle.covenant}"` : 'Your circle ran its course.'} Ready for another season?
+            </p>
+            {isCreator && (
+              <button onClick={fetchRecap} style={{ width: '100%', padding: '11px 0', borderRadius: 12, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.2)', color: '#D4AF37', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 14 }}>
+                ✦ View Season Recap
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              {[30, 60, 90].map(d => (
+                <button key={d} onClick={() => setRenewDuration(d)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${renewDuration === d ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: renewDuration === d ? 'rgba(212,175,55,0.1)' : 'transparent', color: renewDuration === d ? '#D4AF37' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>{d}d</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => primaryCircle && handleRenew(primaryCircle.id)} disabled={renewPending} style={{ flex: 2, padding: '12px 0', borderRadius: 12, background: renewPending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', fontSize: 13, fontWeight: 800, color: renewPending ? 'rgba(255,255,255,0.4)' : '#000', cursor: renewPending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                {renewPending ? 'Renewing…' : `Renew — ${renewDuration} days →`}
+              </button>
+              <button onClick={() => primaryCircle && handleDissolve(primaryCircle.id)} disabled={dissolvePending} style={{ flex: 1, padding: '12px 0', borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', cursor: dissolvePending ? 'not-allowed' : 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                Dissolve
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -710,25 +788,105 @@ export function CircleClient({
       {/* ══════════ NO CIRCLE ══════════ */}
       {!hasCircle && (
         <>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 20 }}>Most people fail alone. The ones who don&apos;t have a Circle.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-            {circleApproved ? (
-              <button onClick={() => setShowCreate(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)', textAlign: 'left', cursor: 'pointer' }}>
-                <p style={{ fontSize: 28, marginBottom: 10 }}>✨</p>
-                <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Start a Circle</p>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Lead a private group of up to 10 people. You set the standard.</p>
-              </button>
-            ) : (
-              <CircleUnlockCard eligibility={circleEligibility} requested={circleRequested} />
-            )}
-            <button onClick={() => setShowJoin(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', textAlign: 'left', cursor: 'pointer' }}>
-              <p style={{ fontSize: 28, marginBottom: 10 }}>🔑</p>
-              <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Join a Circle</p>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Got a code? Get in. Someone who believes in you is waiting.</p>
+          {/* Pending invitations */}
+          {pendingInvites.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 14 }}>
+                YOU HAVE {pendingInvites.length === 1 ? 'AN INVITATION' : `${pendingInvites.length} INVITATIONS`}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {pendingInvites.map(inv => (
+                  <div key={inv.notifId} style={{ borderRadius: 20, border: '1px solid rgba(212,175,55,0.35)', background: 'linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))', overflow: 'hidden' }}>
+                    {/* Gold top bar */}
+                    <div style={{ height: 3, background: 'linear-gradient(90deg,#D4AF37,#9A7010)' }} />
+                    <div style={{ padding: '18px 20px 20px' }}>
+                      {/* Inviter row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #D4AF37', background: avatarGrad(inv.inviterName ?? inv.notifId), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden' }}>
+                          {inv.inviterAvatar
+                            ? <img src={inv.inviterAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : initials(inv.inviterName)
+                          }
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37', marginBottom: 2 }}>PRIVATE CIRCLE INVITATION</p>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: '#EFEFEF' }}>
+                            {inv.inviterName ?? 'Someone'} invited you to join
+                          </p>
+                        </div>
+                      </div>
+                      {/* Circle name */}
+                      <p style={{ fontSize: 22, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.02em', marginBottom: 6 }}>
+                        ⚔️ {inv.circleName}
+                      </p>
+                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 18 }}>
+                        This is a private, invite-only circle. Your spot is waiting.
+                      </p>
+                      <button
+                        onClick={() => handleAcceptInvite(inv.circleId, inv.notifId)}
+                        disabled={joiningInviteId === inv.notifId}
+                        style={{ width: '100%', padding: '14px 0', borderRadius: 14, background: joiningInviteId === inv.notifId ? 'rgba(212,175,55,0.3)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', fontSize: 14, fontWeight: 800, color: joiningInviteId === inv.notifId ? 'rgba(255,255,255,0.5)' : '#000', cursor: joiningInviteId === inv.notifId ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
+                      >
+                        {joiningInviteId === inv.notifId ? 'Joining…' : '✦ Accept Invitation'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Start a circle — gated */}
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300, marginBottom: 16 }}>Most people fail alone. The ones who don&apos;t have a Circle.</p>
+
+          {canCreateCircle ? (
+            <button onClick={() => setShowCreate(true)} style={{ width: '100%', padding: 24, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)', textAlign: 'left', cursor: 'pointer', marginBottom: 16 }}>
+              <p style={{ fontSize: 28, marginBottom: 10 }}>✨</p>
+              <p style={{ fontSize: 16, fontWeight: 800, color: '#EFEFEF', marginBottom: 4 }}>Start a Circle</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 300 }}>Lead a private group of up to 10 people. You set the standard.</p>
             </button>
-          </div>
+          ) : (
+            <div style={{ borderRadius: 18, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)', padding: 20, marginBottom: 16 }}>
+              <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: 14 }}>EARN THE RIGHT TO LEAD</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: moduleComplete ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${moduleComplete ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, color: moduleComplete ? '#4ade80' : 'rgba(255,255,255,0.2)' }}>{moduleComplete ? '✓' : '○'}</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: moduleComplete ? '#EFEFEF' : 'rgba(255,255,255,0.42)' }}>Complete the Circle Module</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>Learn what it means to lead before you lead</p>
+                  </div>
+                  {!moduleComplete && (
+                    <Link href="/circle/module" style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37', textDecoration: 'none', flexShrink: 0 }}>Start →</Link>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: goalsComplete >= 1 ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${goalsComplete >= 1 ? 'rgba(74,222,128,0.35)' : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, color: goalsComplete >= 1 ? '#4ade80' : 'rgba(255,255,255,0.2)' }}>{goalsComplete >= 1 ? '✓' : '○'}</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: goalsComplete >= 1 ? '#EFEFEF' : 'rgba(255,255,255,0.42)' }}>Complete 1 goal</p>
+                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>Prove you finish what you start</p>
+                  </div>
+                  {goalsComplete < 1 && (
+                    <Link href="/goals" style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37', textDecoration: 'none', flexShrink: 0 }}>Goals →</Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subtle code entry fallback */}
+          <button
+            onClick={() => setShowJoin(true)}
+            style={{ width: '100%', padding: '12px 0', borderRadius: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em' }}
+          >
+            Have an invitation code? →
+          </button>
+
           {successCode && (
-            <div style={{ padding: 20, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)' }}>
+            <div style={{ marginTop: 20, padding: 20, borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'rgba(212,175,55,0.05)' }}>
               <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>CIRCLE CREATED — SHARE THIS CODE</p>
               <p style={{ fontSize: 36, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.3em' }}>{successCode}</p>
             </div>
@@ -1077,6 +1235,90 @@ export function CircleClient({
         document.body
       )}
 
+      {/* ── AI Circle Coach modal (portal) ── */}
+      {mounted && showCoach && createPortal(
+        <>
+          <div onClick={() => setShowCoach(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)' }} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', pointerEvents: 'none' }}>
+            <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 480, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(139,92,246,0.3)', overflow: 'hidden', animation: 'scaleIn 0.2s ease both' }}>
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.15),rgba(91,33,182,0.08))', borderBottom: '1px solid rgba(139,92,246,0.15)', padding: '20px 24px', position: 'relative' }}>
+                <button onClick={() => setShowCoach(false)} style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#999', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#a78bfa', marginBottom: 4 }}>WEEKLY INSIGHTS</p>
+                <p style={{ fontSize: 19, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{primaryCircle?.name}</p>
+              </div>
+              {/* Body */}
+              <div style={{ padding: '24px' }}>
+                {coachLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 0' }}>
+                    <div style={{ width: 32, height: 32, border: '2px solid rgba(139,92,246,0.2)', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontFamily: 'Satoshi,sans-serif' }}>Analyzing your circle…</p>
+                  </div>
+                ) : coachText ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {coachText.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                      <p key={i} style={{ fontSize: 14, color: i === 0 ? '#EFEFEF' : i === 1 ? '#ccc' : '#a78bfa', lineHeight: 1.65, fontFamily: 'Satoshi,sans-serif', margin: 0 }}>{para}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center', padding: '20px 0' }}>Unable to generate insights right now.</p>
+                )}
+              </div>
+              {/* Footer */}
+              {!coachLoading && (
+                <div style={{ padding: '0 24px 20px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowCoach(false)} style={{ padding: '10px 20px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Done</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ── End-of-Season Recap modal (portal) ── */}
+      {mounted && showRecap && createPortal(
+        <>
+          <div onClick={() => setShowRecap(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)' }} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', pointerEvents: 'none' }}>
+            <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 480, background: '#0E0E0E', borderRadius: 24, border: '1px solid rgba(212,175,55,0.25)', overflow: 'hidden', animation: 'scaleIn 0.2s ease both' }}>
+              {/* Header */}
+              <div style={{ background: 'linear-gradient(135deg,rgba(212,175,55,0.12),rgba(154,112,16,0.06))', borderBottom: '1px solid rgba(212,175,55,0.12)', padding: '20px 24px', position: 'relative' }}>
+                <button onClick={() => setShowRecap(false)} style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#999', fontSize: 18, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Satoshi,sans-serif' }}>×</button>
+                <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 4 }}>SEASON RECAP</p>
+                <p style={{ fontSize: 19, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{primaryCircle?.name}</p>
+                {primaryCircle && (
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{primaryCircle.season_duration}-day season · {memberStatuses.length} members</p>
+                )}
+              </div>
+              {/* Body */}
+              <div style={{ padding: '24px' }}>
+                {recapLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 0' }}>
+                    <div style={{ width: 32, height: 32, border: '2px solid rgba(212,175,55,0.2)', borderTopColor: '#D4AF37', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontFamily: 'Satoshi,sans-serif' }}>Writing your season story…</p>
+                  </div>
+                ) : recapText ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {recapText.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                      <p key={i} style={{ fontSize: 14, color: i < 2 ? '#EFEFEF' : '#D4AF37', lineHeight: 1.7, fontFamily: 'Satoshi,sans-serif', margin: 0 }}>{para}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center', padding: '20px 0' }}>Unable to generate recap right now.</p>
+                )}
+              </div>
+              {!recapLoading && (
+                <div style={{ padding: '0 24px 20px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowRecap(false)} style={{ padding: '10px 20px', borderRadius: 12, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Done</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+
       {/* ══════════ SESSIONS TAB ══════════ */}
       {hasCircle && mainTab === 'sessions' && (
         <SessionsTab
@@ -1165,14 +1407,39 @@ export function CircleClient({
       )}
 
       {/* ══ Create Circle Modal ══ */}
-      <CCModal show={showCreate} onClose={() => setShowCreate(false)} title="Create a Circle">
-        <form autoComplete="off" action={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <CCModal show={showCreate} onClose={() => setShowCreate(false)} title="Start a Circle">
+        <form autoComplete="off" action={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div>
             <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 8 }}>CIRCLE NAME</label>
             <input name="name" required placeholder="e.g. The Builders" className="cc-input" />
           </div>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 4 }}>THE COVENANT</label>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>What does this circle commit to? Make it specific — this is what everyone signs when they join.</p>
+            <textarea
+              name="covenant"
+              placeholder={`e.g. "We finish what we start, no excuses. Every member ships something real this season."`}
+              className="cc-input"
+              rows={3}
+              style={{ resize: 'none', lineHeight: 1.5 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 8 }}>SEASON LENGTH</label>
+            <input type="hidden" name="season_duration" value={seasonDuration} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[30, 60, 90].map(d => (
+                <button key={d} type="button" onClick={() => setSeasonDuration(d)} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: `1px solid ${seasonDuration === d ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`, background: seasonDuration === d ? 'rgba(212,175,55,0.1)' : 'transparent', color: seasonDuration === d ? '#D4AF37' : 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+                  {d} days
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>
+              Your circle runs until {new Date(Date.now() + seasonDuration * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. You can renew or dissolve at the end.
+            </p>
+          </div>
           {error && <p style={{ color: '#f87171', fontSize: 13 }}>{error}</p>}
-          <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'CREATING...' : 'CREATE CIRCLE'}</button>
+          <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'CREATING...' : 'START CIRCLE →'}</button>
         </form>
       </CCModal>
 

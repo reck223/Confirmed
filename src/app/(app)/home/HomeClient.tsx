@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { AiBriefing } from '@/components/AiBriefing'
 import { getTodayQod } from '@/lib/qod'
 import { getTodayWod } from '@/lib/wod'
-import { markMissionDone } from './actions'
+import { markMissionDone, createHomePost } from './actions'
 import { submitCheckin } from '@/app/(app)/checkin/actions'
 
 type MomentumDay = { date: string; dayLabel: string; done: boolean }
@@ -37,6 +37,64 @@ interface Props {
   qodAnswered: boolean
   missionDone: boolean
   energyToday: number | null
+  morningDone: string | null
+}
+
+function MorningRitual({ morningDone }: { morningDone: string | null }) {
+  const [text, setText] = useState('')
+  const [done, setDone] = useState<string | null>(morningDone)
+  const [pending, startT] = useTransition()
+
+  function handleSubmit() {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    startT(async () => {
+      await createHomePost({ content: trimmed, type: 'lock_in', visibility: 'circle' })
+      setDone(trimmed)
+    })
+  }
+
+  if (done) {
+    return (
+      <div style={{ borderRadius: 18, border: '1px solid rgba(212,175,55,0.2)', background: 'rgba(212,175,55,0.04)', padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+          <span style={{ fontSize: 13, color: '#4ade80' }}>✓</span>
+        </div>
+        <div>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#4ade80', marginBottom: 4 }}>LOCKED IN TODAY</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{done}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ borderRadius: 18, border: '1px solid rgba(212,175,55,0.25)', background: 'linear-gradient(135deg,rgba(212,175,55,0.06),rgba(212,175,55,0.02))', padding: '18px 18px 16px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 16 }}>🔒</span>
+        <div>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#D4AF37' }}>LOCK IT IN</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginTop: 1 }}>What&apos;s the one thing you&apos;re committing to today?</p>
+        </div>
+      </div>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="e.g. Ship the landing page before 5pm. No exceptions."
+        className="cc-input"
+        rows={2}
+        style={{ resize: 'none', fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={!text.trim() || pending}
+        style={{ width: '100%', padding: '12px 0', borderRadius: 12, background: !text.trim() || pending ? 'rgba(212,175,55,0.2)' : 'linear-gradient(135deg,#D4AF37,#9A7010)', border: 'none', fontSize: 13, fontWeight: 800, color: !text.trim() || pending ? 'rgba(255,255,255,0.4)' : '#000', cursor: !text.trim() || pending ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', fontFamily: 'Satoshi,sans-serif' }}
+      >
+        {pending ? 'Locking in…' : 'Lock it in →'}
+      </button>
+    </div>
+  )
 }
 
 const CAT_COLOR: Record<string, string> = {
@@ -390,7 +448,7 @@ const ENERGY_OPTS = [
   { value: 10, emoji: '🚀', label: 'Peak' },
 ]
 
-export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday }: Props) {
+export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone }: Props) {
   const greeting = getGreeting()
   const subline   = getSubline(streak)
   const activeDays = momentumDays.filter(d => d.done).length
@@ -573,6 +631,9 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
           </div>
         )
       })()}
+
+      {/* ── MORNING RITUAL ─────────────────────────────────── */}
+      <MorningRitual morningDone={morningDone} />
 
       {/* ── MISSION CARD ───────────────────────────────────── */}
       <MissionCard goal={missionGoal} initialDone={missionDone} />
