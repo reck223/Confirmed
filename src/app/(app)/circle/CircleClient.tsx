@@ -1523,13 +1523,7 @@ export function CircleClient({
           <div>
             <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 4 }}>THE COVENANT</label>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>What does this circle commit to? Make it specific — this is what everyone signs when they join.</p>
-            <textarea
-              name="covenant"
-              placeholder={`e.g. "We finish what we start, no excuses. Every member ships something real this season."`}
-              className="cc-input"
-              rows={3}
-              style={{ resize: 'none', lineHeight: 1.5 }}
-            />
+            <CovenantField />
           </div>
           <div>
             <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 8 }}>SEASON LENGTH</label>
@@ -1560,14 +1554,7 @@ export function CircleClient({
           <div>
             <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 4 }}>THE COVENANT</label>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>What does this circle commit to? This is what everyone signs when they join.</p>
-            <textarea
-              name="covenant"
-              defaultValue={primaryCircle?.covenant ?? ''}
-              placeholder={`e.g. "We finish what we start, no excuses. Every member ships something real this season."`}
-              className="cc-input"
-              rows={3}
-              style={{ resize: 'none', lineHeight: 1.5 }}
-            />
+            <CovenantField defaultValue={primaryCircle?.covenant ?? ''} circleName={primaryCircle?.name} />
           </div>
           {error && <p style={{ color: '#f87171', fontSize: 13 }}>{error}</p>}
           <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'SAVING...' : 'SAVE CHANGES →'}</button>
@@ -2685,6 +2672,94 @@ function CCModal({ show, onClose, title, children }: { show: boolean; onClose: (
       </div>
     </div>,
     document.body
+  )
+}
+
+function CovenantField({ defaultValue, circleName }: { defaultValue?: string; circleName?: string }) {
+  const [value, setValue] = useState(defaultValue ?? '')
+  const [showAI, setShowAI] = useState(false)
+  const [intent, setIntent] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function generate() {
+    if (intent.trim().length < 8) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/circle-covenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intent: intent.trim(), name: circleName ?? null }),
+      })
+      const data = await res.json()
+      if (data.covenant) {
+        setValue(data.covenant)
+        setShowAI(false)
+        setIntent('')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <textarea
+        name="covenant"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder='e.g. "We finish what we start, no excuses. Every member ships something real this season."'
+        className="cc-input"
+        rows={3}
+        style={{ resize: 'none', lineHeight: 1.5 }}
+      />
+
+      {/* AI generator toggle */}
+      {!showAI ? (
+        <button
+          type="button"
+          onClick={() => setShowAI(true)}
+          style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 800, fontFamily: 'Satoshi,sans-serif' }}>✦ Generate with AI</span>
+        </button>
+      ) : (
+        <div style={{ marginTop: 10, padding: 14, borderRadius: 14, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: '#a78bfa', marginBottom: 8 }}>DESCRIBE YOUR CIRCLE</p>
+          <textarea
+            value={intent}
+            onChange={e => setIntent(e.target.value)}
+            placeholder="e.g. builders who want to ship projects weekly, no excuses, all about momentum"
+            className="cc-input"
+            rows={2}
+            style={{ resize: 'none', lineHeight: 1.5, fontSize: 13, marginBottom: 10 }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={generate}
+              disabled={loading || intent.trim().length < 8}
+              style={{
+                flex: 1, padding: '10px 0', borderRadius: 10,
+                background: loading || intent.trim().length < 8 ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.85)',
+                border: 'none', fontSize: 12, fontWeight: 800,
+                color: loading || intent.trim().length < 8 ? 'rgba(255,255,255,0.4)' : '#fff',
+                cursor: loading || intent.trim().length < 8 ? 'not-allowed' : 'pointer',
+                fontFamily: 'Satoshi,sans-serif',
+              }}
+            >
+              {loading ? 'Writing…' : 'Generate →'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowAI(false); setIntent('') }}
+              style={{ padding: '10px 14px', borderRadius: 10, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
