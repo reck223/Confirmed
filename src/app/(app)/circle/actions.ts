@@ -63,11 +63,22 @@ export async function updateCircle(circleId: string, formData: FormData) {
   if (!name) return { error: 'Circle name is required' }
   const covenant = (formData.get('covenant') as string)?.trim() || null
 
+  // Verify ownership first
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from('circles') as any)
-    .update({ name, covenant })
+  const { data: existing } = await (supabase.from('circles') as any)
+    .select('id')
     .eq('id', circleId)
     .eq('created_by', user.id)
+    .single()
+  if (!existing) return { error: 'Not authorized' }
+
+  // Use RPC to bypass PostgREST schema cache issues with new columns
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.rpc as any)('update_circle_info', {
+    p_id: circleId,
+    p_name: name,
+    p_covenant: covenant,
+  })
 
   if (error) return { error: error.message }
   revalidatePath('/circle')
