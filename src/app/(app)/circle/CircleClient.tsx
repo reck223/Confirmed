@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
-import { createCircle, joinCircle, joinCircleById, renewCircle, dissolveCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
+import { createCircle, updateCircle, joinCircle, joinCircleById, renewCircle, dissolveCircle, createPost, toggleReaction, addComment, deleteComment, createSession, rsvpSession, deleteSession } from './actions'
 import { createHomePost } from '@/app/(app)/home/actions'
 import { createNotification } from '@/lib/notifications'
 import { sendMessage } from '@/app/(app)/inbox/actions'
@@ -288,6 +288,7 @@ export function CircleClient({
   const [mainTab, setMainTab] = useState<'board' | 'feed' | 'sessions' | 'discover'>('board')
   const [showPost, setShowPost] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [showJoin, setShowJoin] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -357,6 +358,17 @@ export function CircleClient({
       if (result.error) { setError(result.error); return }
       if ('code' in result && result.code) setSuccessCode(result.code)
       setShowCreate(false)
+      router.refresh()
+    })
+  }
+
+  function handleUpdate(formData: FormData) {
+    if (!primaryCircle) return
+    setError('')
+    startTransition(async () => {
+      const result = await updateCircle(primaryCircle.id, formData)
+      if (result.error) { setError(result.error); return }
+      setShowEdit(false)
       router.refresh()
     })
   }
@@ -720,7 +732,10 @@ export function CircleClient({
                 </div>
                 <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
                   {isCreator && (
-                    <button onClick={fetchCoachInsights} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
+                    <>
+                      <button onClick={fetchCoachInsights} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>✦ Insights</button>
+                      <button onClick={() => setShowEdit(true)} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Edit</button>
+                    </>
                   )}
                   <button onClick={() => setShowInvite(true)} style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', color: '#D4AF37', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Invite</button>
                   <button onClick={() => setShowPost(true)} className="btn-gold" style={{ width: 'auto', padding: '9px 15px', fontSize: 11 }}>+ Share</button>
@@ -1532,6 +1547,30 @@ export function CircleClient({
           </div>
           {error && <p style={{ color: '#f87171', fontSize: 13 }}>{error}</p>}
           <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'CREATING...' : 'START CIRCLE →'}</button>
+        </form>
+      </CCModal>
+
+      {/* ══ Edit Circle Modal ══ */}
+      <CCModal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Circle">
+        <form autoComplete="off" action={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 8 }}>CIRCLE NAME</label>
+            <input name="name" required defaultValue={primaryCircle?.name ?? ''} className="cc-input" />
+          </div>
+          <div>
+            <label style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', display: 'block', marginBottom: 4 }}>THE COVENANT</label>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>What does this circle commit to? This is what everyone signs when they join.</p>
+            <textarea
+              name="covenant"
+              defaultValue={primaryCircle?.covenant ?? ''}
+              placeholder={`e.g. "We finish what we start, no excuses. Every member ships something real this season."`}
+              className="cc-input"
+              rows={3}
+              style={{ resize: 'none', lineHeight: 1.5 }}
+            />
+          </div>
+          {error && <p style={{ color: '#f87171', fontSize: 13 }}>{error}</p>}
+          <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'SAVING...' : 'SAVE CHANGES →'}</button>
         </form>
       </CCModal>
 

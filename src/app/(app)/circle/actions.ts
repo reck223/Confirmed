@@ -54,6 +54,26 @@ export async function createCircle(formData: FormData) {
   return { success: true, code }
 }
 
+export async function updateCircle(circleId: string, formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'Circle name is required' }
+  const covenant = (formData.get('covenant') as string)?.trim() || null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('circles') as any)
+    .update({ name, covenant })
+    .eq('id', circleId)
+    .eq('created_by', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/circle')
+  return { success: true }
+}
+
 export async function renewCircle(circleId: string, seasonDuration: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
