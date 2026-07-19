@@ -112,6 +112,11 @@ export function CartoonClient() {
   const [loadedCount, setLoadedCount]   = useState(0)
   const [previewIdx, setPreviewIdx]     = useState(0)
   const [autoPlay, setAutoPlay]         = useState(false)
+  // import mode
+  const [mode, setMode]                 = useState<'create' | 'import'>('create')
+  const [importScript, setImportScript] = useState('')
+  const [importStyle, setImportStyle]   = useState('comic_book')
+  const [importPanelCount, setImportPanelCount] = useState(10)
   const seedsRef  = useRef<number[]>([])
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -158,6 +163,31 @@ export function CartoonClient() {
       setStep('review')
     } catch {
       setError('Generation failed — please try again.')
+      setStep('concept')
+    }
+  }
+
+  const importCartoon = async () => {
+    if (!importScript.trim()) { setError('Paste your document content first.'); return }
+    setError('')
+    setStep('generating')
+    try {
+      const res = await fetch('/api/cartoon/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: importScript, style: importStyle, panelCount: importPanelCount }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const panels: Panel[] = (data.panels ?? []).map((p: Panel) => ({ ...p, image_loaded: false, image_error: false }))
+      seedsRef.current = panels.map(() => Math.floor(Math.random() * 99999))
+      setCartoon({ ...data, panels })
+      setForm(f => ({ ...f, style: importStyle }))
+      setGeneratingImgs(false)
+      setLoadedCount(0)
+      setStep('review')
+    } catch {
+      setError('Import failed — please try again.')
       setStep('concept')
     }
   }
@@ -245,6 +275,11 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
       form={form} setForm={setForm} error={error}
       onGenerate={generateStory}
       addChar={addCharacter} removeChar={removeCharacter} updateChar={updateCharacter}
+      mode={mode} setMode={setMode}
+      importScript={importScript} setImportScript={setImportScript}
+      importStyle={importStyle} setImportStyle={setImportStyle}
+      importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
+      onImport={importCartoon}
     />
   )
   if (step === 'generating') return <GeneratingStep msg={loadingMsg} />
@@ -272,7 +307,7 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
 }
 
 // ─── concept step ─────────────────────────────────────────────────────────────
-function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar }: {
+function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, onImport }: {
   form: ConceptForm
   setForm: React.Dispatch<React.SetStateAction<ConceptForm>>
   error: string
@@ -280,6 +315,15 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
   addChar: () => void
   removeChar: (id: string) => void
   updateChar: (id: string, field: keyof Character, value: string) => void
+  mode: 'create' | 'import'
+  setMode: (m: 'create' | 'import') => void
+  importScript: string
+  setImportScript: (s: string) => void
+  importStyle: string
+  setImportStyle: (s: string) => void
+  importPanelCount: number
+  setImportPanelCount: (n: number) => void
+  onImport: () => void
 }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', padding: '24px 16px' }}>
@@ -290,7 +334,7 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
         .cc-chip { padding: 8px 14px; border-radius: 20px; border: 1px solid #333; background: #111; color: #aaa; cursor: pointer; font-size: 0.85rem; transition: all .15s; white-space: nowrap; }
         .cc-chip.selected { border-color: #D4AF37; background: rgba(212,175,55,.12); color: #D4AF37; }
         .cc-chip:hover:not(.selected) { border-color: #555; color: #ddd; }
-        .cc-style { padding: 12px 16px; border-radius: 10px; border: 1px solid #333; background: #111; cursor: pointer; transition: all .15s; }
+        .cc-style { padding: 12px 16px; border-radius: 10px; border: 1px solid #333; background: #111; cursor: pointer; transition: all .15s; text-align: left; width: 100%; }
         .cc-style.selected { border-color: #D4AF37; background: rgba(212,175,55,.1); }
         .cc-style:hover:not(.selected) { border-color: #444; }
         .cc-btn-primary { background: #D4AF37; color: #000; border: none; border-radius: 8px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
@@ -299,14 +343,39 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
         .cc-btn-secondary:hover { border-color: #555; color: #ddd; }
         .cc-btn-danger { background: transparent; color: #e05555; border: 1px solid #e05555; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; transition: all .15s; }
         .cc-btn-danger:hover { background: rgba(224,85,85,.1); }
+        .cc-tab { padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: #555; font-size: 0.92rem; cursor: pointer; transition: all .15s; font-weight: 500; }
+        .cc-tab.active { color: #D4AF37; border-bottom-color: #D4AF37; }
+        .cc-tab:hover:not(.active) { color: #aaa; }
       `}</style>
 
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: '0.8rem', color: '#D4AF37', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>Cartoon Studio</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#fff', margin: 0 }}>Create a Cartoon</h1>
-          <p style={{ color: '#666', marginTop: 6, fontSize: '0.9rem' }}>AI writes the story. AI draws the panels. All free.</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#fff', margin: 0 }}>Cartoon Creator</h1>
         </div>
+
+        {/* Mode tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #1e1e1e', marginBottom: 28 }}>
+          <button className={`cc-tab ${mode === 'create' ? 'active' : ''}`} onClick={() => setMode('create')}>
+            ✦ Create New
+          </button>
+          <button className={`cc-tab ${mode === 'import' ? 'active' : ''}`} onClick={() => setMode('import')}>
+            ↑ Import from Document
+          </button>
+        </div>
+
+        {/* Import tab */}
+        {mode === 'import' && (
+          <ImportTab
+            importScript={importScript} setImportScript={setImportScript}
+            importStyle={importStyle} setImportStyle={setImportStyle}
+            importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
+            error={error} onImport={onImport}
+          />
+        )}
+
+        {/* Create tab */}
+        {mode === 'create' && <>
 
         {/* Genre */}
         <div style={{ marginBottom: 28 }}>
@@ -434,7 +503,93 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
         <button className="cc-btn-primary" onClick={onGenerate} style={{ width: '100%' }}>
           Generate Story →
         </button>
+        </>}
       </div>
+    </div>
+  )
+}
+
+// ─── import tab ───────────────────────────────────────────────────────────────
+function ImportTab({ importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, error, onImport }: {
+  importScript: string; setImportScript: (s: string) => void
+  importStyle: string;  setImportStyle: (s: string) => void
+  importPanelCount: number; setImportPanelCount: (n: number) => void
+  error: string; onImport: () => void
+}) {
+  return (
+    <div>
+      {/* Instructions */}
+      <div style={{ background: 'rgba(167,139,250,.07)', border: '1px solid rgba(167,139,250,.18)', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
+        <div style={{ fontWeight: 600, color: '#a78bfa', marginBottom: 6, fontSize: '0.9rem' }}>How to import from Google Docs</div>
+        <ol style={{ color: '#888', fontSize: '0.85rem', paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
+          <li>Open your Google Doc</li>
+          <li>Press <strong style={{ color: '#ddd' }}>Cmd+A</strong> to select all</li>
+          <li>Press <strong style={{ color: '#ddd' }}>Cmd+C</strong> to copy</li>
+          <li>Paste below with <strong style={{ color: '#ddd' }}>Cmd+V</strong></li>
+        </ol>
+      </div>
+
+      {/* Script paste area */}
+      <div style={{ marginBottom: 24 }}>
+        <label className="cc-label">Paste Your Document Content *</label>
+        <textarea
+          className="cc-input"
+          rows={10}
+          placeholder="Paste your story, script, or cartoon concept here…&#10;&#10;Claude will read it and convert it into panels automatically. It can handle:&#10;• Full scripts with scene headings and dialogue&#10;• Story outlines or summaries&#10;• Rough notes or bullet points&#10;• Existing comic panel descriptions"
+          value={importScript}
+          onChange={e => setImportScript(e.target.value)}
+          style={{ resize: 'vertical', minHeight: 200, lineHeight: 1.6, fontFamily: 'inherit' }}
+        />
+        {importScript && (
+          <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 4 }}>
+            {importScript.length.toLocaleString()} characters pasted
+          </div>
+        )}
+      </div>
+
+      {/* Art style */}
+      <div style={{ marginBottom: 24 }}>
+        <label className="cc-label">Art Style to Apply</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+          {STYLES.map(s => (
+            <button
+              key={s.id}
+              className={`cc-style ${importStyle === s.id ? 'selected' : ''}`}
+              onClick={() => setImportStyle(s.id)}
+            >
+              <div style={{ fontWeight: 600, color: importStyle === s.id ? '#D4AF37' : '#ddd', marginBottom: 2 }}>{s.label}</div>
+              <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Panel count */}
+      <div style={{ marginBottom: 28 }}>
+        <label className="cc-label">Target Number of Panels</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[6, 8, 10, 12].map(n => (
+            <button
+              key={n}
+              className={`cc-chip ${importPanelCount === n ? 'selected' : ''}`}
+              onClick={() => setImportPanelCount(n)}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 6 }}>Claude will adapt your content to fit this many panels</div>
+      </div>
+
+      {error && (
+        <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.9rem' }}>
+          {error}
+        </div>
+      )}
+
+      <button className="cc-btn-primary" onClick={onImport} style={{ width: '100%' }}>
+        Convert to Cartoon →
+      </button>
     </div>
   )
 }
