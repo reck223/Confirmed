@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import mammoth from 'mammoth'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const mammoth = require('mammoth') as typeof import('mammoth')
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
