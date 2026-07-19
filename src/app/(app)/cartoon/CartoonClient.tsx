@@ -117,6 +117,7 @@ export function CartoonClient() {
   const [importScript, setImportScript] = useState('')
   const [importStyle, setImportStyle]   = useState('comic_book')
   const [importPanelCount, setImportPanelCount] = useState(10)
+  const [extractedImages, setExtractedImages]   = useState<string[]>([])
   const seedsRef  = useRef<number[]>([])
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -179,7 +180,12 @@ export function CartoonClient() {
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const panels: Panel[] = (data.panels ?? []).map((p: Panel) => ({ ...p, image_loaded: false, image_error: false }))
+      const panels: Panel[] = (data.panels ?? []).map((p: Panel, i: number) => ({
+        ...p,
+        image_url:    extractedImages[i] ?? undefined,
+        image_loaded: !!extractedImages[i],
+        image_error:  false,
+      }))
       seedsRef.current = panels.map(() => Math.floor(Math.random() * 99999))
       setCartoon({ ...data, panels })
       setForm(f => ({ ...f, style: importStyle }))
@@ -370,6 +376,7 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
             importScript={importScript} setImportScript={setImportScript}
             importStyle={importStyle} setImportStyle={setImportStyle}
             importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
+            extractedImages={extractedImages} setExtractedImages={setExtractedImages}
             error={error} onImport={onImport}
           />
         )}
@@ -510,86 +517,222 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
 }
 
 // ─── import tab ───────────────────────────────────────────────────────────────
-function ImportTab({ importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, error, onImport }: {
+function ImportTab({ importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, extractedImages, setExtractedImages, error, onImport }: {
   importScript: string; setImportScript: (s: string) => void
   importStyle: string;  setImportStyle: (s: string) => void
   importPanelCount: number; setImportPanelCount: (n: number) => void
+  extractedImages: string[]; setExtractedImages: (imgs: string[]) => void
   error: string; onImport: () => void
 }) {
+  const [parsing, setParsing]   = useState(false)
+  const [parseErr, setParseErr] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const parseFile = async (file: File) => {
+    setParseErr('')
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!['docx', 'doc', 'txt'].includes(ext ?? '')) {
+      setParseErr('Please use a .docx file (Google Docs → File → Download → Microsoft Word)')
+      return
+    }
+    setParsing(true)
+    setFileName(file.name)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/cartoon/parse-docx', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error()
+      const { text, images } = await res.json()
+      setImportScript(text ?? '')
+      setExtractedImages(images ?? [])
+    } catch {
+      setParseErr('Could not read the file. Make sure it is a valid .docx exported from Google Docs.')
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) parseFile(file)
+  }
+
+  const ready = !!importScript.trim()
+
   return (
     <div>
-      {/* Instructions */}
-      <div style={{ background: 'rgba(167,139,250,.07)', border: '1px solid rgba(167,139,250,.18)', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
-        <div style={{ fontWeight: 600, color: '#a78bfa', marginBottom: 6, fontSize: '0.9rem' }}>How to import from Google Docs</div>
-        <ol style={{ color: '#888', fontSize: '0.85rem', paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
-          <li>Open your Google Doc</li>
-          <li>Press <strong style={{ color: '#ddd' }}>Cmd+A</strong> to select all</li>
-          <li>Press <strong style={{ color: '#ddd' }}>Cmd+C</strong> to copy</li>
-          <li>Paste below with <strong style={{ color: '#ddd' }}>Cmd+V</strong></li>
-        </ol>
-      </div>
+      <style>{`
+        @keyframes spin3 { to { transform: rotate(360deg) } }
+      `}</style>
 
-      {/* Script paste area */}
-      <div style={{ marginBottom: 24 }}>
-        <label className="cc-label">Paste Your Document Content *</label>
-        <textarea
-          className="cc-input"
-          rows={10}
-          placeholder="Paste your story, script, or cartoon concept here…&#10;&#10;Claude will read it and convert it into panels automatically. It can handle:&#10;• Full scripts with scene headings and dialogue&#10;• Story outlines or summaries&#10;• Rough notes or bullet points&#10;• Existing comic panel descriptions"
-          value={importScript}
-          onChange={e => setImportScript(e.target.value)}
-          style={{ resize: 'vertical', minHeight: 200, lineHeight: 1.6, fontFamily: 'inherit' }}
-        />
-        {importScript && (
-          <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 4 }}>
-            {importScript.length.toLocaleString()} characters pasted
+      {/* Drop zone */}
+      {!ready ? (
+        <div
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          onClick={() => inputRef.current?.click()}
+          style={{
+            border: `2px dashed ${dragging ? '#a78bfa' : '#2a2a2a'}`,
+            borderRadius: 14,
+            padding: '48px 24px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            background: dragging ? 'rgba(167,139,250,.06)' : 'rgba(255,255,255,.02)',
+            transition: 'all .2s',
+            marginBottom: 24,
+          }}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".docx,.doc,.txt"
+            style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f) }}
+          />
+          {parsing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, border: '2px solid #333', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin3 .9s linear infinite' }} />
+              <div style={{ color: '#a78bfa' }}>Reading {fileName}…</div>
+              <div style={{ color: '#444', fontSize: '0.82rem' }}>Extracting text and images</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📄</div>
+              <div style={{ color: '#ddd', fontWeight: 600, marginBottom: 6 }}>
+                {dragging ? 'Drop it here' : 'Drop your file here'}
+              </div>
+              <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 16 }}>or click to browse</div>
+              <div style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.2)', borderRadius: 8, padding: '10px 16px', display: 'inline-block' }}>
+                <div style={{ color: '#a78bfa', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>How to export from Google Docs</div>
+                <div style={{ color: '#666', fontSize: '0.78rem', lineHeight: 1.7 }}>
+                  File → Download → <strong style={{ color: '#bbb' }}>Microsoft Word (.docx)</strong>
+                </div>
+              </div>
+              <div style={{ color: '#333', fontSize: '0.75rem', marginTop: 12 }}>Supports .docx and .txt</div>
+            </>
+          )}
+        </div>
+      ) : (
+        /* Parsed preview */
+        <div style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div>
+              <div style={{ color: '#4ade80', fontWeight: 600, fontSize: '0.9rem', marginBottom: 2 }}>✓ File parsed successfully</div>
+              <div style={{ color: '#555', fontSize: '0.8rem' }}>{fileName}</div>
+            </div>
+            <button
+              className="cc-btn-secondary"
+              onClick={() => { setImportScript(''); setExtractedImages([]); setFileName('') }}
+              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+            >
+              Replace File
+            </button>
           </div>
-        )}
-      </div>
 
-      {/* Art style */}
-      <div style={{ marginBottom: 24 }}>
-        <label className="cc-label">Art Style to Apply</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-          {STYLES.map(s => (
-            <button
-              key={s.id}
-              className={`cc-style ${importStyle === s.id ? 'selected' : ''}`}
-              onClick={() => setImportStyle(s.id)}
-            >
-              <div style={{ fontWeight: 600, color: importStyle === s.id ? '#D4AF37' : '#ddd', marginBottom: 2 }}>{s.label}</div>
-              <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.desc}</div>
-            </button>
-          ))}
-        </div>
-      </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '8px 14px' }}>
+              <div style={{ fontSize: '0.7rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.06em' }}>Text</div>
+              <div style={{ color: '#ddd', fontWeight: 600 }}>{importScript.length.toLocaleString()} chars</div>
+            </div>
+            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '8px 14px' }}>
+              <div style={{ fontSize: '0.7rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.06em' }}>Images Found</div>
+              <div style={{ color: extractedImages.length > 0 ? '#D4AF37' : '#555', fontWeight: 600 }}>
+                {extractedImages.length} image{extractedImages.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
 
-      {/* Panel count */}
-      <div style={{ marginBottom: 28 }}>
-        <label className="cc-label">Target Number of Panels</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[6, 8, 10, 12].map(n => (
-            <button
-              key={n}
-              className={`cc-chip ${importPanelCount === n ? 'selected' : ''}`}
-              onClick={() => setImportPanelCount(n)}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 6 }}>Claude will adapt your content to fit this many panels</div>
-      </div>
+          {/* Image thumbnails */}
+          {extractedImages.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: 8 }}>
+                These images will be used as your panel artwork (in order)
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {extractedImages.slice(0, 12).map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={src}
+                    alt={`Image ${i + 1}`}
+                    style={{ width: 72, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #333' }}
+                  />
+                ))}
+                {extractedImages.length > 12 && (
+                  <div style={{ width: 72, height: 52, borderRadius: 6, background: '#1a1a1a', border: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: '0.78rem' }}>
+                    +{extractedImages.length - 12}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-      {error && (
-        <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.9rem' }}>
-          {error}
+          {extractedImages.length === 0 && (
+            <div style={{ marginTop: 10, fontSize: '0.8rem', color: '#444' }}>
+              No images found in document — Pollinations will generate artwork for each panel
+            </div>
+          )}
         </div>
       )}
 
-      <button className="cc-btn-primary" onClick={onImport} style={{ width: '100%' }}>
-        Convert to Cartoon →
-      </button>
+      {parseErr && (
+        <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.85rem' }}>
+          {parseErr}
+        </div>
+      )}
+
+      {ready && (
+        <>
+          {/* Art style */}
+          <div style={{ marginBottom: 24 }}>
+            <label className="cc-label">Art Style {extractedImages.length > 0 ? '(for panels without an image)' : 'to Apply'}</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              {STYLES.map(s => (
+                <button
+                  key={s.id}
+                  className={`cc-style ${importStyle === s.id ? 'selected' : ''}`}
+                  onClick={() => setImportStyle(s.id)}
+                >
+                  <div style={{ fontWeight: 600, color: importStyle === s.id ? '#D4AF37' : '#ddd', marginBottom: 2 }}>{s.label}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Panel count */}
+          <div style={{ marginBottom: 28 }}>
+            <label className="cc-label">Number of Panels</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[6, 8, 10, 12].map(n => (
+                <button
+                  key={n}
+                  className={`cc-chip ${importPanelCount === n ? 'selected' : ''}`}
+                  onClick={() => setImportPanelCount(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 6 }}>Claude adapts your content to fit this many panels</div>
+          </div>
+
+          {error && (
+            <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.9rem' }}>
+              {error}
+            </div>
+          )}
+
+          <button className="cc-btn-primary" onClick={onImport} style={{ width: '100%' }}>
+            Convert to Cartoon →
+          </button>
+        </>
+      )}
     </div>
   )
 }
