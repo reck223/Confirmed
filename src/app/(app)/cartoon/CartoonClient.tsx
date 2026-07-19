@@ -285,6 +285,7 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
       importScript={importScript} setImportScript={setImportScript}
       importStyle={importStyle} setImportStyle={setImportStyle}
       importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
+      extractedImages={extractedImages} setExtractedImages={setExtractedImages}
       onImport={importCartoon}
     />
   )
@@ -313,7 +314,7 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
 }
 
 // ─── concept step ─────────────────────────────────────────────────────────────
-function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, onImport }: {
+function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, extractedImages, setExtractedImages, onImport }: {
   form: ConceptForm
   setForm: React.Dispatch<React.SetStateAction<ConceptForm>>
   error: string
@@ -329,6 +330,8 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
   setImportStyle: (s: string) => void
   importPanelCount: number
   setImportPanelCount: (n: number) => void
+  extractedImages: string[]
+  setExtractedImages: (imgs: string[]) => void
   onImport: () => void
 }) {
   return (

@@ -124,35 +124,6 @@ export default async function ProfilePage() {
     }
   })
 
-  // ── 90-day activity grid (streak calendar) ──
-  const ninetyDaysAgo = new Date()
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-  const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0]
-
-  const [{ data: ciDays }, { data: activityPosts }, { data: journalDays }, { data: energyDays }] = await Promise.all([
-    supabase.from('check_ins').select('date').eq('user_id', user.id).gte('date', ninetyDaysAgoStr),
-    supabase.from('posts').select('created_at').eq('user_id', user.id).gte('created_at', ninetyDaysAgoStr),
-    supabase.from('journal_entries').select('created_at').eq('user_id', user.id).gte('created_at', ninetyDaysAgoStr),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('daily_checkins') as any).select('date').eq('user_id', user.id).gte('date', ninetyDaysAgoStr),
-  ])
-
-  const activityMap: Record<string, number> = {}
-  const addDay = (date: string) => { activityMap[date] = (activityMap[date] ?? 0) + 1 }
-  for (const r of (ciDays ?? []) as { date: string }[]) addDay(r.date)
-  for (const r of (activityPosts ?? []) as { created_at: string }[]) addDay(r.created_at.split('T')[0])
-  for (const r of (journalDays ?? []) as { created_at: string }[]) addDay(r.created_at.split('T')[0])
-  for (const r of (energyDays ?? []) as { date: string }[]) addDay(r.date)
-
-  // Build 91-cell grid (13 weeks × 7 days), newest day = last cell
-  const today = new Date()
-  const activityGrid = Array.from({ length: 91 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - (90 - i))
-    const dateStr = d.toISOString().split('T')[0]
-    return { date: dateStr, level: Math.min(4, activityMap[dateStr] ?? 0) }
-  })
-
   return (
     <ProfileClient
       profile={data as Profile}
@@ -166,7 +137,6 @@ export default async function ProfilePage() {
       connections={connections}
       currentUserId={user.id}
       myCircles={myCircles}
-      activityGrid={activityGrid}
     />
   )
 }
