@@ -3,14 +3,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 
 // ─── types ────────────────────────────────────────────────────────────────────
-type Step = 'concept' | 'generating' | 'review' | 'preview'
+type MainTab = 'cast' | 'scene' | 'import'
+type SceneStep = 'setup' | 'generating' | 'review' | 'preview'
 
-type Character = {
+type SavedChar = {
   id: string
   name: string
+  role: 'protagonist' | 'antagonist' | 'supporting' | 'recurring'
   description: string
-  role: 'protagonist' | 'antagonist' | 'supporting'
-  refImage?: string   // base64 data URL for reference photo
+  refImage?: string
   analyzing?: boolean
 }
 
@@ -29,56 +30,40 @@ type Panel = {
   image_error: boolean
 }
 
-type CartoonData = {
+type SceneData = {
   title: string
   logline: string
   story_summary: string
   panels: Panel[]
 }
 
-type ConceptForm = {
-  title: string
-  genre: string
-  style: string
-  premise: string
-  characters: Character[]
-  panelCount: number
-}
+type Project = { name: string; style: string }
 
 // ─── constants ────────────────────────────────────────────────────────────────
-const GENRES = [
-  { id: 'superhero', label: 'Superhero', icon: '⚡' },
-  { id: 'scifi',     label: 'Sci-Fi',    icon: '🚀' },
-  { id: 'fantasy',   label: 'Fantasy',   icon: '🧙' },
-  { id: 'comedy',    label: 'Comedy',    icon: '😂' },
-  { id: 'drama',     label: 'Drama',     icon: '🎭' },
-  { id: 'action',    label: 'Action',    icon: '💥' },
-  { id: 'kids',      label: 'Kids',      icon: '🌈' },
-  { id: 'horror',    label: 'Horror',    icon: '👻' },
-]
-
 const STYLES = [
+  { id: 'cartoon',    label: 'Cartoon',    desc: 'Disney/Pixar inspired' },
   { id: 'comic_book', label: 'Comic Book', desc: 'Bold outlines, flat colors' },
   { id: 'manga',      label: 'Manga',      desc: 'Japanese anime style' },
-  { id: 'cartoon',    label: 'Cartoon',    desc: 'Disney/Pixar inspired' },
   { id: 'sketch',     label: 'Sketch',     desc: 'Hand-drawn pencil art' },
 ]
 
 const STYLE_PREFIXES: Record<string, string> = {
-  comic_book: 'Marvel DC comic book panel, bold black outlines, vibrant flat colors, dynamic action composition, professional comic illustration',
+  cartoon:    'Western cartoon animation style, bold outlines, bright flat colors, expressive characters, professional animation',
+  comic_book: 'Comic book panel art, bold black outlines, vibrant flat colors, dynamic composition, professional illustration',
   manga:      'Japanese manga panel art, clean expressive linework, large emotive eyes, screentone shading, anime style',
-  cartoon:    'Western cartoon animation, Disney-Pixar style, smooth rounded shapes, bright saturated colors, expressive characters',
-  sketch:     'Pencil sketch illustration, detailed hand-drawn linework, crosshatching, artistic black and white sketch',
+  sketch:     'Pencil sketch illustration, detailed hand-drawn linework, crosshatching, artistic black and white',
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  protagonist: '#D4AF37',
+  antagonist:  '#e05555',
+  supporting:  '#4ade80',
+  recurring:   '#a78bfa',
 }
 
 const LOADING_MSGS = [
-  'Writing your story…',
-  'Developing your characters…',
-  'Crafting dramatic scenes…',
-  'Building the plot…',
-  'Writing dialogue…',
-  'Planning panel compositions…',
-  'Almost there…',
+  'Writing the scene…', 'Developing the action…', 'Crafting dialogue…',
+  'Planning panel compositions…', 'Adding finishing touches…',
 ]
 
 const KB = [
@@ -86,73 +71,122 @@ const KB = [
   ['scale(1.1) translate(-2%,2%)', 'scale(1) translate(2%,-2%)'   ],
   ['scale(1) translate(2%,0)',     'scale(1.12) translate(0,2%)'   ],
   ['scale(1.1) translate(0,-2%)',  'scale(1) translate(-1%,1%)'    ],
-  ['scale(1) translate(-1%,1%)',   'scale(1.12) translate(2%,-1%)' ],
-  ['scale(1.12) translate(1%,1%)', 'scale(1) translate(-2%,0)'     ],
 ]
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2, 9)
 
 function buildImageUrl(prompt: string, style: string, seed: number) {
-  const prefix = STYLE_PREFIXES[style] ?? STYLE_PREFIXES.comic_book
+  const prefix = STYLE_PREFIXES[style] ?? STYLE_PREFIXES.cartoon
   const full   = `${prefix}, ${prompt}, high quality, detailed, cinematic`
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=768&height=512&model=flux&nologo=true&seed=${seed}`
 }
 
-// ─── main component ───────────────────────────────────────────────────────────
-export function CartoonClient() {
-  const [step, setStep]     = useState<Step>('concept')
-  const [form, setForm]     = useState<ConceptForm>({
-    title: '', genre: 'superhero', style: 'comic_book',
-    premise: '', panelCount: 10,
-    characters: [{ id: uid(), name: '', description: '', role: 'protagonist' }],
-  })
-  const [cartoon, setCartoon]           = useState<CartoonData | null>(null)
-  const [error, setError]               = useState('')
-  const [loadingMsg, setLoadingMsg]     = useState(LOADING_MSGS[0])
-  const [generatingImgs, setGeneratingImgs] = useState(false)
-  const [loadedCount, setLoadedCount]   = useState(0)
-  const [previewIdx, setPreviewIdx]     = useState(0)
-  const [autoPlay, setAutoPlay]         = useState(false)
-  // import mode
-  const [mode, setMode]                 = useState<'create' | 'import'>('create')
-  const [importScript, setImportScript] = useState('')
-  const [importStyle, setImportStyle]   = useState('comic_book')
-  const [importPanelCount, setImportPanelCount] = useState(10)
-  const [extractedImages, setExtractedImages]   = useState<string[]>([])
-  const seedsRef  = useRef<number[]>([])
-  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+// ─── localStorage helpers ─────────────────────────────────────────────────────
+function loadProject(): Project {
+  try { return JSON.parse(localStorage.getItem('cc_project') ?? '{}') } catch { return { name: '', style: 'cartoon' } }
+}
+function saveProject(p: Project) { localStorage.setItem('cc_project', JSON.stringify(p)) }
+function loadChars(): SavedChar[] {
+  try { return JSON.parse(localStorage.getItem('cc_chars') ?? '[]') } catch { return [] }
+}
+function saveChars(chars: SavedChar[]) { localStorage.setItem('cc_chars', JSON.stringify(chars)) }
 
+// ─── shared CSS ───────────────────────────────────────────────────────────────
+const SHARED_CSS = `
+  .cc-input { background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#f0f0f0;padding:10px 14px;width:100%;font-size:.95rem;outline:none;transition:border-color .2s;font-family:inherit; }
+  .cc-input:focus { border-color:#D4AF37; }
+  .cc-input:disabled { opacity:.4;cursor:not-allowed; }
+  .cc-label { font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#666;margin-bottom:6px;display:block; }
+  .cc-btn-gold { background:#D4AF37;color:#000;border:none;border-radius:8px;padding:12px 28px;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .15s;white-space:nowrap; }
+  .cc-btn-gold:hover { opacity:.88; }
+  .cc-btn-ghost { background:#1a1a1a;color:#aaa;border:1px solid #2a2a2a;border-radius:8px;padding:10px 18px;font-size:.88rem;cursor:pointer;transition:all .15s;white-space:nowrap; }
+  .cc-btn-ghost:hover { border-color:#444;color:#ddd; }
+  .cc-btn-danger { background:transparent;color:#e05555;border:1px solid rgba(224,85,85,.4);border-radius:6px;padding:5px 12px;font-size:.8rem;cursor:pointer;transition:all .15s; }
+  .cc-btn-danger:hover { background:rgba(224,85,85,.1); }
+  .cc-chip { padding:7px 14px;border-radius:20px;border:1px solid #2a2a2a;background:#111;color:#888;cursor:pointer;font-size:.82rem;transition:all .15s;white-space:nowrap; }
+  .cc-chip.on { border-color:#D4AF37;background:rgba(212,175,55,.1);color:#D4AF37; }
+  .cc-chip:hover:not(.on) { border-color:#444;color:#ccc; }
+  .cc-style-btn { padding:12px 14px;border-radius:10px;border:1px solid #2a2a2a;background:#111;cursor:pointer;transition:all .15s;text-align:left;width:100%; }
+  .cc-style-btn.on { border-color:#D4AF37;background:rgba(212,175,55,.08); }
+  .cc-style-btn:hover:not(.on) { border-color:#333; }
+  @keyframes spin { to { transform:rotate(360deg) } }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes dialogIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+`
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+export function CartoonClient() {
+  const [tab, setTab]           = useState<MainTab>('cast')
+  const [project, setProjectRaw] = useState<Project>({ name: '', style: 'cartoon' })
+  const [chars, setCharsRaw]    = useState<SavedChar[]>([])
+  const [hydrated, setHydrated] = useState(false)
+
+  // scene state
+  const [sceneStep, setSceneStep]         = useState<SceneStep>('setup')
+  const [selectedCharIds, setSelectedCharIds] = useState<string[]>([])
+  const [scenePremise, setScenePremise]   = useState('')
+  const [scenePanels, setScenePanels]     = useState(6)
+  const [sceneData, setSceneData]         = useState<SceneData | null>(null)
+  const [sceneError, setSceneError]       = useState('')
+  const [loadingMsg, setLoadingMsg]       = useState(LOADING_MSGS[0])
+  const [generatingImgs, setGeneratingImgs] = useState(false)
+  const [loadedCount, setLoadedCount]     = useState(0)
+  const [previewIdx, setPreviewIdx]       = useState(0)
+  const [autoPlay, setAutoPlay]           = useState(false)
+
+  // import state
+  const [importScript, setImportScript]   = useState('')
+  const [importStyle, setImportStyle]     = useState('cartoon')
+  const [importPanelCount, setImportPanelCount] = useState(8)
+  const [extractedImages, setExtractedImages] = useState<string[]>([])
+  const [importError, setImportError]     = useState('')
+
+  const seedsRef = useRef<number[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // hydrate from localStorage
   useEffect(() => {
-    if (step !== 'generating') return
+    const p = loadProject()
+    setProjectRaw({ name: p.name ?? '', style: p.style ?? 'cartoon' })
+    setCharsRaw(loadChars())
+    setHydrated(true)
+  }, [])
+
+  const setProject = (p: Project) => { setProjectRaw(p); saveProject(p) }
+  const setChars   = (c: SavedChar[]) => { setCharsRaw(c); saveChars(c) }
+
+  // loading msg rotation
+  useEffect(() => {
+    if (sceneStep !== 'generating') return
     let i = 0
     const t = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; setLoadingMsg(LOADING_MSGS[i]) }, 1900)
     return () => clearInterval(t)
-  }, [step])
+  }, [sceneStep])
 
+  // auto-play
   useEffect(() => {
-    if (!autoPlay || !cartoon) return
-    timerRef.current = setInterval(() => setPreviewIdx(p => (p + 1) % cartoon.panels.length), 6000)
+    if (!autoPlay || !sceneData) return
+    timerRef.current = setInterval(() => setPreviewIdx(p => (p + 1) % sceneData.panels.length), 6000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [autoPlay, cartoon])
+  }, [autoPlay, sceneData])
 
-  const addCharacter = () => {
-    if (form.characters.length >= 4) return
-    setForm(f => ({ ...f, characters: [...f.characters, { id: uid(), name: '', description: '', role: 'supporting' }] }))
-  }
-  const removeCharacter = (id: string) =>
-    setForm(f => ({ ...f, characters: f.characters.filter(c => c.id !== id) }))
-  const updateCharacter = (id: string, field: keyof Character, value: string | boolean) =>
-    setForm(f => ({ ...f, characters: f.characters.map(c => c.id === id ? { ...c, [field]: value } : c) }))
+  // ── character actions ──────────────────────────────────────────────────────
+  const addChar = () => setChars([...chars, { id: uid(), name: '', role: 'supporting', description: '' }])
 
-  const analyzeCharacterImage = async (id: string, file: File) => {
-    updateCharacter(id, 'analyzing', true)
+  const updateChar = (id: string, patch: Partial<SavedChar>) =>
+    setChars(chars.map(c => c.id === id ? { ...c, ...patch } : c))
+
+  const removeChar = (id: string) => setChars(chars.filter(c => c.id !== id))
+
+  const analyzeCharImg = async (id: string, file: File) => {
+    updateChar(id, { analyzing: true })
     const reader = new FileReader()
     reader.onload = async (e) => {
       const dataUrl = e.target?.result as string
       const [header, b64] = dataUrl.split(',')
       const mediaType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
-      updateCharacter(id, 'refImage', dataUrl)
+      updateChar(id, { refImage: dataUrl })
       try {
         const res = await fetch('/api/cartoon/analyze-character', {
           method: 'POST',
@@ -160,42 +194,95 @@ export function CartoonClient() {
           body: JSON.stringify({ image: b64, mediaType }),
         })
         const { description } = await res.json()
-        if (description) updateCharacter(id, 'description', description)
-      } catch { /* leave description as-is */ }
-      updateCharacter(id, 'analyzing', false)
+        if (description) updateChar(id, { description })
+      } catch { /* leave as-is */ }
+      updateChar(id, { analyzing: false })
     }
     reader.readAsDataURL(file)
   }
 
-  const generateStory = async () => {
-    if (!form.premise.trim())                              { setError('Add a story premise to continue.'); return }
-    if (!form.characters.some(c => c.name.trim()))        { setError('Name at least one character.'); return }
-    setError('')
-    setStep('generating')
+  // ── scene generation ───────────────────────────────────────────────────────
+  const generateScene = async () => {
+    if (!scenePremise.trim()) { setSceneError('Describe what happens in this scene.'); return }
+    if (!selectedCharIds.length) { setSceneError('Select at least one character.'); return }
+    setSceneError('')
+    setSceneStep('generating')
+
+    const sceneChars = chars.filter(c => selectedCharIds.includes(c.id))
+
     try {
       const res = await fetch('/api/cartoon/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, characters: form.characters.filter(c => c.name.trim()) }),
+        body: JSON.stringify({
+          title: project.name || 'One Size Fits All',
+          genre: 'comedy',
+          style: project.style,
+          premise: scenePremise,
+          characters: sceneChars.map(c => ({ name: c.name, description: c.description, role: c.role })),
+          panelCount: scenePanels,
+        }),
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
       const panels: Panel[] = (data.panels ?? []).map((p: Panel) => ({ ...p, image_loaded: false, image_error: false }))
       seedsRef.current = panels.map(() => Math.floor(Math.random() * 99999))
-      setCartoon({ ...data, panels })
+      setSceneData({ ...data, panels })
       setGeneratingImgs(false)
       setLoadedCount(0)
-      setStep('review')
+      setSceneStep('review')
     } catch {
-      setError('Generation failed — please try again.')
-      setStep('concept')
+      setSceneError('Generation failed — try again.')
+      setSceneStep('setup')
     }
   }
 
-  const importCartoon = async () => {
-    if (!importScript.trim()) { setError('Paste your document content first.'); return }
-    setError('')
-    setStep('generating')
+  const generateImages = useCallback(() => {
+    if (!sceneData) return
+    setGeneratingImgs(true)
+    setLoadedCount(0)
+    setSceneData(d => d ? {
+      ...d,
+      panels: d.panels.map((p, i) => ({
+        ...p,
+        image_url:    buildImageUrl(p.image_prompt, project.style, seedsRef.current[i] ?? i * 137),
+        image_loaded: false,
+        image_error:  false,
+      })),
+    } : d)
+  }, [sceneData, project.style])
+
+  const onImageLoad = useCallback((idx: number) => {
+    setSceneData(d => d ? { ...d, panels: d.panels.map((p, i) => i === idx ? { ...p, image_loaded: true } : p) } : d)
+    setLoadedCount(n => n + 1)
+  }, [])
+
+  const onImageError = useCallback((idx: number) => {
+    setSceneData(d => d ? { ...d, panels: d.panels.map((p, i) => i === idx ? { ...p, image_error: true } : p) } : d)
+    setLoadedCount(n => n + 1)
+  }, [])
+
+  const retryImage = (idx: number) => {
+    if (!sceneData) return
+    const seed = Math.floor(Math.random() * 99999)
+    seedsRef.current[idx] = seed
+    setLoadedCount(n => Math.max(0, n - 1))
+    setSceneData(d => d ? {
+      ...d,
+      panels: d.panels.map((p, i) => i === idx ? {
+        ...p,
+        image_url: buildImageUrl(p.image_prompt, project.style, seed),
+        image_loaded: false, image_error: false,
+      } : p),
+    } : d)
+  }
+
+  // ── import ─────────────────────────────────────────────────────────────────
+  const importScript_fn = async () => {
+    if (!importScript.trim()) { setImportError('Paste or drop your document first.'); return }
+    setImportError('')
+    setSceneStep('generating')
+    setTab('scene')
     try {
       const res = await fetch('/api/cartoon/import', {
         method: 'POST',
@@ -211,364 +298,510 @@ export function CartoonClient() {
         image_error:  false,
       }))
       seedsRef.current = panels.map(() => Math.floor(Math.random() * 99999))
-      setCartoon({ ...data, panels })
-      setForm(f => ({ ...f, style: importStyle }))
+      setSceneData({ ...data, panels })
       setGeneratingImgs(false)
-      setLoadedCount(0)
-      setStep('review')
+      setLoadedCount(extractedImages.filter(Boolean).length)
+      setSceneStep('review')
     } catch {
-      setError('Import failed — please try again.')
-      setStep('concept')
+      setImportError('Import failed — try again.')
+      setSceneStep('setup')
+      setTab('import')
     }
   }
 
-  const generateImages = useCallback(() => {
-    if (!cartoon) return
-    setGeneratingImgs(true)
-    setLoadedCount(0)
-    setCartoon(c => c ? {
-      ...c,
-      panels: c.panels.map((p, i) => ({
-        ...p,
-        image_url:    buildImageUrl(p.image_prompt, form.style, seedsRef.current[i] ?? i * 137),
-        image_loaded: false,
-        image_error:  false,
-      })),
-    } : c)
-  }, [cartoon, form.style])
-
-  const onImageLoad = useCallback((idx: number) => {
-    setCartoon(c => c ? { ...c, panels: c.panels.map((p, i) => i === idx ? { ...p, image_loaded: true } : p) } : c)
-    setLoadedCount(n => n + 1)
-  }, [])
-
-  const onImageError = useCallback((idx: number) => {
-    setCartoon(c => c ? { ...c, panels: c.panels.map((p, i) => i === idx ? { ...p, image_error: true } : p) } : c)
-    setLoadedCount(n => n + 1)
-  }, [])
-
-  const retryImage = (idx: number) => {
-    if (!cartoon) return
-    const seed = Math.floor(Math.random() * 99999)
-    seedsRef.current[idx] = seed
-    setLoadedCount(n => Math.max(0, n - 1))
-    setCartoon(c => c ? {
-      ...c,
-      panels: c.panels.map((p, i) => i === idx ? {
-        ...p,
-        image_url: buildImageUrl(p.image_prompt, form.style, seed),
-        image_loaded: false, image_error: false,
-      } : p),
-    } : c)
-  }
-
   const exportPDF = () => {
-    if (!cartoon) return
+    if (!sceneData) return
     const win = window.open('', '_blank')
     if (!win) { alert('Allow popups to export PDF.'); return }
-    const panels = cartoon.panels.map(p => `
+    const panelHtml = sceneData.panels.map(p => `
       <div class="panel">
-        ${p.image_url && p.image_loaded
-          ? `<img src="${p.image_url}" alt="Panel ${p.panel_number}" />`
-          : `<div class="no-img"><span>${p.panel_number}</span></div>`}
+        ${p.image_url && p.image_loaded ? `<img src="${p.image_url}" alt="Panel ${p.panel_number}" />` : `<div class="no-img">${p.panel_number}</div>`}
         <div class="caption">
           <div class="scene">${p.scene_title}</div>
-          ${p.dialogue.map(d => `<div class="line"><b>${d.character}:</b> ${d.text}</div>`).join('')}
+          ${p.dialogue.map(d => `<div class="line"><b>${d.character}:</b> "${d.text}"</div>`).join('')}
         </div>
       </div>`).join('')
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${cartoon.title}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"Comic Sans MS",cursive;background:#fff;padding:20px;color:#000}
-h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:12px;margin-bottom:8px}
-.logline{text-align:center;font-style:italic;font-size:.95rem;margin-bottom:24px;color:#333}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.panel{border:3px solid #000;border-radius:3px;overflow:hidden;break-inside:avoid}
-.panel img{width:100%;height:220px;object-fit:cover;display:block;border-bottom:2px solid #000}
-.no-img{width:100%;height:220px;background:#ddd;display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:bold;border-bottom:2px solid #000}
-.caption{padding:10px 12px}
-.scene{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px;color:#555}
-.line{font-size:.88rem;margin-bottom:3px}
-@media print{html,body{height:auto}@page{margin:10mm}}
-</style></head><body>
-<h1>${cartoon.title}</h1>
-<p class="logline">${cartoon.logline}</p>
-<div class="grid">${panels}</div>
-</body></html>`)
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${sceneData.title}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Comic Sans MS",cursive;background:#fff;padding:20px}h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:6px}.logline{text-align:center;font-style:italic;font-size:.9rem;margin-bottom:20px;color:#333}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{border:3px solid #000;border-radius:3px;overflow:hidden;break-inside:avoid}.panel img{width:100%;height:200px;object-fit:cover;display:block;border-bottom:2px solid #000}.no-img{width:100%;height:200px;background:#eee;display:flex;align-items:center;justify-content:center;font-size:3rem;font-weight:bold;border-bottom:2px solid #000}.caption{padding:8px 12px}.scene{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#555;margin-bottom:4px}.line{font-size:.85rem;margin-bottom:2px}@media print{html,body{height:auto}}</style></head><body>
+<h1>${sceneData.title}</h1><p class="logline">${sceneData.logline}</p>
+<div class="grid">${panelHtml}</div></body></html>`)
     win.document.close()
     setTimeout(() => win.print(), 600)
   }
 
-  // ─── step routing ──────────────────────────────────────────────────────────
-  if (step === 'concept') return (
-    <ConceptStep
-      form={form} setForm={setForm} error={error}
-      onGenerate={generateStory}
-      addChar={addCharacter} removeChar={removeCharacter} updateChar={updateCharacter}
-      analyzeCharImg={analyzeCharacterImage}
-      mode={mode} setMode={setMode}
-      importScript={importScript} setImportScript={setImportScript}
-      importStyle={importStyle} setImportStyle={setImportStyle}
-      importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
-      extractedImages={extractedImages} setExtractedImages={setExtractedImages}
-      onImport={importCartoon}
-    />
-  )
-  if (step === 'generating') return <GeneratingStep msg={loadingMsg} />
-  if (step === 'review' && cartoon) return (
+  if (!hydrated) return null
+
+  // ── routing ────────────────────────────────────────────────────────────────
+  // scene steps take over full screen
+  if (tab === 'scene' && sceneStep === 'generating') return <GeneratingStep msg={loadingMsg} />
+  if (tab === 'scene' && sceneStep === 'review' && sceneData) return (
     <ReviewStep
-      cartoon={cartoon} form={form}
-      generatingImgs={generatingImgs}
-      loadedCount={loadedCount}
+      sceneData={sceneData} style={project.style}
+      generatingImgs={generatingImgs} loadedCount={loadedCount}
       onGenerateImages={generateImages}
       onImageLoad={onImageLoad} onImageError={onImageError} onRetry={retryImage}
-      onPreview={() => { setPreviewIdx(0); setAutoPlay(false); setStep('preview') }}
-      onReset={() => { setCartoon(null); setStep('concept') }}
+      onPreview={() => { setPreviewIdx(0); setAutoPlay(false); setSceneStep('preview') }}
+      onBack={() => setSceneStep('setup')}
     />
   )
-  if (step === 'preview' && cartoon) return (
+  if (tab === 'scene' && sceneStep === 'preview' && sceneData) return (
     <PreviewStep
-      cartoon={cartoon} previewIdx={previewIdx}
-      setPreviewIdx={setPreviewIdx}
-      autoPlay={autoPlay} setAutoPlay={setAutoPlay}
-      onBack={() => setStep('review')}
+      sceneData={sceneData} previewIdx={previewIdx}
+      setPreviewIdx={setPreviewIdx} autoPlay={autoPlay}
+      setAutoPlay={setAutoPlay}
+      onBack={() => setSceneStep('review')}
+      onNewScene={() => { setSceneData(null); setScenePremise(''); setSceneStep('setup') }}
       onExport={exportPDF}
     />
   )
-  return null
-}
 
-// ─── concept step ─────────────────────────────────────────────────────────────
-function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, analyzeCharImg, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, extractedImages, setExtractedImages, onImport }: {
-  form: ConceptForm
-  setForm: React.Dispatch<React.SetStateAction<ConceptForm>>
-  error: string
-  onGenerate: () => void
-  addChar: () => void
-  removeChar: (id: string) => void
-  updateChar: (id: string, field: keyof Character, value: string | boolean) => void
-  analyzeCharImg: (id: string, file: File) => void
-  mode: 'create' | 'import'
-  setMode: (m: 'create' | 'import') => void
-  importScript: string
-  setImportScript: (s: string) => void
-  importStyle: string
-  setImportStyle: (s: string) => void
-  importPanelCount: number
-  setImportPanelCount: (n: number) => void
-  extractedImages: string[]
-  setExtractedImages: (imgs: string[]) => void
-  onImport: () => void
-}) {
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', padding: '24px 16px' }}>
-      <style>{`
-        .cc-input { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: #f0f0f0; padding: 10px 14px; width: 100%; font-size: 0.95rem; outline: none; transition: border-color .2s; }
-        .cc-input:focus { border-color: #D4AF37; }
-        .cc-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: .08em; color: #888; margin-bottom: 6px; display: block; }
-        .cc-chip { padding: 8px 14px; border-radius: 20px; border: 1px solid #333; background: #111; color: #aaa; cursor: pointer; font-size: 0.85rem; transition: all .15s; white-space: nowrap; }
-        .cc-chip.selected { border-color: #D4AF37; background: rgba(212,175,55,.12); color: #D4AF37; }
-        .cc-chip:hover:not(.selected) { border-color: #555; color: #ddd; }
-        .cc-style { padding: 12px 16px; border-radius: 10px; border: 1px solid #333; background: #111; cursor: pointer; transition: all .15s; text-align: left; width: 100%; }
-        .cc-style.selected { border-color: #D4AF37; background: rgba(212,175,55,.1); }
-        .cc-style:hover:not(.selected) { border-color: #444; }
-        .cc-btn-primary { background: #D4AF37; color: #000; border: none; border-radius: 8px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
-        .cc-btn-primary:hover { opacity: .9; }
-        .cc-btn-secondary { background: #1a1a1a; color: #aaa; border: 1px solid #333; border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; cursor: pointer; transition: all .15s; }
-        .cc-btn-secondary:hover { border-color: #555; color: #ddd; }
-        .cc-btn-danger { background: transparent; color: #e05555; border: 1px solid #e05555; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; transition: all .15s; }
-        .cc-btn-danger:hover { background: rgba(224,85,85,.1); }
-        .cc-tab { padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: #555; font-size: 0.92rem; cursor: pointer; transition: all .15s; font-weight: 500; }
-        .cc-tab.active { color: #D4AF37; border-bottom-color: #D4AF37; }
-        .cc-tab:hover:not(.active) { color: #aaa; }
-      `}</style>
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0' }}>
+      <style>{SHARED_CSS}</style>
 
-      <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: '0.8rem', color: '#D4AF37', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>Cartoon Studio</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#fff', margin: 0 }}>Cartoon Creator</h1>
+      {/* Project header */}
+      <div style={{ borderBottom: '1px solid #141414', padding: '16px 20px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <input
+              className="cc-input"
+              placeholder="Show / project name…"
+              value={project.name}
+              onChange={e => setProject({ ...project, name: e.target.value })}
+              style={{ fontWeight: 700, fontSize: '1rem' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {STYLES.map(s => (
+              <button
+                key={s.id}
+                className={`cc-chip ${project.style === s.id ? 'on' : ''}`}
+                onClick={() => setProject({ ...project, style: s.id })}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
 
-        {/* Mode tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #1e1e1e', marginBottom: 28 }}>
-          <button className={`cc-tab ${mode === 'create' ? 'active' : ''}`} onClick={() => setMode('create')}>
-            ✦ Create New
-          </button>
-          <button className={`cc-tab ${mode === 'import' ? 'active' : ''}`} onClick={() => setMode('import')}>
-            ↑ Import from Document
-          </button>
+      {/* Main tabs */}
+      <div style={{ borderBottom: '1px solid #141414' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex' }}>
+          {([
+            { id: 'cast',   label: '👥 Cast' },
+            { id: 'scene',  label: '🎬 Scene' },
+            { id: 'import', label: '📄 Import Script' },
+          ] as { id: MainTab; label: string }[]).map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setTab(t.id); if (t.id === 'scene') setSceneStep('setup') }}
+              style={{
+                padding: '14px 20px', background: 'none', border: 'none',
+                borderBottom: `2px solid ${tab === t.id ? '#D4AF37' : 'transparent'}`,
+                color: tab === t.id ? '#D4AF37' : '#555',
+                fontWeight: tab === t.id ? 700 : 400,
+                fontSize: '.9rem', cursor: 'pointer', transition: 'all .15s',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Import tab */}
-        {mode === 'import' && (
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 20px' }}>
+        {tab === 'cast'   && <CastTab chars={chars} addChar={addChar} updateChar={updateChar} removeChar={removeChar} analyzeCharImg={analyzeCharImg} />}
+        {tab === 'scene'  && sceneStep === 'setup' && (
+          <SceneTab
+            chars={chars}
+            selectedCharIds={selectedCharIds} setSelectedCharIds={setSelectedCharIds}
+            premise={scenePremise} setPremise={setScenePremise}
+            panelCount={scenePanels} setPanelCount={setScenePanels}
+            error={sceneError} onGenerate={generateScene}
+          />
+        )}
+        {tab === 'import' && (
           <ImportTab
             importScript={importScript} setImportScript={setImportScript}
             importStyle={importStyle} setImportStyle={setImportStyle}
             importPanelCount={importPanelCount} setImportPanelCount={setImportPanelCount}
             extractedImages={extractedImages} setExtractedImages={setExtractedImages}
-            error={error} onImport={onImport}
+            error={importError} onImport={importScript_fn}
           />
         )}
+      </div>
+    </div>
+  )
+}
 
-        {/* Create tab */}
-        {mode === 'create' && <>
-
-        {/* Genre */}
-        <div style={{ marginBottom: 28 }}>
-          <label className="cc-label">Genre</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {GENRES.map(g => (
-              <button
-                key={g.id}
-                className={`cc-chip ${form.genre === g.id ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, genre: g.id }))}
-              >
-                {g.icon} {g.label}
-              </button>
-            ))}
-          </div>
+// ─── cast tab ─────────────────────────────────────────────────────────────────
+function CastTab({ chars, addChar, updateChar, removeChar, analyzeCharImg }: {
+  chars: SavedChar[]
+  addChar: () => void
+  updateChar: (id: string, patch: Partial<SavedChar>) => void
+  removeChar: (id: string) => void
+  analyzeCharImg: (id: string, file: File) => void
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', margin: 0 }}>Cast & Characters</h2>
+          <p style={{ color: '#444', fontSize: '.82rem', marginTop: 2 }}>Upload reference images — Claude locks in their visual style for every scene</p>
         </div>
+        <button className="cc-btn-gold" onClick={addChar}>+ Add Character</button>
+      </div>
 
-        {/* Art Style */}
-        <div style={{ marginBottom: 28 }}>
-          <label className="cc-label">Art Style</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-            {STYLES.map(s => (
-              <button
-                key={s.id}
-                className={`cc-style ${form.style === s.id ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, style: s.id }))}
-              >
-                <div style={{ fontWeight: 600, color: form.style === s.id ? '#D4AF37' : '#ddd', marginBottom: 2 }}>{s.label}</div>
-                <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.desc}</div>
-              </button>
-            ))}
-          </div>
+      {chars.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed #1e1e1e', borderRadius: 12 }}>
+          <div style={{ fontSize: '2rem', marginBottom: 10 }}>👥</div>
+          <div style={{ color: '#444', marginBottom: 16 }}>No characters yet</div>
+          <button className="cc-btn-gold" onClick={addChar}>Add Your First Character</button>
         </div>
+      )}
 
-        {/* Story Title */}
-        <div style={{ marginBottom: 20 }}>
-          <label className="cc-label">Story Title (optional — Claude can name it)</label>
-          <input
-            className="cc-input"
-            placeholder="e.g. The Last Guardian"
-            value={form.title}
-            onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-          />
-        </div>
-
-        {/* Premise */}
-        <div style={{ marginBottom: 28 }}>
-          <label className="cc-label">Story Premise *</label>
-          <textarea
-            className="cc-input"
-            rows={3}
-            placeholder="Describe what your story is about. Include the main conflict, setting, and tone. The more detail, the better."
-            value={form.premise}
-            onChange={e => setForm(f => ({ ...f, premise: e.target.value }))}
-            style={{ resize: 'vertical', minHeight: 80 }}
-          />
-        </div>
-
-        {/* Characters */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <label className="cc-label" style={{ margin: 0 }}>Characters *</label>
-            {form.characters.length < 4 && (
-              <button className="cc-btn-secondary" onClick={addChar}>+ Add Character</button>
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {form.characters.map((c, idx) => (
-              <div key={c.id} style={{ background: '#111', border: '1px solid #222', borderRadius: 10, padding: '14px 16px' }}>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'center' }}>
-                  {/* Reference image upload */}
-                  <label style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }} title="Upload reference photo">
-                    <input
-                      type="file" accept="image/*" style={{ display: 'none' }}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCharImg(c.id, f) }}
-                    />
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 8, overflow: 'hidden',
-                      border: c.refImage ? '2px solid #D4AF37' : '2px dashed #333',
-                      background: '#0a0a0a',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'border-color .15s',
-                    }}>
-                      {c.analyzing ? (
-                        <div style={{ width: 18, height: 18, border: '2px solid #333', borderTopColor: '#D4AF37', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                      ) : c.refImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.refImage} alt="ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <span style={{ fontSize: '1.2rem', opacity: 0.4 }}>📷</span>
-                      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {chars.map((c, idx) => (
+          <div key={c.id} style={{ background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              {/* Photo upload */}
+              <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+                <input type="file" accept="image/*" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCharImg(c.id, f) }} />
+                <div style={{
+                  width: 64, height: 64, borderRadius: 10, overflow: 'hidden',
+                  border: c.refImage ? '2px solid #D4AF37' : '2px dashed #2a2a2a',
+                  background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, transition: 'border-color .15s',
+                }}>
+                  {c.analyzing ? (
+                    <div style={{ width: 22, height: 22, border: '2px solid #333', borderTopColor: '#D4AF37', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  ) : c.refImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.refImage} alt="ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.3rem', opacity: .3 }}>📷</div>
+                      <div style={{ fontSize: '.6rem', color: '#333', marginTop: 2 }}>Upload</div>
                     </div>
-                  </label>
-                  <input
-                    className="cc-input"
-                    placeholder={`Character ${idx + 1} name`}
-                    value={c.name}
-                    onChange={e => updateChar(c.id, 'name', e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <select
-                    className="cc-input"
-                    value={c.role}
-                    onChange={e => updateChar(c.id, 'role', e.target.value)}
-                    style={{ width: 'auto', minWidth: 140 }}
-                  >
+                  )}
+                </div>
+              </label>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <input className="cc-input" placeholder={`Character ${idx + 1} name`}
+                    value={c.name} onChange={e => updateChar(c.id, { name: e.target.value })}
+                    style={{ flex: 1, padding: '8px 12px', fontSize: '.9rem' }} />
+                  <select className="cc-input" value={c.role}
+                    onChange={e => updateChar(c.id, { role: e.target.value as SavedChar['role'] })}
+                    style={{ width: 'auto', minWidth: 130, padding: '8px 10px', fontSize: '.85rem' }}>
                     <option value="protagonist">Protagonist</option>
                     <option value="antagonist">Antagonist</option>
                     <option value="supporting">Supporting</option>
+                    <option value="recurring">Recurring</option>
                   </select>
-                  {form.characters.length > 1 && (
-                    <button className="cc-btn-danger" onClick={() => removeChar(c.id)}>✕</button>
-                  )}
+                  <button className="cc-btn-danger" onClick={() => removeChar(c.id)}>✕</button>
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    className="cc-input"
-                    placeholder={c.analyzing ? 'Analyzing your image…' : 'Physical description — or upload a photo above to auto-fill'}
-                    value={c.description}
-                    onChange={e => updateChar(c.id, 'description', e.target.value)}
-                    disabled={!!c.analyzing}
-                  />
-                  {c.refImage && !c.analyzing && (
-                    <div style={{ fontSize: '0.72rem', color: '#D4AF37', marginTop: 4 }}>✓ Visual style locked from your reference image</div>
-                  )}
-                </div>
+                <textarea className="cc-input"
+                  placeholder={c.analyzing ? 'Analyzing your image…' : 'Visual description — or upload a photo above to auto-fill'}
+                  value={c.description}
+                  onChange={e => updateChar(c.id, { description: e.target.value })}
+                  disabled={!!c.analyzing}
+                  rows={2}
+                  style={{ resize: 'none', fontSize: '.85rem', lineHeight: 1.5 }}
+                />
+                {c.refImage && !c.analyzing && (
+                  <div style={{ fontSize: '.7rem', color: '#D4AF37', marginTop: 4 }}>✓ Visual style locked from reference image</div>
+                )}
               </div>
-            ))}
+            </div>
+
+            {/* Role badge */}
+            {c.name && (
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.08em',
+                  color: ROLE_COLORS[c.role], border: `1px solid ${ROLE_COLORS[c.role]}40`,
+                  borderRadius: 4, padding: '2px 8px', background: `${ROLE_COLORS[c.role]}10`,
+                }}>{c.role}</span>
+                {c.description && <span style={{ fontSize: '.75rem', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description.slice(0, 60)}…</span>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {chars.length > 0 && (
+        <div style={{ marginTop: 20, padding: '12px 16px', background: '#0f0f0f', borderRadius: 10, border: '1px solid #1a1a1a' }}>
+          <div style={{ fontSize: '.75rem', color: '#444' }}>
+            {chars.filter(c => c.description).length} of {chars.length} characters described — go to <strong style={{ color: '#D4AF37' }}>Scene</strong> to start generating
           </div>
         </div>
+      )}
+    </div>
+  )
+}
 
-        {/* Panel Count */}
-        <div style={{ marginBottom: 32 }}>
-          <label className="cc-label">Number of Panels</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[6, 8, 10, 12].map(n => (
+// ─── scene tab ────────────────────────────────────────────────────────────────
+function SceneTab({ chars, selectedCharIds, setSelectedCharIds, premise, setPremise, panelCount, setPanelCount, error, onGenerate }: {
+  chars: SavedChar[]
+  selectedCharIds: string[]; setSelectedCharIds: (ids: string[]) => void
+  premise: string; setPremise: (s: string) => void
+  panelCount: number; setPanelCount: (n: number) => void
+  error: string; onGenerate: () => void
+}) {
+  const toggle = (id: string) =>
+    setSelectedCharIds(selectedCharIds.includes(id) ? selectedCharIds.filter(x => x !== id) : [...selectedCharIds, id])
+
+  return (
+    <div>
+      <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', marginBottom: 4 }}>Generate a Scene</h2>
+      <p style={{ color: '#444', fontSize: '.82rem', marginBottom: 24 }}>Each scene is {panelCount} panels. Build your episode scene by scene.</p>
+
+      {/* Character select */}
+      <div style={{ marginBottom: 24 }}>
+        <label className="cc-label">Who's in this scene?</label>
+        {chars.length === 0 ? (
+          <div style={{ color: '#444', fontSize: '.85rem', padding: '12px 16px', background: '#0f0f0f', borderRadius: 8, border: '1px solid #1a1a1a' }}>
+            No characters yet — add them in the <strong style={{ color: '#D4AF37' }}>Cast</strong> tab first
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {chars.map(c => (
               <button
-                key={n}
-                className={`cc-chip ${form.panelCount === n ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, panelCount: n }))}
+                key={c.id}
+                className={`cc-chip ${selectedCharIds.includes(c.id) ? 'on' : ''}`}
+                onClick={() => toggle(c.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 7 }}
               >
-                {n}
+                {c.refImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.refImage} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
+                )}
+                {c.name || `Character ${chars.indexOf(c) + 1}`}
+                <span style={{ fontSize: '.7rem', color: ROLE_COLORS[c.role], opacity: .8 }}>·</span>
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Scene description */}
+      <div style={{ marginBottom: 24 }}>
+        <label className="cc-label">What happens in this scene? *</label>
+        <textarea
+          className="cc-input"
+          rows={4}
+          placeholder="Describe the scene — setting, conflict, action, and tone. The more specific, the better the panels.&#10;&#10;Example: Uncle T is outside Oracle Arena hustling bootleg SF Giants shirts when Carlos shows up with a legitimate merch stand right next to him. The two go back and forth until Nia shows up with a school fundraiser sign and steals all the customers."
+          value={premise}
+          onChange={e => setPremise(e.target.value)}
+          style={{ resize: 'vertical', lineHeight: 1.6 }}
+        />
+      </div>
+
+      {/* Panel count */}
+      <div style={{ marginBottom: 28 }}>
+        <label className="cc-label">Panels in this scene</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[4, 6, 8, 10].map(n => (
+            <button key={n} className={`cc-chip ${panelCount === n ? 'on' : ''}`} onClick={() => setPanelCount(n)}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: 'rgba(224,85,85,.08)', border: '1px solid rgba(224,85,85,.25)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '.88rem' }}>
+          {error}
+        </div>
+      )}
+
+      <button className="cc-btn-gold" onClick={onGenerate} style={{ width: '100%', padding: '14px', fontSize: '1rem' }}>
+        Generate Scene →
+      </button>
+    </div>
+  )
+}
+
+// ─── generating step ──────────────────────────────────────────────────────────
+function GeneratingStep({ msg }: { msg: string }) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}`}</style>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', border: '3px solid #1a1a1a', borderTopColor: '#D4AF37', animation: 'spin 1s linear infinite' }} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: '#D4AF37', fontWeight: 600, fontSize: '1rem', marginBottom: 6 }}>Generating Scene</div>
+        <div style={{ color: '#444', fontSize: '.88rem', animation: 'pulse 1.9s ease-in-out infinite' }}>{msg}</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── review step ──────────────────────────────────────────────────────────────
+function ReviewStep({ sceneData, style, generatingImgs, loadedCount, onGenerateImages, onImageLoad, onImageError, onRetry, onPreview, onBack }: {
+  sceneData: SceneData; style: string
+  generatingImgs: boolean; loadedCount: number
+  onGenerateImages: () => void
+  onImageLoad: (i: number) => void; onImageError: (i: number) => void; onRetry: (i: number) => void
+  onPreview: () => void; onBack: () => void
+}) {
+  const total = sceneData.panels.length
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', padding: '20px 16px' }}>
+      <style>{SHARED_CSS + `.cc-panel-img{width:100%;aspect-ratio:3/2;object-fit:cover;display:block} .cc-panel-ph{width:100%;aspect-ratio:3/2;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px} @keyframes spin2{to{transform:rotate(360deg)}} .cc-spinner{width:22px;height:22px;border:2px solid #222;border-top-color:#D4AF37;border-radius:50%;animation:spin2 .8s linear infinite}`}</style>
+
+      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: '.75rem', color: '#D4AF37', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>Scene Generated</div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>{sceneData.title}</h1>
+            <p style={{ color: '#555', fontSize: '.85rem', fontStyle: 'italic', margin: 0 }}>{sceneData.logline}</p>
+          </div>
+          <button className="cc-btn-ghost" onClick={onBack}>← Back to Setup</button>
         </div>
 
-        {error && (
-          <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.9rem' }}>
-            {error}
+        <div style={{ background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
+          <div style={{ fontSize: '.7rem', color: '#333', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Summary</div>
+          <p style={{ color: '#888', fontSize: '.88rem', margin: 0, lineHeight: 1.6 }}>{sceneData.story_summary}</p>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ color: '#444', fontSize: '.82rem' }}>
+            {generatingImgs ? `${loadedCount} / ${total} images ready` : `${total} panels`}
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {!generatingImgs && <button className="cc-btn-gold" onClick={onGenerateImages}>Generate Images</button>}
+            {generatingImgs && loadedCount > 0 && <button className="cc-btn-gold" onClick={onPreview}>▶ Preview</button>}
+          </div>
+        </div>
+
+        {generatingImgs && (
+          <div style={{ height: 3, background: '#1a1a1a', borderRadius: 2, marginBottom: 20, overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: '#D4AF37', width: `${(loadedCount / total) * 100}%`, transition: 'width .4s ease', borderRadius: 2 }} />
           </div>
         )}
 
-        <button className="cc-btn-primary" onClick={onGenerate} style={{ width: '100%' }}>
-          Generate Story →
-        </button>
-        </>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+          {sceneData.panels.map((panel, idx) => (
+            <div key={panel.panel_number} style={{ background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 10, overflow: 'hidden' }}>
+              {panel.image_url ? (
+                panel.image_error ? (
+                  <div className="cc-panel-ph">
+                    <div style={{ color: '#444', fontSize: '.8rem' }}>Failed</div>
+                    <button className="cc-btn-ghost" onClick={() => onRetry(idx)} style={{ padding: '5px 12px', fontSize: '.78rem' }}>Retry</button>
+                  </div>
+                ) : panel.image_loaded ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={panel.image_url} alt={panel.scene_title} className="cc-panel-img" />
+                ) : (
+                  <div className="cc-panel-ph">
+                    <div className="cc-spinner" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={panel.image_url} alt="" style={{ display: 'none' }} onLoad={() => onImageLoad(idx)} onError={() => onImageError(idx)} />
+                  </div>
+                )
+              ) : (
+                <div className="cc-panel-ph">
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1e1e1e' }}>{String(idx + 1).padStart(2, '0')}</div>
+                  <div style={{ color: '#333', fontSize: '.75rem', textAlign: 'center', maxWidth: '80%', lineHeight: 1.4 }}>{panel.action}</div>
+                </div>
+              )}
+              <div style={{ padding: '10px 12px' }}>
+                <div style={{ fontSize: '.68rem', textTransform: 'uppercase', letterSpacing: '.07em', color: '#333', marginBottom: 3 }}>Panel {panel.panel_number}</div>
+                <div style={{ fontWeight: 600, color: '#ddd', fontSize: '.88rem', marginBottom: 6 }}>{panel.scene_title}</div>
+                {panel.dialogue.slice(0, 2).map((d, i) => (
+                  <div key={i} style={{ fontSize: '.78rem', color: '#555', marginBottom: 2 }}>
+                    <span style={{ color: '#D4AF37', fontWeight: 600 }}>{d.character}: </span>
+                    <span>&ldquo;{d.text}&rdquo;</span>
+                  </div>
+                ))}
+                {panel.image_loaded && (
+                  <button className="cc-btn-ghost" onClick={() => onRetry(idx)} style={{ marginTop: 6, padding: '4px 10px', fontSize: '.72rem' }}>↺ Regenerate</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── preview step ─────────────────────────────────────────────────────────────
+function PreviewStep({ sceneData, previewIdx, setPreviewIdx, autoPlay, setAutoPlay, onBack, onNewScene, onExport }: {
+  sceneData: SceneData; previewIdx: number
+  setPreviewIdx: (n: number | ((p: number) => number)) => void
+  autoPlay: boolean; setAutoPlay: (v: boolean) => void
+  onBack: () => void; onNewScene: () => void; onExport: () => void
+}) {
+  const panel = sceneData.panels[previewIdx]
+  const total = sceneData.panels.length
+  const kb    = KB[previewIdx % KB.length]
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#000', color: '#f0f0f0', display: 'flex', flexDirection: 'column' }}>
+      <style>{`@keyframes kb{from{transform:${kb[0]}}to{transform:${kb[1]}}} @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} @keyframes dialogIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}} .nav-btn{background:rgba(255,255,255,.08);border:none;color:#fff;width:42px;height:42px;border-radius:50%;font-size:1.2rem;cursor:pointer;transition:background .15s;flex-shrink:0} .nav-btn:hover{background:rgba(255,255,255,.18)} .nav-btn:disabled{opacity:.2;cursor:not-allowed} .sm-btn{background:transparent;color:#D4AF37;border:1px solid rgba(212,175,55,.35);border-radius:6px;padding:6px 14px;font-size:.82rem;cursor:pointer} .sm-btn:hover{background:rgba(212,175,55,.08)} .sm-btn.green{color:#4ade80;border-color:rgba(74,222,128,.35)} .sm-btn.green:hover{background:rgba(74,222,128,.08)}`}</style>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: '1px solid #111', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="sm-btn" onClick={onBack}>← Panels</button>
+          <button className="sm-btn" onClick={onNewScene}>+ New Scene</button>
+        </div>
+        <span style={{ color: '#222', fontSize: '.82rem' }}>{sceneData.title}</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className={`sm-btn ${autoPlay ? 'green' : ''}`} onClick={() => setAutoPlay(!autoPlay)}>
+            {autoPlay ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <button className="sm-btn" onClick={onExport}>PDF</button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+        {panel.image_url && panel.image_loaded ? (
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img key={previewIdx} src={panel.image_url} alt={panel.scene_title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', animation: 'kb 7s ease-in-out forwards', transformOrigin: 'center center' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom,rgba(0,0,0,.5) 0%,transparent 28%,transparent 55%,rgba(0,0,0,.88) 100%)' }} />
+          </div>
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '3.5rem', fontWeight: 800, color: '#141414', marginBottom: 8 }}>{String(previewIdx + 1).padStart(2, '0')}</div>
+              <div style={{ color: '#2a2a2a', fontSize: '.88rem' }}>{panel.action}</div>
+            </div>
+          </div>
+        )}
+
+        <div key={`t-${previewIdx}`} style={{ position: 'absolute', top: 16, left: 18, right: 18, animation: 'fadeUp .5s ease both' }}>
+          <div style={{ fontSize: '.65rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'rgba(212,175,55,.7)', marginBottom: 3 }}>
+            {previewIdx + 1} / {total}
+          </div>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,.9)' }}>{panel.scene_title}</div>
+        </div>
+
+        {panel.dialogue.length > 0 && (
+          <div key={`d-${previewIdx}`} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px 18px', animation: 'dialogIn .6s .3s ease both' }}>
+            {panel.dialogue.map((d, i) => (
+              <div key={i} style={{ background: 'rgba(0,0,0,.82)', border: '1px solid rgba(212,175,55,.18)', borderRadius: 8, padding: '7px 13px', marginBottom: 6, backdropFilter: 'blur(4px)', maxWidth: 520 }}>
+                <span style={{ color: '#D4AF37', fontWeight: 700, fontSize: '.78rem', marginRight: 6 }}>{d.character}:</span>
+                <span style={{ color: '#f0f0f0', fontSize: '.88rem' }}>&ldquo;{d.text}&rdquo;</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '14px 18px', borderTop: '1px solid #111', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+        <button className="nav-btn" onClick={() => setPreviewIdx(p => Math.max(0, p - 1))} disabled={previewIdx === 0}>‹</button>
+        <div style={{ flex: 1, display: 'flex', gap: 5, justifyContent: 'center', overflowX: 'auto', padding: '4px 0' }}>
+          {sceneData.panels.map((_, i) => (
+            <div key={i} onClick={() => setPreviewIdx(i)} style={{ width: 8, height: 8, borderRadius: '50%', background: i === previewIdx ? '#D4AF37' : '#222', transform: i === previewIdx ? 'scale(1.4)' : 'scale(1)', cursor: 'pointer', transition: 'all .15s', flexShrink: 0 }} />
+          ))}
+        </div>
+        <button className="nav-btn" onClick={() => setPreviewIdx(p => Math.min(total - 1, p + 1))} disabled={previewIdx === total - 1}>›</button>
       </div>
     </div>
   )
@@ -591,567 +824,111 @@ function ImportTab({ importScript, setImportScript, importStyle, setImportStyle,
   const parseFile = async (file: File) => {
     setParseErr('')
     const ext = file.name.split('.').pop()?.toLowerCase()
-
     if (ext === 'txt') {
-      setFileName(file.name)
-      setParsing(true)
-      try {
-        setImportScript(await file.text())
-        setExtractedImages([])
-      } finally { setParsing(false) }
+      setFileName(file.name); setParsing(true)
+      try { setImportScript(await file.text()); setExtractedImages([]) } finally { setParsing(false) }
       return
     }
-
     if (!['docx', 'doc'].includes(ext ?? '')) {
-      setParseErr('Please use a .docx file — in Google Docs go to File → Download → Microsoft Word (.docx)')
+      setParseErr('Please use a .docx file — File → Download → Microsoft Word (.docx)')
       return
     }
-
-    setParsing(true)
-    setFileName(file.name)
+    setParsing(true); setFileName(file.name)
     try {
       const JSZip = (await import('jszip')).default
       const zip   = await JSZip.loadAsync(await file.arrayBuffer())
-
-      // ── text ──────────────────────────────────────────────────────────────
       const docXml = await zip.file('word/document.xml')?.async('string') ?? ''
       const text = docXml
-        .replace(/<w:p[ >][^>]*>/g, '\n')
-        .replace(/<w:br[^>]*\/>/g, '\n')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-        .replace(/&#x[0-9A-Fa-f]+;/g, ' ')
-        .replace(/\n[ \t]+/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-
-      // ── images ────────────────────────────────────────────────────────────
+        .replace(/<w:p[ >][^>]*>/g, '\n').replace(/<w:br[^>]*\/>/g, '\n').replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+        .replace(/&#x[0-9A-Fa-f]+;/g,' ').replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim()
       const images: string[] = []
-      const mediaPaths = Object.keys(zip.files).filter(p =>
-        p.startsWith('word/media/') && !zip.files[p].dir
-      )
+      const mediaPaths = Object.keys(zip.files).filter(p => p.startsWith('word/media/') && !zip.files[p].dir)
       for (const p of mediaPaths) {
         const extImg = p.split('.').pop()?.toLowerCase() ?? ''
-        const mime   = extImg === 'png' ? 'image/png' : extImg === 'gif' ? 'image/gif' : extImg === 'webp' ? 'image/webp' : 'image/jpeg'
-        const b64    = await zip.files[p].async('base64')
-        images.push(`data:${mime};base64,${b64}`)
+        const mime   = extImg==='png'?'image/png':extImg==='gif'?'image/gif':extImg==='webp'?'image/webp':'image/jpeg'
+        images.push(`data:${mime};base64,${await zip.files[p].async('base64')}`)
       }
-
-      setImportScript(text)
-      setExtractedImages(images)
+      setImportScript(text); setExtractedImages(images)
     } catch (e) {
-      console.error('docx parse error:', e)
-      setParseErr('Could not read the file. Make sure it is exported as .docx from Google Docs.')
-    } finally {
-      setParsing(false)
-    }
-  }
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) parseFile(file)
+      console.error(e); setParseErr('Could not read the file. Try exporting as .docx from Google Docs.')
+    } finally { setParsing(false) }
   }
 
   const ready = !!importScript.trim()
 
   return (
     <div>
-      <style>{`
-        @keyframes spin3 { to { transform: rotate(360deg) } }
-      `}</style>
+      <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', marginBottom: 4 }}>Import Script</h2>
+      <p style={{ color: '#444', fontSize: '.82rem', marginBottom: 20 }}>Drop your Google Doc and Claude converts it into scenes</p>
 
-      {/* Drop zone */}
       {!ready ? (
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
+          onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) parseFile(f) }}
           onClick={() => inputRef.current?.click()}
-          style={{
-            border: `2px dashed ${dragging ? '#a78bfa' : '#2a2a2a'}`,
-            borderRadius: 14,
-            padding: '48px 24px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            background: dragging ? 'rgba(167,139,250,.06)' : 'rgba(255,255,255,.02)',
-            transition: 'all .2s',
-            marginBottom: 24,
-          }}
+          style={{ border: `2px dashed ${dragging ? '#a78bfa' : '#1e1e1e'}`, borderRadius: 14, padding: '44px 24px', textAlign: 'center', cursor: 'pointer', background: dragging ? 'rgba(167,139,250,.05)' : 'transparent', transition: 'all .2s', marginBottom: 16 }}
         >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".docx,.doc,.txt"
-            style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f) }}
-          />
+          <input ref={inputRef} type="file" accept=".docx,.doc,.txt" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) parseFile(f) }} />
           {parsing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, border: '2px solid #333', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin3 .9s linear infinite' }} />
-              <div style={{ color: '#a78bfa' }}>Reading {fileName}…</div>
-              <div style={{ color: '#444', fontSize: '0.82rem' }}>Extracting text and images</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 30, height: 30, border: '2px solid #2a2a2a', borderTopColor: '#a78bfa', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ color: '#a78bfa', fontSize: '.9rem' }}>Reading {fileName}…</div>
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📄</div>
-              <div style={{ color: '#ddd', fontWeight: 600, marginBottom: 6 }}>
-                {dragging ? 'Drop it here' : 'Drop your file here'}
-              </div>
-              <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 16 }}>or click to browse</div>
-              <div style={{ background: 'rgba(167,139,250,.1)', border: '1px solid rgba(167,139,250,.2)', borderRadius: 8, padding: '10px 16px', display: 'inline-block' }}>
-                <div style={{ color: '#a78bfa', fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>How to export from Google Docs</div>
-                <div style={{ color: '#666', fontSize: '0.78rem', lineHeight: 1.7 }}>
-                  File → Download → <strong style={{ color: '#bbb' }}>Microsoft Word (.docx)</strong>
-                </div>
-              </div>
-              <div style={{ color: '#333', fontSize: '0.75rem', marginTop: 12 }}>Supports .docx and .txt</div>
+              <div style={{ fontSize: '2rem', marginBottom: 10 }}>📄</div>
+              <div style={{ color: '#888', fontWeight: 600, marginBottom: 4 }}>{dragging ? 'Drop it' : 'Drop your .docx here'}</div>
+              <div style={{ color: '#333', fontSize: '.8rem', marginBottom: 12 }}>or click to browse</div>
+              <div style={{ fontSize: '.75rem', color: '#2a2a2a' }}>Google Docs → File → Download → Microsoft Word (.docx)</div>
             </>
           )}
         </div>
       ) : (
-        /* Parsed preview */
-        <div style={{ background: '#0f0f0f', border: '1px solid #1e1e1e', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div>
-              <div style={{ color: '#4ade80', fontWeight: 600, fontSize: '0.9rem', marginBottom: 2 }}>✓ File parsed successfully</div>
-              <div style={{ color: '#555', fontSize: '0.8rem' }}>{fileName}</div>
-            </div>
-            <button
-              className="cc-btn-secondary"
-              onClick={() => { setImportScript(''); setExtractedImages([]); setFileName('') }}
-              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-            >
-              Replace File
-            </button>
+        <div style={{ background: '#0f0f0f', border: '1px solid #1a1a1a', borderRadius: 12, padding: 14, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ color: '#4ade80', fontWeight: 600, fontSize: '.88rem' }}>✓ {fileName} parsed</div>
+            <button className="cc-btn-ghost" onClick={() => { setImportScript(''); setExtractedImages([]); setFileName('') }} style={{ padding: '5px 12px', fontSize: '.78rem' }}>Replace</button>
           </div>
-
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '8px 14px' }}>
-              <div style={{ fontSize: '0.7rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.06em' }}>Text</div>
-              <div style={{ color: '#ddd', fontWeight: 600 }}>{importScript.length.toLocaleString()} chars</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '6px 12px' }}>
+              <div style={{ fontSize: '.65rem', color: '#333', textTransform: 'uppercase' }}>Text</div>
+              <div style={{ color: '#ddd', fontWeight: 600, fontSize: '.88rem' }}>{importScript.length.toLocaleString()} chars</div>
             </div>
-            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '8px 14px' }}>
-              <div style={{ fontSize: '0.7rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.06em' }}>Images Found</div>
-              <div style={{ color: extractedImages.length > 0 ? '#D4AF37' : '#555', fontWeight: 600 }}>
-                {extractedImages.length} image{extractedImages.length !== 1 ? 's' : ''}
-              </div>
+            <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '6px 12px' }}>
+              <div style={{ fontSize: '.65rem', color: '#333', textTransform: 'uppercase' }}>Images</div>
+              <div style={{ color: extractedImages.length > 0 ? '#D4AF37' : '#444', fontWeight: 600, fontSize: '.88rem' }}>{extractedImages.length}</div>
             </div>
           </div>
-
-          {/* Image thumbnails */}
           {extractedImages.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: 8 }}>
-                These images will be used as your panel artwork (in order)
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {extractedImages.slice(0, 12).map((src, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={src}
-                    alt={`Image ${i + 1}`}
-                    style={{ width: 72, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #333' }}
-                  />
-                ))}
-                {extractedImages.length > 12 && (
-                  <div style={{ width: 72, height: 52, borderRadius: 6, background: '#1a1a1a', border: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: '0.78rem' }}>
-                    +{extractedImages.length - 12}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {extractedImages.length === 0 && (
-            <div style={{ marginTop: 10, fontSize: '0.8rem', color: '#444' }}>
-              No images found in document — Pollinations will generate artwork for each panel
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              {extractedImages.slice(0, 10).map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt="" style={{ width: 60, height: 44, objectFit: 'cover', borderRadius: 6, border: '1px solid #222' }} />
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {parseErr && (
-        <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.85rem' }}>
-          {parseErr}
-        </div>
-      )}
+      {parseErr && <div style={{ background: 'rgba(224,85,85,.08)', border: '1px solid rgba(224,85,85,.25)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 14, fontSize: '.85rem' }}>{parseErr}</div>}
 
       {ready && (
         <>
-          {/* Art style */}
-          <div style={{ marginBottom: 24 }}>
-            <label className="cc-label">Art Style {extractedImages.length > 0 ? '(for panels without an image)' : 'to Apply'}</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-              {STYLES.map(s => (
-                <button
-                  key={s.id}
-                  className={`cc-style ${importStyle === s.id ? 'selected' : ''}`}
-                  onClick={() => setImportStyle(s.id)}
-                >
-                  <div style={{ fontWeight: 600, color: importStyle === s.id ? '#D4AF37' : '#ddd', marginBottom: 2 }}>{s.label}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Panel count */}
-          <div style={{ marginBottom: 28 }}>
-            <label className="cc-label">Number of Panels</label>
+          <div style={{ marginBottom: 18 }}>
+            <label className="cc-label">Panels to generate</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {[6, 8, 10, 12].map(n => (
-                <button
-                  key={n}
-                  className={`cc-chip ${importPanelCount === n ? 'selected' : ''}`}
-                  onClick={() => setImportPanelCount(n)}
-                >
-                  {n}
-                </button>
+                <button key={n} className={`cc-chip ${importPanelCount === n ? 'on' : ''}`} onClick={() => setImportPanelCount(n)}>{n}</button>
               ))}
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#444', marginTop: 6 }}>Claude adapts your content to fit this many panels</div>
           </div>
-
-          {error && (
-            <div style={{ background: 'rgba(224,85,85,.1)', border: '1px solid rgba(224,85,85,.3)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 16, fontSize: '0.9rem' }}>
-              {error}
-            </div>
-          )}
-
-          <button className="cc-btn-primary" onClick={onImport} style={{ width: '100%' }}>
-            Convert to Cartoon →
-          </button>
+          {error && <div style={{ background: 'rgba(224,85,85,.08)', border: '1px solid rgba(224,85,85,.25)', borderRadius: 8, padding: '10px 14px', color: '#e05555', marginBottom: 14, fontSize: '.88rem' }}>{error}</div>}
+          <button className="cc-btn-gold" onClick={onImport} style={{ width: '100%', padding: '14px', fontSize: '1rem' }}>Convert to Scene →</button>
         </>
       )}
-    </div>
-  )
-}
-
-// ─── generating step ──────────────────────────────────────────────────────────
-function GeneratingStep({ msg }: { msg: string }) {
-  return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
-      `}</style>
-      <div style={{
-        width: 64, height: 64, borderRadius: '50%',
-        border: '3px solid #222', borderTopColor: '#D4AF37',
-        animation: 'spin 1s linear infinite',
-      }} />
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ color: '#D4AF37', fontSize: '1.1rem', fontWeight: 600, marginBottom: 8 }}>Creating Your Cartoon</div>
-        <div style={{ color: '#666', fontSize: '0.9rem', animation: 'pulse 1.9s ease-in-out infinite' }}>{msg}</div>
-      </div>
-      <div style={{ color: '#333', fontSize: '0.8rem' }}>This takes about 20–40 seconds</div>
-    </div>
-  )
-}
-
-// ─── review step ──────────────────────────────────────────────────────────────
-function ReviewStep({ cartoon, form, generatingImgs, loadedCount, onGenerateImages, onImageLoad, onImageError, onRetry, onPreview, onReset }: {
-  cartoon: CartoonData
-  form: ConceptForm
-  generatingImgs: boolean
-  loadedCount: number
-  onGenerateImages: () => void
-  onImageLoad: (idx: number) => void
-  onImageError: (idx: number) => void
-  onRetry: (idx: number) => void
-  onPreview: () => void
-  onReset: () => void
-}) {
-  const total        = cartoon.panels.length
-  const allLoaded    = loadedCount >= total && generatingImgs
-  const readyForPrev = allLoaded || (generatingImgs && loadedCount > 0)
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#f0f0f0', padding: '24px 16px' }}>
-      <style>{`
-        .cc-panel-card { background: #111; border: 1px solid #222; border-radius: 12px; overflow: hidden; }
-        .cc-panel-img  { width: 100%; aspect-ratio: 3/2; object-fit: cover; display: block; }
-        .cc-panel-ph   { width: 100%; aspect-ratio: 3/2; background: #1a1a1a; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; }
-        @keyframes spin2 { to { transform: rotate(360deg) } }
-        .cc-spinner { width: 24px; height: 24px; border: 2px solid #333; border-top-color: #D4AF37; border-radius: 50%; animation: spin2 .8s linear infinite; }
-        .cc-btn-primary { background: #D4AF37; color: #000; border: none; border-radius: 8px; padding: 12px 28px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
-        .cc-btn-primary:hover { opacity: .9; }
-        .cc-btn-secondary { background: #1a1a1a; color: #aaa; border: 1px solid #333; border-radius: 8px; padding: 12px 24px; font-size: 0.95rem; cursor: pointer; transition: all .15s; }
-        .cc-btn-secondary:hover { border-color: #555; color: #ddd; }
-        .cc-btn-sm { background: transparent; color: #D4AF37; border: 1px solid rgba(212,175,55,.4); border-radius: 6px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; }
-        .cc-btn-sm:hover { background: rgba(212,175,55,.08); }
-      `}</style>
-
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: '0.78rem', color: '#D4AF37', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 4 }}>Your Cartoon</div>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#fff', margin: '0 0 6px' }}>{cartoon.title}</h1>
-              <p style={{ color: '#888', fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>{cartoon.logline}</p>
-            </div>
-            <button className="cc-btn-secondary" onClick={onReset} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
-              ← Start Over
-            </button>
-          </div>
-
-          <div style={{ background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '14px 16px', marginTop: 16 }}>
-            <div style={{ fontSize: '0.75rem', color: '#555', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>Story Summary</div>
-            <p style={{ color: '#bbb', fontSize: '0.9rem', margin: 0, lineHeight: 1.6 }}>{cartoon.story_summary}</p>
-          </div>
-        </div>
-
-        {/* Image controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ color: '#666', fontSize: '0.88rem' }}>
-            {generatingImgs
-              ? `${loadedCount} of ${total} images ready`
-              : `${total} panels — no images yet`}
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {!generatingImgs && (
-              <button className="cc-btn-primary" onClick={onGenerateImages}>
-                Generate Images
-              </button>
-            )}
-            {generatingImgs && loadedCount > 0 && (
-              <button className="cc-btn-primary" onClick={onPreview}>
-                Preview Motion Comic →
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        {generatingImgs && (
-          <div style={{ height: 4, background: '#1a1a1a', borderRadius: 2, marginBottom: 24, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', background: '#D4AF37', borderRadius: 2,
-              width: `${(loadedCount / total) * 100}%`, transition: 'width .4s ease',
-            }} />
-          </div>
-        )}
-
-        {/* Panel grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {cartoon.panels.map((panel, idx) => (
-            <PanelCard
-              key={panel.panel_number}
-              panel={panel}
-              idx={idx}
-              onLoad={() => onImageLoad(idx)}
-              onError={() => onImageError(idx)}
-              onRetry={() => onRetry(idx)}
-            />
-          ))}
-        </div>
-
-        {/* Bottom actions */}
-        {generatingImgs && loadedCount > 0 && (
-          <div style={{ textAlign: 'center', marginTop: 32 }}>
-            <button className="cc-btn-primary" onClick={onPreview} style={{ fontSize: '1.05rem', padding: '16px 40px' }}>
-              ▶ Open Motion Comic Preview
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function PanelCard({ panel, idx, onLoad, onError, onRetry }: {
-  panel: Panel; idx: number
-  onLoad: () => void; onError: () => void; onRetry: () => void
-}) {
-  return (
-    <div className="cc-panel-card">
-      {panel.image_url ? (
-        panel.image_error ? (
-          <div className="cc-panel-ph">
-            <div style={{ color: '#555', fontSize: '0.85rem', marginBottom: 8 }}>Failed to load</div>
-            <button className="cc-btn-sm" onClick={onRetry}>Retry</button>
-          </div>
-        ) : panel.image_loaded ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={panel.image_url} alt={panel.scene_title} className="cc-panel-img" />
-        ) : (
-          <div className="cc-panel-ph">
-            <div className="cc-spinner" />
-            {/* hidden img to trigger load */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={panel.image_url} alt="" style={{ display: 'none' }} onLoad={onLoad} onError={onError} />
-          </div>
-        )
-      ) : (
-        <div className="cc-panel-ph">
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#2a2a2a' }}>{String(idx + 1).padStart(2, '0')}</div>
-          <div style={{ color: '#444', fontSize: '0.78rem', textAlign: 'center', maxWidth: '80%', lineHeight: 1.4 }}>{panel.action}</div>
-        </div>
-      )}
-
-      <div style={{ padding: '12px 14px' }}>
-        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '.08em', color: '#555', marginBottom: 4 }}>
-          Panel {panel.panel_number}
-        </div>
-        <div style={{ fontWeight: 600, color: '#ddd', marginBottom: 8, fontSize: '0.9rem' }}>{panel.scene_title}</div>
-        {panel.dialogue.slice(0, 2).map((d, i) => (
-          <div key={i} style={{ fontSize: '0.82rem', color: '#888', marginBottom: 3 }}>
-            <span style={{ color: '#D4AF37', fontWeight: 600 }}>{d.character}: </span>
-            <span>&ldquo;{d.text}&rdquo;</span>
-          </div>
-        ))}
-        {panel.dialogue.length > 2 && (
-          <div style={{ fontSize: '0.78rem', color: '#555', marginTop: 2 }}>+{panel.dialogue.length - 2} more lines</div>
-        )}
-        {panel.image_loaded && onRetry && (
-          <button className="cc-btn-sm" onClick={onRetry} style={{ marginTop: 8 }}>Regenerate Image</button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── preview step (motion comic) ──────────────────────────────────────────────
-function PreviewStep({ cartoon, previewIdx, setPreviewIdx, autoPlay, setAutoPlay, onBack, onExport }: {
-  cartoon: CartoonData
-  previewIdx: number
-  setPreviewIdx: (n: number | ((p: number) => number)) => void
-  autoPlay: boolean
-  setAutoPlay: (v: boolean) => void
-  onBack: () => void
-  onExport: () => void
-}) {
-  const panel = cartoon.panels[previewIdx]
-  const total = cartoon.panels.length
-  const kb    = KB[previewIdx % KB.length]
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#000', color: '#f0f0f0', display: 'flex', flexDirection: 'column' }}>
-      <style>{`
-        @keyframes kb { from { transform: ${kb[0]} } to { transform: ${kb[1]} } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes dialogIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
-        .prev-btn { background: rgba(255,255,255,.08); border: none; color: #fff; width: 44px; height: 44px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; transition: background .15s; flex-shrink: 0; }
-        .prev-btn:hover { background: rgba(255,255,255,.18); }
-        .prev-btn:disabled { opacity: .25; cursor: not-allowed; }
-        .cc-btn-sm { background: transparent; color: #D4AF37; border: 1px solid rgba(212,175,55,.4); border-radius: 6px; padding: 6px 14px; font-size: 0.82rem; cursor: pointer; }
-        .cc-btn-sm:hover { background: rgba(212,175,55,.1); }
-        .thumb-dot { width: 8px; height: 8px; border-radius: 50%; cursor: pointer; transition: all .15s; flex-shrink: 0; }
-      `}</style>
-
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid #111', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="cc-btn-sm" onClick={onBack}>← Back</button>
-          <span style={{ color: '#444', fontSize: '0.85rem' }}>{cartoon.title}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            className="cc-btn-sm"
-            onClick={() => setAutoPlay(!autoPlay)}
-            style={{ color: autoPlay ? '#4ade80' : '#D4AF37', borderColor: autoPlay ? 'rgba(74,222,128,.4)' : 'rgba(212,175,55,.4)' }}
-          >
-            {autoPlay ? '⏸ Pause' : '▶ Auto-Play'}
-          </button>
-          <button className="cc-btn-sm" onClick={onExport}>Export PDF</button>
-        </div>
-      </div>
-
-      {/* Main panel display */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
-        {panel.image_url && panel.image_loaded ? (
-          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-            {/* Ken Burns image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              key={previewIdx}
-              src={panel.image_url}
-              alt={panel.scene_title}
-              style={{
-                width: '100%', height: '100%', objectFit: 'cover',
-                animation: 'kb 7s ease-in-out forwards',
-                transformOrigin: 'center center',
-              }}
-            />
-            {/* gradient overlays */}
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,.5) 0%, transparent 30%, transparent 55%, rgba(0,0,0,.85) 100%)' }} />
-          </div>
-        ) : (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #111 0%, #0a0a0a 100%)',
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '4rem', fontWeight: 800, color: '#1a1a1a', marginBottom: 8 }}>{String(previewIdx + 1).padStart(2, '0')}</div>
-              <div style={{ color: '#333', fontSize: '0.9rem' }}>{panel.action}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Scene title */}
-        <div key={`title-${previewIdx}`} style={{
-          position: 'absolute', top: 20, left: 20, right: 20,
-          animation: 'fadeUp .5s ease both',
-        }}>
-          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'rgba(212,175,55,.8)', marginBottom: 4 }}>
-            Panel {panel.panel_number} of {total}
-          </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,.8)' }}>{panel.scene_title}</div>
-        </div>
-
-        {/* Dialogue */}
-        {panel.dialogue.length > 0 && (
-          <div key={`dialog-${previewIdx}`} style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 24px',
-            animation: 'dialogIn .6s .3s ease both',
-          }}>
-            {panel.dialogue.map((d, i) => (
-              <div key={i} style={{
-                background: 'rgba(0,0,0,.82)', border: '1px solid rgba(212,175,55,.2)',
-                borderRadius: 8, padding: '8px 14px', marginBottom: 8, backdropFilter: 'blur(4px)',
-                maxWidth: 560,
-              }}>
-                <span style={{ color: '#D4AF37', fontWeight: 700, fontSize: '0.82rem', marginRight: 6 }}>{d.character}:</span>
-                <span style={{ color: '#f0f0f0', fontSize: '0.9rem' }}>&ldquo;{d.text}&rdquo;</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <div style={{ padding: '16px 20px', borderTop: '1px solid #111', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-        <button
-          className="prev-btn"
-          onClick={() => setPreviewIdx(p => Math.max(0, p - 1))}
-          disabled={previewIdx === 0}
-        >‹</button>
-
-        {/* Thumbnail dots */}
-        <div style={{ flex: 1, display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', overflowX: 'auto', padding: '4px 0' }}>
-          {cartoon.panels.map((_, i) => (
-            <div
-              key={i}
-              className="thumb-dot"
-              onClick={() => setPreviewIdx(i)}
-              style={{
-                background: i === previewIdx ? '#D4AF37' : '#333',
-                transform: i === previewIdx ? 'scale(1.4)' : 'scale(1)',
-              }}
-            />
-          ))}
-        </div>
-
-        <button
-          className="prev-btn"
-          onClick={() => setPreviewIdx(p => Math.min(total - 1, p + 1))}
-          disabled={previewIdx === total - 1}
-        >›</button>
-      </div>
     </div>
   )
 }
