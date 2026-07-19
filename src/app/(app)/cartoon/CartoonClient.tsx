@@ -536,22 +536,57 @@ function ImportTab({ importScript, setImportScript, importStyle, setImportStyle,
   const parseFile = async (file: File) => {
     setParseErr('')
     const ext = file.name.split('.').pop()?.toLowerCase()
-    if (!['docx', 'doc', 'txt'].includes(ext ?? '')) {
-      setParseErr('Please use a .docx file (Google Docs → File → Download → Microsoft Word)')
+
+    if (ext === 'txt') {
+      setFileName(file.name)
+      setParsing(true)
+      try {
+        setImportScript(await file.text())
+        setExtractedImages([])
+      } finally { setParsing(false) }
       return
     }
+
+    if (!['docx', 'doc'].includes(ext ?? '')) {
+      setParseErr('Please use a .docx file — in Google Docs go to File → Download → Microsoft Word (.docx)')
+      return
+    }
+
     setParsing(true)
     setFileName(file.name)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/cartoon/parse-docx', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error()
-      const { text, images } = await res.json()
-      setImportScript(text ?? '')
-      setExtractedImages(images ?? [])
-    } catch {
-      setParseErr('Could not read the file. Make sure it is a valid .docx exported from Google Docs.')
+      const JSZip = (await import('jszip')).default
+      const zip   = await JSZip.loadAsync(await file.arrayBuffer())
+
+      // ── text ──────────────────────────────────────────────────────────────
+      const docXml = await zip.file('word/document.xml')?.async('string') ?? ''
+      const text = docXml
+        .replace(/<w:p[ >][^>]*>/g, '\n')
+        .replace(/<w:br[^>]*\/>/g, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .replace(/&#x[0-9A-Fa-f]+;/g, ' ')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
+      // ── images ────────────────────────────────────────────────────────────
+      const images: string[] = []
+      const mediaPaths = Object.keys(zip.files).filter(p =>
+        p.startsWith('word/media/') && !zip.files[p].dir
+      )
+      for (const p of mediaPaths) {
+        const extImg = p.split('.').pop()?.toLowerCase() ?? ''
+        const mime   = extImg === 'png' ? 'image/png' : extImg === 'gif' ? 'image/gif' : extImg === 'webp' ? 'image/webp' : 'image/jpeg'
+        const b64    = await zip.files[p].async('base64')
+        images.push(`data:${mime};base64,${b64}`)
+      }
+
+      setImportScript(text)
+      setExtractedImages(images)
+    } catch (e) {
+      console.error('docx parse error:', e)
+      setParseErr('Could not read the file. Make sure it is exported as .docx from Google Docs.')
     } finally {
       setParsing(false)
     }
