@@ -55,6 +55,25 @@ export function TopBar({ unreadCount, isCreator }: { unreadCount: number; isCrea
       }}>
         {isCreator && (
           <>
+            <Link href="/cartoon" style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: 'rgba(167,139,250,0.07)',
+              border: '1px solid rgba(167,139,250,0.18)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              textDecoration: 'none',
+              boxShadow: 'inset 0 1px 0 rgba(167,139,250,0.08)',
+            }}>
+              {/* film strip / cartoon icon */}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                <line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <line x1="2" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="22" y2="7"/>
+                <line x1="17" y1="17" x2="22" y2="17"/><line x1="2" y1="17" x2="7" y2="17"/>
+              </svg>
+            </Link>
             <Link href="/trading" style={{
               width: 36, height: 36, borderRadius: 10,
               background: 'rgba(74,222,128,0.07)',
