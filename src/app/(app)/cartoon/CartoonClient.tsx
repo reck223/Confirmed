@@ -10,6 +10,8 @@ type Character = {
   name: string
   description: string
   role: 'protagonist' | 'antagonist' | 'supporting'
+  refImage?: string   // base64 data URL for reference photo
+  analyzing?: boolean
 }
 
 type Dialogue = { character: string; text: string }
@@ -140,8 +142,30 @@ export function CartoonClient() {
   }
   const removeCharacter = (id: string) =>
     setForm(f => ({ ...f, characters: f.characters.filter(c => c.id !== id) }))
-  const updateCharacter = (id: string, field: keyof Character, value: string) =>
+  const updateCharacter = (id: string, field: keyof Character, value: string | boolean) =>
     setForm(f => ({ ...f, characters: f.characters.map(c => c.id === id ? { ...c, [field]: value } : c) }))
+
+  const analyzeCharacterImage = async (id: string, file: File) => {
+    updateCharacter(id, 'analyzing', true)
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string
+      const [header, b64] = dataUrl.split(',')
+      const mediaType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+      updateCharacter(id, 'refImage', dataUrl)
+      try {
+        const res = await fetch('/api/cartoon/analyze-character', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: b64, mediaType }),
+        })
+        const { description } = await res.json()
+        if (description) updateCharacter(id, 'description', description)
+      } catch { /* leave description as-is */ }
+      updateCharacter(id, 'analyzing', false)
+    }
+    reader.readAsDataURL(file)
+  }
 
   const generateStory = async () => {
     if (!form.premise.trim())                              { setError('Add a story premise to continue.'); return }
@@ -281,6 +305,7 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
       form={form} setForm={setForm} error={error}
       onGenerate={generateStory}
       addChar={addCharacter} removeChar={removeCharacter} updateChar={updateCharacter}
+      analyzeCharImg={analyzeCharacterImage}
       mode={mode} setMode={setMode}
       importScript={importScript} setImportScript={setImportScript}
       importStyle={importStyle} setImportStyle={setImportStyle}
@@ -314,14 +339,15 @@ h1{text-align:center;font-size:2rem;border-bottom:4px solid #000;padding-bottom:
 }
 
 // ─── concept step ─────────────────────────────────────────────────────────────
-function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, extractedImages, setExtractedImages, onImport }: {
+function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, updateChar, analyzeCharImg, mode, setMode, importScript, setImportScript, importStyle, setImportStyle, importPanelCount, setImportPanelCount, extractedImages, setExtractedImages, onImport }: {
   form: ConceptForm
   setForm: React.Dispatch<React.SetStateAction<ConceptForm>>
   error: string
   onGenerate: () => void
   addChar: () => void
   removeChar: (id: string) => void
-  updateChar: (id: string, field: keyof Character, value: string) => void
+  updateChar: (id: string, field: keyof Character, value: string | boolean) => void
+  analyzeCharImg: (id: string, file: File) => void
   mode: 'create' | 'import'
   setMode: (m: 'create' | 'import') => void
   importScript: string
@@ -456,6 +482,29 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
             {form.characters.map((c, idx) => (
               <div key={c.id} style={{ background: '#111', border: '1px solid #222', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'center' }}>
+                  {/* Reference image upload */}
+                  <label style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }} title="Upload reference photo">
+                    <input
+                      type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCharImg(c.id, f) }}
+                    />
+                    <div style={{
+                      width: 44, height: 44, borderRadius: 8, overflow: 'hidden',
+                      border: c.refImage ? '2px solid #D4AF37' : '2px dashed #333',
+                      background: '#0a0a0a',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'border-color .15s',
+                    }}>
+                      {c.analyzing ? (
+                        <div style={{ width: 18, height: 18, border: '2px solid #333', borderTopColor: '#D4AF37', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                      ) : c.refImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.refImage} alt="ref" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '1.2rem', opacity: 0.4 }}>📷</span>
+                      )}
+                    </div>
+                  </label>
                   <input
                     className="cc-input"
                     placeholder={`Character ${idx + 1} name`}
@@ -477,12 +526,18 @@ function ConceptStep({ form, setForm, error, onGenerate, addChar, removeChar, up
                     <button className="cc-btn-danger" onClick={() => removeChar(c.id)}>✕</button>
                   )}
                 </div>
-                <input
-                  className="cc-input"
-                  placeholder="Physical description (appearance, clothing, distinctive features…)"
-                  value={c.description}
-                  onChange={e => updateChar(c.id, 'description', e.target.value)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="cc-input"
+                    placeholder={c.analyzing ? 'Analyzing your image…' : 'Physical description — or upload a photo above to auto-fill'}
+                    value={c.description}
+                    onChange={e => updateChar(c.id, 'description', e.target.value)}
+                    disabled={!!c.analyzing}
+                  />
+                  {c.refImage && !c.analyzing && (
+                    <div style={{ fontSize: '0.72rem', color: '#D4AF37', marginTop: 4 }}>✓ Visual style locked from your reference image</div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
