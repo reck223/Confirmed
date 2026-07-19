@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Signal = {
@@ -27,6 +27,8 @@ interface Props {
   totalPnl:    number
   winRate:     number | null
   totalTrades: number
+  botRunning:  boolean
+  toggleBot:   (running: boolean) => Promise<void>
 }
 
 function ago(dateStr: string): string {
@@ -45,12 +47,22 @@ const LEVEL_COLOR: Record<string, string> = {
   INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171'
 }
 
-export function TradingClient({ signals, trades, logs, openCount, totalPnl, winRate, totalTrades }: Props) {
+export function TradingClient({ signals, trades, logs, openCount, totalPnl, winRate, totalTrades, botRunning, toggleBot }: Props) {
   const [tab, setTab] = useState<'signals' | 'trades' | 'log'>('signals')
+  const [optimisticRunning, setOptimisticRunning] = useState(botRunning)
+  const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   const pendingSignals = signals.filter(s => s.status === 'pending')
   const lastLog = logs[0]
+
+  function handleToggle() {
+    const next = !optimisticRunning
+    setOptimisticRunning(next)
+    startTransition(async () => {
+      await toggleBot(next)
+    })
+  }
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 20px 100px', fontFamily: 'Satoshi,sans-serif' }} className="view-panel">
@@ -66,11 +78,30 @@ export function TradingClient({ signals, trades, logs, openCount, totalPnl, winR
             Trading Bot
           </span>
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: pendingSignals.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.2)', boxShadow: pendingSignals.length > 0 ? '0 0 8px #4ade80' : 'none' }} />
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-            {lastLog ? `Last scan: ${ago(lastLog.created_at)}` : 'Bot not yet started'}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: optimisticRunning ? '#4ade80' : 'rgba(255,255,255,0.2)', boxShadow: optimisticRunning ? '0 0 8px #4ade80' : 'none', transition: 'all 0.3s ease' }} />
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              {optimisticRunning ? (lastLog ? `Last scan: ${ago(lastLog.created_at)}` : 'Running — waiting for session') : 'Bot paused'}
+            </p>
+          </div>
+          <button
+            onClick={handleToggle}
+            disabled={isPending}
+            style={{
+              padding: '8px 20px', borderRadius: 12, border: 'none', cursor: isPending ? 'wait' : 'pointer',
+              fontFamily: 'Satoshi,sans-serif', fontSize: 12, fontWeight: 900, letterSpacing: '0.06em',
+              background: optimisticRunning
+                ? 'rgba(248,113,113,0.12)' : 'rgba(74,222,128,0.12)',
+              color: optimisticRunning ? '#f87171' : '#4ade80',
+              outline: optimisticRunning
+                ? '1px solid rgba(248,113,113,0.3)' : '1px solid rgba(74,222,128,0.3)',
+              opacity: isPending ? 0.6 : 1,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isPending ? '...' : optimisticRunning ? '⏹ Stop Bot' : '▶ Start Bot'}
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { TradingClient } from './TradingClient'
+import { toggleBot }     from './actions'
 
 const CREATOR_EMAIL = 'graysdarius@gmail.com'
 
@@ -33,6 +34,7 @@ export default async function TradingPage() {
     { data: signalsRaw },
     { data: tradesRaw  },
     { data: logsRaw    },
+    { data: botConfigRaw },
   ] = await Promise.all([
     supabase.from('fx_signals')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,rr1,rr2,status,dry_run,notes,created_at,confluence')
@@ -46,11 +48,14 @@ export default async function TradingPage() {
       .select('id,level,message,created_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('bot_config') as any).select('running,dry_run').limit(1).single(),
   ])
 
-  const signals  = (signalsRaw ?? []) as FxSignal[]
-  const trades   = (tradesRaw  ?? []) as FxTrade[]
-  const logs     = (logsRaw    ?? []) as BotLog[]
+  const signals   = (signalsRaw ?? []) as FxSignal[]
+  const trades    = (tradesRaw  ?? []) as FxTrade[]
+  const logs      = (logsRaw    ?? []) as BotLog[]
+  const botRunning = (botConfigRaw as { running?: boolean } | null)?.running ?? false
 
   // Summary stats
   const closedTrades  = trades.filter(t => t.status === 'closed')
@@ -68,6 +73,8 @@ export default async function TradingPage() {
       totalPnl={totalPnl}
       winRate={winRate}
       totalTrades={closedTrades.length}
+      botRunning={botRunning}
+      toggleBot={toggleBot}
     />
   )
 }
