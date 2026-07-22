@@ -2,29 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { TradingClient } from './TradingClient'
 import { toggleBot }     from './actions'
+import type { Signal as FxSignal, Trade as FxTrade, Log as BotLog, PairStat } from './types'
 
 const CREATOR_EMAIL = 'graysdarius@gmail.com'
-
-type FxSignal = {
-  id: string; pair: string; setup: string; direction: string
-  entry: number; sl: number; tp1: number; tp2: number
-  rr1: number; rr2: number; status: string; dry_run: boolean
-  notes: string; created_at: string
-  confluence: { rsi?: number; ema_trend?: string; price_vs_ema?: string }
-}
-
-type FxTrade = {
-  id: string; pair: string; setup: string; direction: string
-  entry: number; sl: number; tp1: number; tp2: number
-  qty: number; pnl: number | null; status: string
-  close_reason: string; opened_at: string; closed_at: string | null
-}
-
-type PairStat = { pair: string; count: number; wins: number; pnl: number }
-
-type BotLog = {
-  id: string; level: string; message: string; created_at: string
-}
 
 export default async function TradingPage() {
   const supabase = await createClient()
@@ -39,7 +19,7 @@ export default async function TradingPage() {
     { data: botConfigRaw },
   ] = await Promise.all([
     supabase.from('fx_signals')
-      .select('id,pair,setup,direction,entry,sl,tp1,tp2,rr1,rr2,status,dry_run,notes,created_at,confluence')
+      .select('id,pair,setup,direction,entry,sl,tp1,tp2,rr1,rr2,status,dry_run,notes,created_at,fib_anchor,fib_break,confluence')
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.from('fx_trades')
