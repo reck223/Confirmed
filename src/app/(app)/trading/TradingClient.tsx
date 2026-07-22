@@ -108,13 +108,26 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
 
       {/* ── TRADING DESK: LIVE CHARTS FOR OPEN POSITIONS ────── */}
       {openTrades.length > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: 16,
-          marginBottom: 24,
-        }}>
-          {openTrades.map(t => <PairChart key={t.id} trade={t} />)}
+        <div style={{ position: 'relative', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span className="pulse-gold" style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF37' }} />
+            <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.3)' }}>LIVE POSITIONS · {openTrades.length}</p>
+          </div>
+          <div
+            className="scroll-x"
+            style={{
+              display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4,
+              scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
+            }}
+          >
+            {openTrades.map(t => (
+              <div key={t.id} style={{ flex: '0 0 auto', width: 400, scrollSnapAlign: 'start' }}>
+                <PairChart trade={t} />
+              </div>
+            ))}
+          </div>
+          <div style={{ position: 'absolute', top: 26, bottom: 4, left: 0, width: 24, background: 'linear-gradient(90deg,#080808,transparent)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', top: 26, bottom: 4, right: 0, width: 24, background: 'linear-gradient(270deg,#080808,transparent)', pointerEvents: 'none' }} />
         </div>
       ) : (
         <div style={{ borderRadius: 16, background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.07)', padding: '32px 20px', textAlign: 'center', marginBottom: 24, color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
