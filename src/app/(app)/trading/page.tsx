@@ -77,6 +77,7 @@ export default async function TradingPage() {
       trades={trades}
       logs={logs}
       openCount={openTrades.length}
+      openTrades={openTrades}
       totalPnl={totalPnl}
       winRate={winRate}
       totalTrades={closedTrades.length}

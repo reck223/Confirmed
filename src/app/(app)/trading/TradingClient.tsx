@@ -1,6 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { RealtimeSync } from './RealtimeSync'
 import { SessionStrip } from './components/SessionStrip'
 import { EquityCurve } from './components/EquityCurve'
@@ -10,11 +11,14 @@ import { FibLadder } from './components/FibLadder'
 import { PairPerformance } from './components/PairPerformance'
 import type { Signal, Trade, Log, PairStat } from './types'
 
+const PairChart = dynamic(() => import('./components/PairChart').then(m => m.PairChart), { ssr: false })
+
 interface Props {
   signals:     Signal[]
   trades:      Trade[]
   logs:        Log[]
   openCount:   number
+  openTrades:  Trade[]
   totalPnl:    number
   winRate:     number | null
   totalTrades: number
@@ -41,7 +45,7 @@ const LEVEL_COLOR: Record<string, string> = {
   INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171'
 }
 
-export function TradingClient({ signals, trades, logs, openCount, totalPnl, winRate, totalTrades, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
+export function TradingClient({ signals, trades, logs, openCount, openTrades, totalPnl, winRate, totalTrades, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
   const [tab, setTab] = useState<'signals' | 'trades' | 'log'>('signals')
   const [optimisticRunning, setOptimisticRunning] = useState(botRunning)
   const [isPending, startTransition] = useTransition()
@@ -60,7 +64,7 @@ export function TradingClient({ signals, trades, logs, openCount, totalPnl, winR
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 20px 100px', fontFamily: 'Satoshi,sans-serif' }} className="view-panel">
+    <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px 100px', fontFamily: 'Satoshi,sans-serif' }} className="view-panel">
       <RealtimeSync />
 
       {/* ── HEADER ─────────────────────────────────────────── */}
@@ -101,6 +105,24 @@ export function TradingClient({ signals, trades, logs, openCount, totalPnl, winR
 
       {/* ── SESSION STRIP ──────────────────────────────────── */}
       <SessionStrip />
+
+      {/* ── TRADING DESK: LIVE CHARTS FOR OPEN POSITIONS ────── */}
+      {openTrades.length > 0 ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: 16,
+          marginBottom: 24,
+        }}>
+          {openTrades.map(t => <PairChart key={t.id} trade={t} />)}
+        </div>
+      ) : (
+        <div style={{ borderRadius: 16, background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.07)', padding: '32px 20px', textAlign: 'center', marginBottom: 24, color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
+          No open positions — charts appear here once the bot opens a trade
+        </div>
+      )}
+
+      <div style={{ maxWidth: 600, margin: '0 auto' }}>
 
       {/* ── HERO: EQUITY CURVE + STATS ─────────────────────── */}
       <div className="lift" style={{ borderRadius: 20, background: 'linear-gradient(160deg,#111 0%,#0a0a0a 100%)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px 20px 16px', marginBottom: 20 }}>
@@ -316,6 +338,7 @@ export function TradingClient({ signals, trades, logs, openCount, totalPnl, winR
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

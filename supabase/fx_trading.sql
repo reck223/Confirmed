@@ -5,7 +5,7 @@
 create table if not exists public.fx_signals (
   id          uuid primary key default gen_random_uuid(),
   pair        text not null,
-  setup       text not null,         -- 'A' or 'B'
+  setup       text not null,         -- 'A', 'B', or 'C'
   direction   text not null,         -- 'long' or 'short'
   entry       numeric(12,5),
   sl          numeric(12,5),
