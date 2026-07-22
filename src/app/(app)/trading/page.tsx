@@ -20,6 +20,8 @@ type FxTrade = {
   close_reason: string; opened_at: string; closed_at: string | null
 }
 
+type PairStat = { pair: string; count: number; wins: number; pnl: number }
+
 type BotLog = {
   id: string; level: string; message: string; created_at: string
 }
@@ -43,7 +45,7 @@ export default async function TradingPage() {
     supabase.from('fx_trades')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,qty,pnl,status,close_reason,opened_at,closed_at')
       .order('opened_at', { ascending: false })
-      .limit(30),
+      .limit(60),
     supabase.from('fx_bot_log')
       .select('id,level,message,created_at')
       .order('created_at', { ascending: false })
@@ -64,6 +66,31 @@ export default async function TradingPage() {
   const winCount      = closedTrades.filter(t => (t.pnl ?? 0) > 0).length
   const winRate       = closedTrades.length ? Math.round((winCount / closedTrades.length) * 100) : null
 
+  // Equity curve — cumulative P&L over closed trades, oldest to newest
+  const equityCurve = [...closedTrades]
+    .filter(t => t.closed_at)
+    .sort((a, b) => new Date(a.closed_at!).getTime() - new Date(b.closed_at!).getTime())
+    .reduce<number[]>((acc, t) => {
+      acc.push((acc.length ? acc[acc.length - 1] : 0) + (t.pnl ?? 0))
+      return acc
+    }, [0])
+
+  // Per-pair breakdown
+  const pairStats: PairStat[] = Object.values(
+    closedTrades.reduce<Record<string, PairStat>>((acc, t) => {
+      const entry = acc[t.pair] ?? { pair: t.pair, count: 0, wins: 0, pnl: 0 }
+      entry.count += 1
+      if ((t.pnl ?? 0) > 0) entry.wins += 1
+      entry.pnl += t.pnl ?? 0
+      acc[t.pair] = entry
+      return acc
+    }, {})
+  ).sort((a, b) => b.pnl - a.pnl)
+
+  const bestTrade = closedTrades.reduce<FxTrade | null>(
+    (best, t) => ((t.pnl ?? -Infinity) > (best?.pnl ?? -Infinity) ? t : best), null
+  )
+
   return (
     <TradingClient
       signals={signals}
@@ -75,6 +102,9 @@ export default async function TradingPage() {
       totalTrades={closedTrades.length}
       botRunning={botRunning}
       toggleBot={toggleBot}
+      equityCurve={equityCurve}
+      pairStats={pairStats}
+      bestTrade={bestTrade}
     />
   )
 }
