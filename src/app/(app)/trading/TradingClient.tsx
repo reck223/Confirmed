@@ -79,7 +79,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: optimisticRunning ? '#4ade80' : 'rgba(255,255,255,0.2)', boxShadow: optimisticRunning ? '0 0 8px #4ade80' : 'none', transition: 'all 0.3s ease' }} />
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+            <p suppressHydrationWarning style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
               {optimisticRunning ? (lastLog ? `Last scan: ${ago(lastLog.created_at)}` : 'Running — waiting for session') : 'Bot paused'}
             </p>
           </div>
@@ -135,7 +135,11 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
         </div>
       )}
 
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+      <div style={{
+        maxWidth: 1100, margin: '0 auto',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20, alignItems: 'start',
+      }}>
+      <div>
 
       {/* ── HERO: EQUITY CURVE + STATS ─────────────────────── */}
       <div className="lift" style={{ borderRadius: 20, background: 'linear-gradient(160deg,#111 0%,#0a0a0a 100%)', border: '1px solid rgba(255,255,255,0.08)', padding: '20px 20px 16px', marginBottom: 20 }}>
@@ -171,7 +175,9 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
 
       {/* ── PAIR PERFORMANCE ───────────────────────────────── */}
       <PairPerformance stats={pairStats} />
+      </div>
 
+      <div>
       {/* ── BOT SETUP INSTRUCTIONS ─────────────────────────── */}
       {logs.length === 0 && (
         <div style={{ borderRadius: 18, background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.18)', padding: '20px 20px', marginBottom: 20 }}>
@@ -237,7 +243,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {s.dry_run && <span style={{ fontSize: 8, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 4, padding: '2px 6px', fontWeight: 800 }}>DRY</span>}
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{ago(s.created_at)}</span>
+                    <span suppressHydrationWarning style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{ago(s.created_at)}</span>
                   </div>
                 </div>
 
@@ -312,7 +318,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
                   {t.close_reason && <span style={{ color: '#fbbf24' }}>{t.close_reason}</span>}
                 </div>
                 {isOpen && <RangeBar sl={t.sl} entry={t.entry} tp1={t.tp1} tp2={t.tp2} direction={t.direction} />}
-                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>{ago(t.opened_at)}</p>
+                <p suppressHydrationWarning style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>{ago(t.opened_at)}</p>
               </div>
             )
           })}
@@ -335,7 +341,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {terminalLogs.map(l => (
                   <div key={l.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontFamily: 'monospace', fontSize: 11.5, lineHeight: 1.5 }}>
-                    <span style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{ago(l.created_at)}</span>
+                    <span suppressHydrationWarning style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{ago(l.created_at)}</span>
                     <span style={{ fontWeight: 900, color: LEVEL_COLOR[l.level] ?? '#888', flexShrink: 0, minWidth: 44 }}>{l.level}</span>
                     <span style={{ color: 'rgba(255,255,255,0.62)', flex: 1 }}>{l.message}</span>
                   </div>
@@ -351,6 +357,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
           </div>
         </div>
       )}
+      </div>
       </div>
     </div>
   )
