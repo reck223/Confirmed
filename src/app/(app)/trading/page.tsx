@@ -4,6 +4,8 @@ import { TradingClient } from './TradingClient'
 import { toggleBot }     from './actions'
 import type { Signal as FxSignal, Trade as FxTrade, Log as BotLog, PairStat } from './types'
 
+type Streak = { type: 'win' | 'loss' | null; count: number }
+
 const CREATOR_EMAIL = 'graysdarius@gmail.com'
 
 export default async function TradingPage() {
@@ -46,14 +48,31 @@ export default async function TradingPage() {
   const winCount      = closedTrades.filter(t => (t.pnl ?? 0) > 0).length
   const winRate       = closedTrades.length ? Math.round((winCount / closedTrades.length) * 100) : null
 
-  // Equity curve — cumulative P&L over closed trades, oldest to newest
-  const equityCurve = [...closedTrades]
+  // Chronological (oldest -> newest) closed trades, reused for the equity curve and the streak
+  const chronologicalClosed = [...closedTrades]
     .filter(t => t.closed_at)
     .sort((a, b) => new Date(a.closed_at!).getTime() - new Date(b.closed_at!).getTime())
-    .reduce<number[]>((acc, t) => {
-      acc.push((acc.length ? acc[acc.length - 1] : 0) + (t.pnl ?? 0))
-      return acc
-    }, [0])
+
+  // Equity curve — cumulative P&L over closed trades, oldest to newest
+  const equityCurve = chronologicalClosed.reduce<number[]>((acc, t) => {
+    acc.push((acc.length ? acc[acc.length - 1] : 0) + (t.pnl ?? 0))
+    return acc
+  }, [0])
+
+  // Today's realized P&L
+  const todayKey = new Date().toDateString()
+  const todayPnl = closedTrades
+    .filter(t => t.closed_at && new Date(t.closed_at).toDateString() === todayKey)
+    .reduce((s, t) => s + (t.pnl ?? 0), 0)
+
+  // Current win/loss streak, walking back from the most recent closed trade
+  let currentStreak: Streak = { type: null, count: 0 }
+  for (let i = chronologicalClosed.length - 1; i >= 0; i--) {
+    const type: 'win' | 'loss' = (chronologicalClosed[i].pnl ?? 0) > 0 ? 'win' : 'loss'
+    if (currentStreak.type === null) currentStreak = { type, count: 1 }
+    else if (currentStreak.type === type) currentStreak = { type, count: currentStreak.count + 1 }
+    else break
+  }
 
   // Per-pair breakdown
   const pairStats: PairStat[] = Object.values(
@@ -79,8 +98,10 @@ export default async function TradingPage() {
       openCount={openTrades.length}
       openTrades={openTrades}
       totalPnl={totalPnl}
+      todayPnl={todayPnl}
       winRate={winRate}
       totalTrades={closedTrades.length}
+      currentStreak={currentStreak}
       botRunning={botRunning}
       toggleBot={toggleBot}
       equityCurve={equityCurve}

@@ -1,9 +1,8 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { createChart, CandlestickSeries, ColorType, IChartApi, ISeriesApi, IPriceLine, UTCTimestamp } from 'lightweight-charts'
+import { useRef, useState } from 'react'
 import type { Trade } from '../types'
-
-const REFRESH_MS = 60_000
+import { useTradeChart, type Timeframe } from './useTradeChart'
+import { TimeframeSwitcher } from './TimeframeSwitcher'
 
 const DIR_COLOR = (d: string) => d === 'long' ? '#4ade80' : '#f87171'
 
@@ -26,83 +25,17 @@ function Corner({ top, left, right, bottom, color }: { top?: boolean; left?: boo
   )
 }
 
-export function PairChart({ trade }: { trade: Trade }) {
+interface Props {
+  trade: Trade
+  onExpand: (tradeId: string, timeframe: Timeframe) => void
+}
+
+export function PairChart({ trade, onExpand }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const chartRef      = useRef<IChartApi | null>(null)
-  const seriesRef      = useRef<ISeriesApi<'Candlestick'> | null>(null)
-  const slLineRef       = useRef<IPriceLine | null>(null)
-  const [livePrice, setLivePrice] = useState<number | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  const [timeframe, setTimeframe] = useState<Timeframe>('1H')
+  const { livePrice, loaded } = useTradeChart(containerRef, trade, timeframe, 240)
 
   const color = DIR_COLOR(trade.direction)
-
-  // Create the chart + static reference lines once per trade
-  useEffect(() => {
-    if (!containerRef.current) return
-    const chart = createChart(containerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: 'rgba(255,255,255,0.45)', fontFamily: 'Satoshi,sans-serif', attributionLogo: false },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.03)' } },
-      crosshair: {
-        vertLine: { color: 'rgba(212,175,55,0.5)', width: 1, style: 3, labelBackgroundColor: '#D4AF37' },
-        horzLine: { color: 'rgba(212,175,55,0.5)', width: 1, style: 3, labelBackgroundColor: '#D4AF37' },
-      },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(255,255,255,0.06)' },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.06)' },
-      width: containerRef.current.clientWidth,
-      height: 240,
-    })
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#4ade80', downColor: '#f87171', borderVisible: false,
-      wickUpColor: '#4ade80', wickDownColor: '#f87171',
-    })
-    chartRef.current = chart
-    seriesRef.current = series
-
-    series.createPriceLine({ price: trade.entry, color: 'rgba(239,239,239,0.7)', lineWidth: 1, lineStyle: 3, title: 'ENTRY' })
-    slLineRef.current = series.createPriceLine({ price: trade.sl, color: '#f87171', lineWidth: 1, lineStyle: 0, title: 'SL' })
-    series.createPriceLine({ price: trade.tp1, color: '#4ade80', lineWidth: 1, lineStyle: 2, title: 'TP1' })
-    if (trade.tp2 && trade.tp2 !== trade.tp1) {
-      series.createPriceLine({ price: trade.tp2, color: '#22c55e', lineWidth: 1, lineStyle: 2, title: 'TP2' })
-    }
-
-    const ro = new ResizeObserver(entries => {
-      const { width } = entries[0].contentRect
-      chart.applyOptions({ width })
-    })
-    ro.observe(containerRef.current)
-
-    return () => {
-      ro.disconnect()
-      chart.remove()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trade.pair])
-
-  // Move the SL line in place (no chart re-init) whenever the trailing stop updates
-  useEffect(() => {
-    slLineRef.current?.applyOptions({ price: trade.sl })
-  }, [trade.sl])
-
-  // Fetch bars on mount + poll
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const res = await fetch(`/api/fx-bars?pair=${trade.pair}&interval=1h&range=5d`)
-        const { bars } = await res.json()
-        if (cancelled || !seriesRef.current || !Array.isArray(bars) || !bars.length) return
-        seriesRef.current.setData(bars.map((b: { time: number; open: number; high: number; low: number; close: number }) => ({
-          time: b.time as UTCTimestamp, open: b.open, high: b.high, low: b.low, close: b.close,
-        })))
-        setLivePrice(bars[bars.length - 1].close)
-        setLoaded(true)
-      } catch { /* transient fetch failure — next interval retries */ }
-    }
-    load()
-    const id = setInterval(load, REFRESH_MS)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [trade.pair])
-
   const pnl = trade.pnl ?? 0
   const decimals = trade.pair.toUpperCase().includes('JPY') ? 3 : 5
   const priceChange = livePrice != null ? livePrice - trade.entry : null
@@ -144,7 +77,15 @@ export function PairChart({ trade }: { trade: Trade }) {
         </div>
       </div>
 
-      <div style={{ position: 'relative', background: 'rgba(0,0,0,0.2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 14px 8px' }}>
+        <TimeframeSwitcher value={timeframe} onChange={setTimeframe} />
+      </div>
+
+      <div
+        onClick={() => onExpand(trade.id, timeframe)}
+        style={{ position: 'relative', background: 'rgba(0,0,0,0.2)', cursor: 'pointer' }}
+        title="Click to expand"
+      >
         <div ref={containerRef} style={{ width: '100%', height: 240 }} />
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',

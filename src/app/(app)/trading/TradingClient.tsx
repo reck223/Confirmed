@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { RealtimeSync } from './RealtimeSync'
@@ -10,8 +10,12 @@ import { RangeBar } from './components/RangeBar'
 import { FibLadder } from './components/FibLadder'
 import { PairPerformance } from './components/PairPerformance'
 import type { Signal, Trade, Log, PairStat } from './types'
+import type { Timeframe } from './components/useTradeChart'
 
-const PairChart = dynamic(() => import('./components/PairChart').then(m => m.PairChart), { ssr: false })
+const PairChart  = dynamic(() => import('./components/PairChart').then(m => m.PairChart), { ssr: false })
+const ChartModal = dynamic(() => import('./components/ChartModal').then(m => m.ChartModal), { ssr: false })
+
+interface Streak { type: 'win' | 'loss' | null; count: number }
 
 interface Props {
   signals:     Signal[]
@@ -20,8 +24,10 @@ interface Props {
   openCount:   number
   openTrades:  Trade[]
   totalPnl:    number
+  todayPnl:    number
   winRate:     number | null
   totalTrades: number
+  currentStreak: Streak
   botRunning:  boolean
   toggleBot:   (running: boolean) => Promise<void>
   equityCurve: number[]
@@ -45,15 +51,24 @@ const LEVEL_COLOR: Record<string, string> = {
   INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171'
 }
 
-export function TradingClient({ signals, trades, logs, openCount, openTrades, totalPnl, winRate, totalTrades, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
+export function TradingClient({ signals, trades, logs, openCount, openTrades, totalPnl, todayPnl, winRate, totalTrades, currentStreak, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
   const [tab, setTab] = useState<'signals' | 'trades' | 'log'>('signals')
   const [optimisticRunning, setOptimisticRunning] = useState(botRunning)
   const [isPending, startTransition] = useTransition()
+  const [fullscreen, setFullscreen] = useState<{ tradeId: string; timeframe: Timeframe } | null>(null)
+  const [logFilter, setLogFilter] = useState<'ALL' | 'INFO' | 'SIGNAL' | 'TRADE' | 'ERROR'>('ALL')
   const router = useRouter()
 
   const pendingSignals = signals.filter(s => s.status === 'pending')
   const lastLog = logs[0]
   const terminalLogs = [...logs].reverse()
+  const filteredLogs = logFilter === 'ALL' ? terminalLogs : terminalLogs.filter(l => l.level === logFilter)
+  const fullscreenTrade = fullscreen ? openTrades.find(t => t.id === fullscreen.tradeId) : null
+
+  const logPanelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (tab === 'log') logPanelRef.current?.scrollTo({ top: logPanelRef.current.scrollHeight })
+  }, [tab, filteredLogs.length])
 
   function handleToggle() {
     const next = !optimisticRunning
@@ -81,6 +96,8 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: optimisticRunning ? '#4ade80' : 'rgba(255,255,255,0.2)', boxShadow: optimisticRunning ? '0 0 8px #4ade80' : 'none', transition: 'all 0.3s ease' }} />
             <p suppressHydrationWarning style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
               {optimisticRunning ? (lastLog ? `Last scan: ${ago(lastLog.created_at)}` : 'Running — waiting for session') : 'Bot paused'}
+              {' · '}<span style={{ color: '#38bdf8' }}>{openCount} open</span>
+              {' · '}<span style={{ color: todayPnl >= 0 ? '#4ade80' : '#f87171' }}>{todayPnl >= 0 ? '+' : ''}${todayPnl.toFixed(2)} today</span>
             </p>
           </div>
           <button
@@ -122,7 +139,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
           >
             {openTrades.map(t => (
               <div key={t.id} style={{ flex: '0 0 auto', width: 400, scrollSnapAlign: 'start' }}>
-                <PairChart trade={t} />
+                <PairChart trade={t} onExpand={(tradeId, tf) => setFullscreen({ tradeId, timeframe: tf })} />
               </div>
             ))}
           </div>
@@ -133,6 +150,14 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
         <div style={{ borderRadius: 16, background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.07)', padding: '32px 20px', textAlign: 'center', marginBottom: 24, color: 'rgba(255,255,255,0.25)', fontSize: 13 }}>
           No open positions — charts appear here once the bot opens a trade
         </div>
+      )}
+
+      {fullscreenTrade && (
+        <ChartModal
+          trade={fullscreenTrade}
+          initialTimeframe={fullscreen!.timeframe}
+          onClose={() => setFullscreen(null)}
+        />
       )}
 
       <div style={{
@@ -154,6 +179,15 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <WinRateRing pct={winRate} />
             <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)' }}>WIN RATE</span>
+            {currentStreak.type && (
+              <span style={{
+                fontSize: 8, fontWeight: 900, letterSpacing: '0.04em', borderRadius: 999, padding: '2px 7px', marginTop: 2,
+                color: currentStreak.type === 'win' ? '#4ade80' : '#f87171',
+                background: currentStreak.type === 'win' ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+              }}>
+                {currentStreak.count}{currentStreak.type === 'win' ? 'W' : 'L'} streak
+              </span>
+            )}
           </div>
         </div>
         <EquityCurve data={equityCurve} />
@@ -328,18 +362,37 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
       {/* ── LOG TAB ────────────────────────────────────────── */}
       {tab === 'log' && (
         <div>
-          <button onClick={() => router.refresh()} style={{ display: 'block', marginLeft: 'auto', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', marginBottom: 10 }}>
-            Refresh ↻
-          </button>
-          <div style={{
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['ALL', 'INFO', 'SIGNAL', 'TRADE', 'ERROR'] as const).map(f => {
+                const sel = logFilter === f
+                const color = f === 'ALL' ? '#D4AF37' : LEVEL_COLOR[f]
+                return (
+                  <button key={f} onClick={() => setLogFilter(f)} style={{
+                    fontSize: 9, fontWeight: 800, letterSpacing: '0.02em', borderRadius: 7, padding: '5px 9px', cursor: 'pointer',
+                    fontFamily: 'Satoshi,sans-serif', border: `1px solid ${sel ? color + '55' : 'rgba(255,255,255,0.08)'}`,
+                    background: sel ? color + '18' : 'rgba(255,255,255,0.03)', color: sel ? color : 'rgba(255,255,255,0.35)',
+                  }}>
+                    {f}
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => router.refresh()} style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>
+              Refresh ↻
+            </button>
+          </div>
+          <div ref={logPanelRef} style={{
             borderRadius: 16, background: '#000', border: '1px solid rgba(255,255,255,0.08)', padding: '14px 16px', maxHeight: 440, overflowY: 'auto',
             backgroundImage: 'repeating-linear-gradient(rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px)',
           }}>
-            {terminalLogs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13, fontFamily: 'monospace' }}>Bot hasn&apos;t run yet</div>
+            {filteredLogs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 0', color: 'rgba(255,255,255,0.25)', fontSize: 13, fontFamily: 'monospace' }}>
+                {terminalLogs.length === 0 ? "Bot hasn't run yet" : 'No matching log entries'}
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {terminalLogs.map(l => (
+                {filteredLogs.map(l => (
                   <div key={l.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontFamily: 'monospace', fontSize: 11.5, lineHeight: 1.5 }}>
                     <span suppressHydrationWarning style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{ago(l.created_at)}</span>
                     <span style={{ fontWeight: 900, color: LEVEL_COLOR[l.level] ?? '#888', flexShrink: 0, minWidth: 44 }}>{l.level}</span>
