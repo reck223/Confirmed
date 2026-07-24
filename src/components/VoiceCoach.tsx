@@ -19,9 +19,28 @@ export function VoiceCoach() {
   const [persona, setPersona] = useState<PersonaId>('motivator')
   const [status, setStatus] = useState<Status>('idle')
   const [history, setHistory] = useState<Turn[]>([])
+  const [scrolling, setScrolling] = useState(false)
   const historyRef = useRef<Turn[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fade the button while the page is actively being scrolled — keeps it
+  // out of the way of content, back at full opacity ~500ms after scrolling
+  // stops. Only applies when the panel's closed; never fade mid-conversation.
+  useEffect(() => {
+    if (open) { setScrolling(false); return }
+    function onScroll() {
+      setScrolling(true)
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+      scrollTimerRef.current = setTimeout(() => setScrolling(false), 500)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+    }
+  }, [open])
 
   useEffect(() => { historyRef.current = history }, [history])
   useEffect(() => {
@@ -97,7 +116,12 @@ export function VoiceCoach() {
   const busy = status === 'thinking' || status === 'speaking' || status === 'listening'
 
   return (
-    <div style={{ position: 'fixed', right: 20, bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))', zIndex: 350 }}>
+    <div style={{
+      position: 'fixed', right: 20, bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))', zIndex: 350,
+      opacity: scrolling ? 0.25 : 1,
+      transition: 'opacity 0.25s ease',
+      pointerEvents: scrolling ? 'none' : 'auto',
+    }}>
       {open && (
         <div style={{
           width: 300, marginBottom: 12, borderRadius: 20,
