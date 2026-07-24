@@ -5,6 +5,7 @@ import { TopBar } from '@/components/TopBar'
 import { AnimationObserver } from '@/components/AnimationObserver'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { PushRegistrar } from '@/components/PushRegistrar'
+import { VoiceCoach } from '@/components/VoiceCoach'
 import type { Profile } from '@/lib/types/database'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </SwipeNavigator>
       </main>
+      <VoiceCoach />
     </div>
   )
 }
