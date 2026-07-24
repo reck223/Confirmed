@@ -97,7 +97,7 @@ export function VoiceCoach() {
   const busy = status === 'thinking' || status === 'speaking' || status === 'listening'
 
   return (
-    <div style={{ position: 'fixed', right: 20, bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', zIndex: 350 }}>
+    <div style={{ position: 'fixed', right: 20, bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))', zIndex: 350 }}>
       {open && (
         <div style={{
           width: 300, marginBottom: 12, borderRadius: 20,
