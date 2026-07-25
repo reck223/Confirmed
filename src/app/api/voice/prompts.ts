@@ -5,7 +5,7 @@
 // the field ids once it has enough to fill the form.
 
 export type PromptField = { id: string; label: string; hint?: string }
-export type PromptSchemaId = 'checkin_morning' | 'checkin_evening' | 'meal' | 'workout'
+export type PromptSchemaId = 'checkin_morning' | 'checkin_evening' | 'meal' | 'workout' | 'reading_goal' | 'letter_goal'
 
 export type PromptSchema = {
   id: PromptSchemaId
@@ -60,6 +60,25 @@ export function buildSchemas(qodQuestion: string): Record<PromptSchemaId, Prompt
         { id: 'name', label: 'Workout name/type' },
         { id: 'durationMins', label: 'Duration in minutes (number)' },
         { id: 'exercises', label: 'List of {name, sets, reps, weightLbs, isCardio}' },
+      ],
+    },
+    reading_goal: {
+      id: 'reading_goal', title: 'Start a Reading Goal', route: '/goals',
+      guidance: `Help them set up a reading goal. Ask how many books they want to read and by when (a target date is optional — if they don't give one, that's fine). Ask what they're currently reading, if anything (optional — a book title, and author if they mention it). Come up with a short, motivating goal title yourself like "Read 12 Books This Year" based on their count.`,
+      fields: [
+        { id: 'title', label: 'Short goal title, e.g. "Read 12 Books This Year"' },
+        { id: 'bookCount', label: 'Number of books (used as the why/target)' },
+        { id: 'deadline', label: 'Target date, YYYY-MM-DD, or null if not given' },
+        { id: 'currentBook', label: 'Book currently reading, or null' },
+        { id: 'bookAuthor', label: 'Author of that book, or null' },
+      ],
+    },
+    letter_goal: {
+      id: 'letter_goal', title: 'Write a Letter to Self', route: '/goals',
+      guidance: `Help them write a letter to their future self, which will stay sealed until a date they choose. First ask when they want it to unlock (a future date). Then tell them to just talk — whatever they say next, in full, IS the letter, so let them speak freely and at length; don't interrupt with follow-up questions, just capture everything they say as the letter content. Once they've said their piece, warmly confirm and finish.`,
+      fields: [
+        { id: 'deadline', label: 'Unlock date, YYYY-MM-DD, required' },
+        { id: 'letterContent', label: 'The full letter, verbatim from what they said' },
       ],
     },
   }

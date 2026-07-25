@@ -57,6 +57,46 @@ export async function createGoal(formData: FormData) {
   redirect('/goals')
 }
 
+// Same insert as createGoal, minus the redirect — for callers (like the voice
+// coach) that need the created goal's id back instead of a page navigation.
+export async function createGoalFromVoice(goalType: 'reading' | 'letter', data: {
+  title?: string; why?: string; deadline?: string | null
+  nextAction?: string; bookAuthor?: string; bookCoverUrl?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const title = goalType === 'letter' ? 'Letter to Self' : (data.title?.trim() || 'Reading Goal')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: goalRow, error } = await (supabase.from('goals') as any).insert({
+    user_id: user.id,
+    title,
+    category: null,
+    why_it_matters: data.why?.trim() || null,
+    next_action: data.nextAction?.trim() || null,
+    deadline: data.deadline || null,
+    visibility: 'circle',
+    goal_type: goalType,
+  }).select('id').single()
+
+  if (error) return { error: error.message }
+
+  if (goalType === 'reading' && data.nextAction?.trim()) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('goal_books') as any).insert({
+      goal_id: goalRow.id, user_id: user.id,
+      title: data.nextAction.trim(), author: data.bookAuthor?.trim() || null,
+      cover_url: data.bookCoverUrl?.trim() || null, status: 'reading',
+    })
+  }
+
+  revalidatePath('/goals')
+  revalidatePath('/home')
+  return { success: true, id: goalRow.id }
+}
+
 export async function saveMilestones(goalId: string, milestones: { id?: string; text: string }[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

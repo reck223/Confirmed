@@ -7,6 +7,7 @@ import { getTodayQod } from '@/lib/qod'
 import { createJournalEntryFromVoice } from '@/app/(app)/journal/actions'
 import { addMeal } from '@/app/(app)/tools/meals/actions'
 import { saveWorkoutSession } from '@/app/(app)/tools/workout/actions'
+import { createGoalFromVoice } from '@/app/(app)/goals/actions'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 type Status = 'idle' | 'listening' | 'thinking' | 'speaking' | 'unsupported' | 'error'
@@ -26,6 +27,8 @@ const FILL_OPTIONS: { id: PromptSchemaId; route: string; label: string }[] = [
   { id: 'checkin_evening', route: '/journal', label: 'Evening reflection' },
   { id: 'meal', route: '/tools/meals', label: 'Log a meal' },
   { id: 'workout', route: '/tools/workout', label: 'Log a workout' },
+  { id: 'reading_goal', route: '/goals', label: 'Start a reading goal' },
+  { id: 'letter_goal', route: '/goals', label: 'Write a letter to self' },
 ]
 
 export function VoiceCoach() {
@@ -127,6 +130,20 @@ export function VoiceCoach() {
         }
       })
       await saveWorkoutSession(str(data.name) || 'Workout', num(data.durationMins) ?? 0, exercises)
+    } else if (schemaId === 'reading_goal') {
+      const count = num(data.bookCount)
+      await createGoalFromVoice('reading', {
+        title: str(data.title) || (count ? `Read ${count} Books` : 'Reading Goal'),
+        why: count != null ? String(count) : '',
+        deadline: data.deadline ? str(data.deadline) : null,
+        nextAction: str(data.currentBook),
+        bookAuthor: str(data.bookAuthor),
+      })
+    } else if (schemaId === 'letter_goal') {
+      await createGoalFromVoice('letter', {
+        why: str(data.letterContent),
+        deadline: str(data.deadline) || null,
+      })
     }
   }, [])
 
