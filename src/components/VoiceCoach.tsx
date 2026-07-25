@@ -1,9 +1,16 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { PERSONAS, type PersonaId } from '@/app/api/voice/personas'
+import type { PromptSchemaId } from '@/app/api/voice/prompts'
+import { getTodayQod } from '@/lib/qod'
+import { createJournalEntryFromVoice } from '@/app/(app)/journal/actions'
+import { addMeal } from '@/app/(app)/tools/meals/actions'
+import { saveWorkoutSession } from '@/app/(app)/tools/workout/actions'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 type Status = 'idle' | 'listening' | 'thinking' | 'speaking' | 'unsupported' | 'error'
+type FillData = Record<string, unknown>
 
 const STATUS_LABEL: Record<Status, string> = {
   idle: 'Tap to talk',
@@ -14,16 +21,27 @@ const STATUS_LABEL: Record<Status, string> = {
   error: 'Something went wrong — try again',
 }
 
+const FILL_OPTIONS: { id: PromptSchemaId; route: string; label: string }[] = [
+  { id: 'checkin_morning', route: '/journal', label: 'Morning check-in' },
+  { id: 'checkin_evening', route: '/journal', label: 'Evening reflection' },
+  { id: 'meal', route: '/tools/meals', label: 'Log a meal' },
+  { id: 'workout', route: '/tools/workout', label: 'Log a workout' },
+]
+
 export function VoiceCoach() {
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [persona, setPersona] = useState<PersonaId>('motivator')
   const [status, setStatus] = useState<Status>('idle')
   const [history, setHistory] = useState<Turn[]>([])
   const [scrolling, setScrolling] = useState(false)
+  const [fillMode, setFillMode] = useState<PromptSchemaId | null>(null)
   const historyRef = useRef<Turn[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const availableFills = FILL_OPTIONS.filter(f => pathname?.startsWith(f.route))
 
   // Fade the button while the page is actively being scrolled — keeps it
   // out of the way of content, back at full opacity ~500ms after scrolling
@@ -75,11 +93,67 @@ export function VoiceCoach() {
     }
   }, [persona])
 
+  const saveFillData = useCallback(async (schemaId: PromptSchemaId, data: FillData) => {
+    const num = (v: unknown): number | null => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() ? Number(v) : null))
+    const str = (v: unknown): string => (typeof v === 'string' ? v : v != null ? String(v) : '')
+
+    if (schemaId === 'checkin_morning') {
+      await createJournalEntryFromVoice('checkin', {
+        checkin_type: 'morning', mood: '',
+        intention: str(data.intention), task1: str(data.task1), task2: str(data.task2), task3: str(data.task3),
+        excited: str(data.excited),
+        qod_question: getTodayQod().q, qod_answer: str(data.qod_answer),
+      })
+    } else if (schemaId === 'checkin_evening') {
+      await createJournalEntryFromVoice('checkin', {
+        checkin_type: 'evening', mood: '',
+        win: str(data.win), challenge: str(data.challenge), lesson: str(data.lesson),
+        energy: str(data.energy || '5'),
+      })
+    } else if (schemaId === 'meal') {
+      const today = new Date().toISOString().split('T')[0]
+      await addMeal(today, str(data.mealType || 'snack'), str(data.name), num(data.calories), num(data.proteinG), num(data.carbsG), num(data.fatG))
+    } else if (schemaId === 'workout') {
+      const rawExercises = Array.isArray(data.exercises) ? data.exercises as FillData[] : []
+      const exercises = rawExercises.map((ex, i) => {
+        const setCount = Math.max(1, Math.round(num(ex.sets) ?? 1))
+        return {
+          name: str(ex.name) || `Exercise ${i + 1}`,
+          isCardio: !!ex.isCardio,
+          sortOrder: i,
+          sets: Array.from({ length: setCount }, (_, si) => ({
+            setNumber: si + 1, reps: num(ex.reps), weightLbs: num(ex.weightLbs), durationMins: null,
+          })),
+        }
+      })
+      await saveWorkoutSession(str(data.name) || 'Workout', num(data.durationMins) ?? 0, exercises)
+    }
+  }, [])
+
   const handleUserMessage = useCallback(async (message: string) => {
     const nextHistory = [...historyRef.current, { role: 'user' as const, content: message }]
     setHistory(nextHistory)
     setStatus('thinking')
     try {
+      if (fillMode) {
+        const res = await fetch('/api/voice/fill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ schemaId: fillMode, message, history: historyRef.current }),
+        })
+        const data = await res.json()
+        if (!data.reply) { setStatus('error'); return }
+        setHistory([...nextHistory, { role: 'assistant', content: data.reply }])
+        if (data.done && data.data) {
+          await saveFillData(fillMode, data.data)
+          await speak(data.reply)
+          setFillMode(null)
+        } else {
+          await speak(data.reply)
+        }
+        return
+      }
+
       const res = await fetch('/api/voice/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,7 +166,34 @@ export function VoiceCoach() {
     } catch {
       setStatus('error')
     }
-  }, [persona, speak])
+  }, [fillMode, persona, speak, saveFillData])
+
+  const startFill = useCallback(async (schemaId: PromptSchemaId) => {
+    setFillMode(schemaId)
+    setHistory([])
+    historyRef.current = []
+    setStatus('thinking')
+    try {
+      const res = await fetch('/api/voice/fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemaId, message: "Let's begin.", history: [] }),
+      })
+      const data = await res.json()
+      if (!data.reply) { setStatus('error'); return }
+      setHistory([{ role: 'assistant', content: data.reply }])
+      await speak(data.reply)
+    } catch {
+      setStatus('error')
+    }
+  }, [speak])
+
+  const exitFill = useCallback(() => {
+    setFillMode(null)
+    setHistory([])
+    historyRef.current = []
+    setStatus('idle')
+  }, [])
 
   const startListening = useCallback(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,6 +215,7 @@ export function VoiceCoach() {
 
   const p = PERSONAS[persona]
   const busy = status === 'thinking' || status === 'speaking' || status === 'listening'
+  const fillLabel = FILL_OPTIONS.find(f => f.id === fillMode)?.label
 
   return (
     <div style={{
@@ -130,35 +232,66 @@ export function VoiceCoach() {
           overflow: 'hidden', fontFamily: 'Satoshi,sans-serif',
         }}>
           <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>VOICE COACH</p>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(Object.keys(PERSONAS) as PersonaId[]).map(id => {
-                const sel = id === persona
-                return (
-                  <button
-                    key={id}
-                    disabled={busy}
-                    onClick={() => setPersona(id)}
-                    style={{
-                      flex: 1, padding: '7px 4px', borderRadius: 10, cursor: busy ? 'default' : 'pointer',
-                      border: `1px solid ${sel ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                      background: sel ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
-                      color: sel ? '#D4AF37' : 'rgba(255,255,255,0.4)',
-                      fontFamily: 'Satoshi,sans-serif', fontSize: 10, fontWeight: 800, opacity: busy ? 0.5 : 1,
-                    }}
-                  >
-                    {PERSONAS[id].name}
-                  </button>
-                )
-              })}
-            </div>
+            {fillMode ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37' }}>FILLING: {fillLabel?.toUpperCase()}</p>
+                <button onClick={exitFill} style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  ✕ Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>VOICE COACH</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(Object.keys(PERSONAS) as PersonaId[]).map(id => {
+                    const sel = id === persona
+                    return (
+                      <button
+                        key={id}
+                        disabled={busy}
+                        onClick={() => setPersona(id)}
+                        style={{
+                          flex: 1, padding: '7px 4px', borderRadius: 10, cursor: busy ? 'default' : 'pointer',
+                          border: `1px solid ${sel ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                          background: sel ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
+                          color: sel ? '#D4AF37' : 'rgba(255,255,255,0.4)',
+                          fontFamily: 'Satoshi,sans-serif', fontSize: 10, fontWeight: 800, opacity: busy ? 0.5 : 1,
+                        }}
+                      >
+                        {PERSONAS[id].name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <div ref={scrollRef} style={{ maxHeight: 260, minHeight: 80, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {history.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
-                Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+                  Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.
+                </p>
+                {availableFills.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em', marginTop: 8 }}>OR FILL THIS OUT BY VOICE</p>
+                    {availableFills.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => startFill(f.id)}
+                        style={{
+                          textAlign: 'left', padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+                          border: '1px solid rgba(212,175,55,0.2)', background: 'rgba(212,175,55,0.06)',
+                          color: '#D4AF37', fontFamily: 'Satoshi,sans-serif', fontSize: 11, fontWeight: 700,
+                        }}
+                      >
+                        🎙️ {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : history.map((t, i) => (
               <div key={i} style={{ alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
                 <p style={{

@@ -85,3 +85,22 @@ export async function createJournalEntry(formData: FormData) {
   revalidatePath('/journal')
   return { success: true }
 }
+
+// Same insert as createJournalEntry, but for callers (like the voice coach)
+// that already have a structured content object instead of a <form>'s FormData.
+export async function createJournalEntryFromVoice(type: 'checkin', content: Record<string, unknown>) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('journal_entries') as any).insert({
+    user_id: user.id,
+    type,
+    content,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/journal')
+  return { success: true }
+}
