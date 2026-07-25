@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildSchemas, type PromptSchemaId } from '../prompts'
 import { getTodayQod } from '@/lib/qod'
+import { PLAYBOOK } from '@/app/(app)/playbook/content'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -14,11 +15,17 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ reply: null }, { status: 401 })
 
   try {
-    const { schemaId, message, history } = await req.json() as {
-      schemaId: PromptSchemaId; message: string; history: HistoryTurn[]
+    const { schemaId, message, history, lessonId } = await req.json() as {
+      schemaId: PromptSchemaId; message: string; history: HistoryTurn[]; lessonId?: string
     }
 
-    const schema = buildSchemas(getTodayQod().q)[schemaId]
+    const lesson = lessonId
+      ? PLAYBOOK.flatMap(m => m.lessons).find(l => l.id === lessonId)
+      : undefined
+
+    const schema = buildSchemas(getTodayQod().q, lesson ? {
+      title: lesson.title, content: lesson.content, reflection: lesson.reflection, pullQuote: lesson.pullQuote,
+    } : undefined)[schemaId]
     if (!schema) return NextResponse.json({ reply: null }, { status: 400 })
 
     const fieldList = schema.fields.map(f => `- ${f.id}: ${f.label}`).join('\n')

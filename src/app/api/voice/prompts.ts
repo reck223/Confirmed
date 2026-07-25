@@ -5,7 +5,7 @@
 // the field ids once it has enough to fill the form.
 
 export type PromptField = { id: string; label: string; hint?: string }
-export type PromptSchemaId = 'checkin_morning' | 'checkin_evening' | 'meal' | 'workout' | 'reading_goal' | 'letter_goal'
+export type PromptSchemaId = 'checkin_morning' | 'checkin_evening' | 'meal' | 'workout' | 'reading_goal' | 'letter_goal' | 'lesson'
 
 export type PromptSchema = {
   id: PromptSchemaId
@@ -17,7 +17,9 @@ export type PromptSchema = {
   fields: PromptField[]
 }
 
-export function buildSchemas(qodQuestion: string): Record<PromptSchemaId, PromptSchema> {
+export type LessonForVoice = { title: string; content: string[]; reflection: string; pullQuote?: string }
+
+export function buildSchemas(qodQuestion: string, lesson?: LessonForVoice): Record<PromptSchemaId, PromptSchema> {
   return {
     checkin_morning: {
       id: 'checkin_morning', title: 'Morning Check-in', route: '/journal',
@@ -80,6 +82,18 @@ export function buildSchemas(qodQuestion: string): Record<PromptSchemaId, Prompt
         { id: 'deadline', label: 'Unlock date, YYYY-MM-DD, required' },
         { id: 'letterContent', label: 'The full letter, verbatim from what they said' },
       ],
+    },
+    lesson: lesson ? {
+      id: 'lesson', title: `Lesson: ${lesson.title}`, route: '/playbook',
+      guidance: `Walk them through today's playbook lesson, "${lesson.title}", by voice. Here is the lesson content, for your reference only — do NOT read it verbatim, that's tedious to listen to: ${lesson.pullQuote ? `Key idea: "${lesson.pullQuote}" ` : ''}${lesson.content.join(' ')}
+First, in your own words, give a tight 2-3 sentence spoken summary of the lesson's core idea — natural and conversational, like you're explaining it to a friend, not reciting it. Then ask them this exact reflection question: "${lesson.reflection}" Let them answer however they want, at whatever length. Once they've given a real answer (not just "I don't know" — if they say that, gently prompt once more), wrap up warmly and finish.`,
+      fields: [
+        { id: 'reflection', label: "Their answer to the reflection question, in their own words" },
+      ],
+    } : {
+      id: 'lesson', title: 'Lesson', route: '/playbook',
+      guidance: `No lesson content was provided. Apologize briefly and let them know there's nothing to go over right now.`,
+      fields: [],
     },
   }
 }

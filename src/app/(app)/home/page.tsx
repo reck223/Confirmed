@@ -51,6 +51,8 @@ export default async function HomePage() {
     { data: morningFocusRow },
     { data: eveningRow },
     { data: yesterdayEveningRow },
+    { data: voiceMorningRow },
+    { data: voiceEveningRow },
   ] = await Promise.all([
     supabase.from('profiles').select('full_name, streak, xp, level, pinned_goal_id, assessment_day').eq('id', user.id).single(),
     supabase.from('goals')
@@ -93,6 +95,22 @@ export default async function HomePage() {
       .gte('created_at', yesterday + 'T00:00:00')
       .lt('created_at', today + 'T00:00:00')
       .maybeSingle(),
+    // Today's voice-fillable journal check-in (/journal page's own check-in tab,
+    // distinct from the home page's separate "Morning Flow" ritual above)
+    supabase.from('journal_entries')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('type', 'checkin')
+      .filter('content->>checkin_type', 'eq', 'morning')
+      .gte('created_at', today + 'T00:00:00')
+      .maybeSingle(),
+    supabase.from('journal_entries')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('type', 'checkin')
+      .filter('content->>checkin_type', 'eq', 'evening')
+      .gte('created_at', today + 'T00:00:00')
+      .maybeSingle(),
   ])
 
   type ProfileRow = Pick<Profile, 'full_name' | 'streak' | 'xp' | 'level' | 'pinned_goal_id'> & { assessment_day?: string }
@@ -131,12 +149,12 @@ export default async function HomePage() {
 
   // Next playbook lesson: first uncompleted across all modules
   const completedIds = new Set((playbookRows ?? []).map((r: { lesson_id: string }) => r.lesson_id))
-  type NextLesson = { moduleEmoji: string; moduleTitle: string; moduleColor: string; lessonTitle: string; duration: string }
+  type NextLesson = { lessonId: string; moduleEmoji: string; moduleTitle: string; moduleColor: string; lessonTitle: string; duration: string }
   let nextLesson: NextLesson | null = null
   outer: for (const mod of PLAYBOOK) {
     for (const lesson of mod.lessons) {
       if (!completedIds.has(lesson.id)) {
-        nextLesson = { moduleEmoji: mod.emoji, moduleTitle: mod.title, moduleColor: mod.color, lessonTitle: lesson.title, duration: lesson.duration }
+        nextLesson = { lessonId: lesson.id, moduleEmoji: mod.emoji, moduleTitle: mod.title, moduleColor: mod.color, lessonTitle: lesson.title, duration: lesson.duration }
         break outer
       }
     }
@@ -186,6 +204,14 @@ export default async function HomePage() {
 
   const levelTitle = getLevelInfo(profile?.xp ?? 0).title
 
+  // Which voice-fillable check-in (if any) is still open today — used to
+  // offer it as a hands-free step. Morning stays available until evening
+  // check-in becomes the natural next one.
+  const hasMorningCheckin = !!voiceMorningRow
+  const hasEveningCheckin = !!voiceEveningRow
+  const pendingCheckinType: 'morning' | 'evening' | null =
+    !hasMorningCheckin ? 'morning' : !hasEveningCheckin ? 'evening' : null
+
   return (
     <HomeClient
       firstName={firstName}
@@ -212,6 +238,7 @@ export default async function HomePage() {
       levelTitle={levelTitle}
       hasReadingGoal={hasReadingGoal}
       hasLetterGoal={hasLetterGoal}
+      pendingCheckinType={pendingCheckinType}
     />
   )
 }

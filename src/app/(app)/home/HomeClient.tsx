@@ -8,6 +8,7 @@ import { getTodayQod } from '@/lib/qod'
 import { getTodayWod } from '@/lib/wod'
 import { markMissionDone, createHomePost, saveMorningFocus, saveEveningReflection } from './actions'
 import { submitCheckin } from '@/app/(app)/checkin/actions'
+import { startHandsFree, type HandsFreeItem } from '@/lib/voiceCoachBus'
 
 type MomentumDay = { date: string; dayLabel: string; done: boolean }
 type MissionGoal = {
@@ -19,7 +20,7 @@ type MissionGoal = {
   deadline: string | null
 }
 type RingGoal = { id: string; title: string; category: string | null; progress: number }
-type NextLesson = { moduleEmoji: string; moduleTitle: string; moduleColor: string; lessonTitle: string; duration: string }
+type NextLesson = { lessonId: string; moduleEmoji: string; moduleTitle: string; moduleColor: string; lessonTitle: string; duration: string }
 
 type WeeklyReflection = { rating: number; weekTitle: string | null } | null
 
@@ -50,6 +51,7 @@ interface Props {
   levelTitle: string
   hasReadingGoal: boolean
   hasLetterGoal: boolean
+  pendingCheckinType: 'morning' | 'evening' | null
 }
 
 // ══════════════════════════════════════════════════════
@@ -869,6 +871,54 @@ function MissionCard({ goal, initialDone }: { goal: MissionGoal | null; initialD
   )
 }
 
+// ── Hands-Free ────────────────────────────────────────────────────────
+// Kicks off a voice session that walks through whatever's still pending
+// today — the check-in, then the next lesson — with no taps required
+// once it starts: the coach speaks, listens, speaks again automatically.
+function HandsFreeCard({ pendingCheckinType, nextLesson }: {
+  pendingCheckinType: 'morning' | 'evening' | null
+  nextLesson: NextLesson | null
+}) {
+  const items: HandsFreeItem[] = []
+  if (pendingCheckinType === 'morning') items.push({ schemaId: 'checkin_morning', label: 'Morning Check-in' })
+  else if (pendingCheckinType === 'evening') items.push({ schemaId: 'checkin_evening', label: 'Evening Reflection' })
+  if (nextLesson) items.push({ schemaId: 'lesson', lessonId: nextLesson.lessonId, label: nextLesson.lessonTitle })
+
+  if (items.length === 0) return null
+
+  const parts = items.map(i => i.label)
+  const summary = parts.length === 2 ? `${parts[0]} + ${parts[1]}` : parts[0]
+
+  return (
+    <button
+      onClick={() => startHandsFree(items)}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+        margin: '0 0 24px', padding: '16px 18px', borderRadius: 18,
+        background: 'linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))',
+        border: '1px solid rgba(212,175,55,0.22)', cursor: 'pointer',
+        textAlign: 'left', WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <div style={{
+        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+        background: 'radial-gradient(circle,#D4AF37,#9A7010)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 0 18px rgba(212,175,55,0.35)',
+      }}>
+        <span style={{ fontSize: 17 }}>🎧</span>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 12.5, fontWeight: 800, color: '#EFEFEF', marginBottom: 2 }}>Go hands-free</p>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          Talk through {summary} — just listen and speak
+        </p>
+      </div>
+      <span style={{ fontSize: 9, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em', flexShrink: 0 }}>START →</span>
+    </button>
+  )
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 const ENERGY_OPTS = [
   { value: 2, emoji: '😴', label: 'Low' },
@@ -878,7 +928,7 @@ const ENERGY_OPTS = [
   { value: 10, emoji: '🚀', label: 'Peak' },
 ]
 
-export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, circleName, circlePostsThisWeek, levelTitle, hasReadingGoal, hasLetterGoal }: Props) {
+export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, circleName, circlePostsThisWeek, levelTitle, hasReadingGoal, hasLetterGoal, pendingCheckinType }: Props) {
   const greeting = getGreeting()
   const subline   = getSubline(streak)
   const activeDays = momentumDays.filter(d => d.done).length
@@ -985,6 +1035,8 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
           hasLetterGoal={hasLetterGoal}
         />
       </div>
+
+      <HandsFreeCard pendingCheckinType={pendingCheckinType} nextLesson={nextLesson} />
 
       {/* ── DAILY CARDS ROW (QOD + WOD horizontal scroll) ─── */}
       {(() => {

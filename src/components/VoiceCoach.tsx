@@ -8,6 +8,8 @@ import { createJournalEntryFromVoice } from '@/app/(app)/journal/actions'
 import { addMeal } from '@/app/(app)/tools/meals/actions'
 import { saveWorkoutSession } from '@/app/(app)/tools/workout/actions'
 import { createGoalFromVoice } from '@/app/(app)/goals/actions'
+import { completeLesson } from '@/app/(app)/playbook/actions'
+import { onHandsFreeRequest, type HandsFreeItem } from '@/lib/voiceCoachBus'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 type Status = 'idle' | 'listening' | 'thinking' | 'speaking' | 'unsupported' | 'error'
@@ -39,10 +41,17 @@ export function VoiceCoach() {
   const [history, setHistory] = useState<Turn[]>([])
   const [scrolling, setScrolling] = useState(false)
   const [fillMode, setFillMode] = useState<PromptSchemaId | null>(null)
+  const [handsFree, setHandsFree] = useState(false)
+  const [queueTotal, setQueueTotal] = useState(0)
+  const [queuePos, setQueuePos] = useState(0)
   const historyRef = useRef<Turn[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handsFreeRef = useRef(false)
+  const queueRef = useRef<HandsFreeItem[]>([])
+  const lessonIdRef = useRef<string | null>(null)
+  const startListeningRef = useRef<() => void>(() => {})
 
   const availableFills = FILL_OPTIONS.filter(f => pathname?.startsWith(f.route))
 
@@ -74,7 +83,11 @@ export function VoiceCoach() {
     if (!SR) setStatus('unsupported')
   }, [])
 
-  const speak = useCallback(async (text: string) => {
+  // `onDone` lets a caller run something exactly when the spoken audio
+  // finishes playing (not when playback merely starts, which is when the
+  // returned promise resolves) — needed so hands-free mode never starts
+  // fetching the next question while the current one is still being read.
+  const speak = useCallback(async (text: string, onDone?: () => void) => {
     setStatus('speaking')
     try {
       const res = await fetch('/api/voice/speak', {
@@ -82,21 +95,27 @@ export function VoiceCoach() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, persona }),
       })
-      if (!res.ok) { setStatus('error'); return }
+      if (!res.ok) { setStatus('error'); onDone?.(); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = audioRef.current ?? new Audio()
       audioRef.current = audio
       audio.src = url
-      audio.onended = () => { URL.revokeObjectURL(url); setStatus('idle') }
-      audio.onerror = () => { URL.revokeObjectURL(url); setStatus('error') }
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        if (onDone) { onDone(); return }
+        if (handsFreeRef.current) { startListeningRef.current() }
+        else { setStatus('idle') }
+      }
+      audio.onerror = () => { URL.revokeObjectURL(url); setStatus('error'); onDone?.() }
       await audio.play()
     } catch {
       setStatus('error')
+      onDone?.()
     }
   }, [persona])
 
-  const saveFillData = useCallback(async (schemaId: PromptSchemaId, data: FillData) => {
+  const saveFillData = useCallback(async (schemaId: PromptSchemaId, data: FillData, lessonId?: string | null) => {
     const num = (v: unknown): number | null => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() ? Number(v) : null))
     const str = (v: unknown): string => (typeof v === 'string' ? v : v != null ? String(v) : '')
 
@@ -144,8 +163,49 @@ export function VoiceCoach() {
         why: str(data.letterContent),
         deadline: str(data.deadline) || null,
       })
+    } else if (schemaId === 'lesson' && lessonId) {
+      try { localStorage.setItem(`manifest:reflection-${lessonId}`, str(data.reflection)) } catch { /* */ }
+      await completeLesson(lessonId)
     }
   }, [])
+
+  const startFill = useCallback(async (schemaId: PromptSchemaId, lessonId?: string | null) => {
+    lessonIdRef.current = lessonId ?? null
+    setFillMode(schemaId)
+    setHistory([])
+    historyRef.current = []
+    setStatus('thinking')
+    try {
+      const res = await fetch('/api/voice/fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemaId, message: "Let's begin.", history: [], lessonId: lessonIdRef.current ?? undefined }),
+      })
+      const data = await res.json()
+      if (!data.reply) { setStatus('error'); return }
+      setHistory([{ role: 'assistant', content: data.reply }])
+      await speak(data.reply)
+    } catch {
+      setStatus('error')
+    }
+  }, [speak])
+
+  // Hands-free mode walks through a queue of items (e.g. morning check-in,
+  // then today's lesson) end to end with no taps — each speak() auto-starts
+  // listening again (see `speak`'s onDone/handsFreeRef logic), and this
+  // advances to the next queued item once one finishes.
+  const advanceQueue = useCallback(() => {
+    const next = queueRef.current.shift()
+    setQueuePos(p => p + 1)
+    if (!next) {
+      handsFreeRef.current = false
+      setHandsFree(false)
+      lessonIdRef.current = null
+      speak("That's everything for now — nice work. You're all caught up.")
+      return
+    }
+    startFill(next.schemaId, next.lessonId ?? null)
+  }, [speak, startFill])
 
   const handleUserMessage = useCallback(async (message: string) => {
     const nextHistory = [...historyRef.current, { role: 'user' as const, content: message }]
@@ -156,15 +216,20 @@ export function VoiceCoach() {
         const res = await fetch('/api/voice/fill', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ schemaId: fillMode, message, history: historyRef.current }),
+          body: JSON.stringify({ schemaId: fillMode, message, history: historyRef.current, lessonId: lessonIdRef.current ?? undefined }),
         })
         const data = await res.json()
         if (!data.reply) { setStatus('error'); return }
         setHistory([...nextHistory, { role: 'assistant', content: data.reply }])
         if (data.done && data.data) {
-          await saveFillData(fillMode, data.data)
-          await speak(data.reply)
+          await saveFillData(fillMode, data.data, lessonIdRef.current)
           setFillMode(null)
+          if (handsFreeRef.current) {
+            await new Promise<void>(resolve => { speak(data.reply, resolve) })
+            advanceQueue()
+          } else {
+            await speak(data.reply)
+          }
         } else {
           await speak(data.reply)
         }
@@ -183,33 +248,17 @@ export function VoiceCoach() {
     } catch {
       setStatus('error')
     }
-  }, [fillMode, persona, speak, saveFillData])
-
-  const startFill = useCallback(async (schemaId: PromptSchemaId) => {
-    setFillMode(schemaId)
-    setHistory([])
-    historyRef.current = []
-    setStatus('thinking')
-    try {
-      const res = await fetch('/api/voice/fill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schemaId, message: "Let's begin.", history: [] }),
-      })
-      const data = await res.json()
-      if (!data.reply) { setStatus('error'); return }
-      setHistory([{ role: 'assistant', content: data.reply }])
-      await speak(data.reply)
-    } catch {
-      setStatus('error')
-    }
-  }, [speak])
+  }, [fillMode, persona, speak, saveFillData, advanceQueue])
 
   const exitFill = useCallback(() => {
     setFillMode(null)
     setHistory([])
     historyRef.current = []
     setStatus('idle')
+    handsFreeRef.current = false
+    setHandsFree(false)
+    queueRef.current = []
+    lessonIdRef.current = null
   }, [])
 
   const startListening = useCallback(() => {
@@ -230,9 +279,27 @@ export function VoiceCoach() {
     setStatus('listening')
   }, [handleUserMessage])
 
+  useEffect(() => { startListeningRef.current = startListening }, [startListening])
+
+  // Lets the home page (or any other component) start a hands-free run —
+  // e.g. "morning check-in, then today's lesson" — via a decoupled event
+  // bus rather than prop-drilling through the shared layout.
+  useEffect(() => {
+    return onHandsFreeRequest((items) => {
+      if (items.length === 0) return
+      queueRef.current = items.slice(1)
+      handsFreeRef.current = true
+      setHandsFree(true)
+      setQueueTotal(items.length)
+      setQueuePos(1)
+      setOpen(true)
+      startFill(items[0].schemaId, items[0].lessonId ?? null)
+    })
+  }, [startFill])
+
   const p = PERSONAS[persona]
   const busy = status === 'thinking' || status === 'speaking' || status === 'listening'
-  const fillLabel = FILL_OPTIONS.find(f => f.id === fillMode)?.label
+  const fillLabel = fillMode === 'lesson' ? "Today's Lesson" : FILL_OPTIONS.find(f => f.id === fillMode)?.label
 
   return (
     <div style={{
@@ -251,9 +318,11 @@ export function VoiceCoach() {
           <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             {fillMode ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37' }}>FILLING: {fillLabel?.toUpperCase()}</p>
+                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37' }}>
+                  {handsFree ? `🎧 HANDS-FREE ${queuePos}/${queueTotal} · ${fillLabel?.toUpperCase()}` : `FILLING: ${fillLabel?.toUpperCase()}`}
+                </p>
                 <button onClick={exitFill} style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  ✕ Cancel
+                  ✕ {handsFree ? 'Stop' : 'Cancel'}
                 </button>
               </div>
             ) : (
