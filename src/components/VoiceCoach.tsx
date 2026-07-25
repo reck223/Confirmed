@@ -33,6 +33,68 @@ const FILL_OPTIONS: { id: PromptSchemaId; route: string; label: string }[] = [
   { id: 'letter_goal', route: '/goals', label: 'Write a letter to self' },
 ]
 
+function MicIcon({ size = 20, color = '#0a0a0a' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="9" y="2" width="6" height="12" rx="3" fill={color} />
+      <path d="M5 11a7 7 0 0 0 14 0" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <line x1="12" y1="18" x2="12" y2="22" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <line x1="8.5" y1="22" x2="15.5" y2="22" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CloseIcon({ size = 16, color = 'rgba(255,255,255,0.85)' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.25} strokeLinecap="round">
+      <line x1="6" y1="6" x2="18" y2="18" />
+      <line x1="18" y1="6" x2="6" y2="18" />
+    </svg>
+  )
+}
+
+function HeadphonesIcon({ size = 13, color = '#D4AF37' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 15v-3a9 9 0 0 1 18 0v3" />
+      <rect x="16" y="14" width="5" height="7" rx="2" />
+      <rect x="3" y="14" width="5" height="7" rx="2" />
+    </svg>
+  )
+}
+
+function SparkleIcon({ size = 12, color = '#D4AF37' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <path d="M12 2l1.9 6.6L20.5 10.5l-6.6 1.9L12 19l-1.9-6.6L3.5 10.5l6.6-1.9L12 2z" />
+    </svg>
+  )
+}
+
+// Small live status glyph rendered above the mic label — an equalizer while
+// speaking, a soft pulse while listening, three dots while thinking.
+function StatusGlyph({ status }: { status: Status }) {
+  if (status === 'speaking') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, height: 12 }}>
+        {[0, 1, 2, 3].map(i => (
+          <span key={i} className="vc-bar" style={{ animationDelay: `${i * 0.12}s` }} />
+        ))}
+      </span>
+    )
+  }
+  if (status === 'thinking') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        {[0, 1, 2].map(i => (
+          <span key={i} className="vc-dot" style={{ animationDelay: `${i * 0.15}s` }} />
+        ))}
+      </span>
+    )
+  }
+  return null
+}
+
 export function VoiceCoach() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
@@ -308,27 +370,95 @@ export function VoiceCoach() {
       transition: 'opacity 0.25s ease',
       pointerEvents: scrolling ? 'none' : 'auto',
     }}>
+      <style>{`
+        @keyframes vcRing {
+          0%   { transform: scale(0.7); opacity: 0.55; }
+          100% { transform: scale(1.9); opacity: 0; }
+        }
+        @keyframes vcBar {
+          0%, 100% { transform: scaleY(0.3); }
+          50%      { transform: scaleY(1); }
+        }
+        @keyframes vcDot {
+          0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+          40%           { opacity: 1; transform: translateY(-2px); }
+        }
+        @keyframes vcBreathe {
+          0%, 100% { box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 0 rgba(212,175,55,0.28); }
+          50%      { box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 7px rgba(212,175,55,0); }
+        }
+        @keyframes vcRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .vc-bar {
+          display: inline-block; width: 3px; height: 12px; border-radius: 2px;
+          background: #D4AF37; animation: vcBar 0.9s ease-in-out infinite;
+        }
+        .vc-dot {
+          display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+          background: #D4AF37; animation: vcDot 1.1s ease-in-out infinite;
+        }
+        .vc-panel { animation: vcRise 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+      `}</style>
+
       {open && (
-        <div style={{
-          width: 300, marginBottom: 12, borderRadius: 20,
-          background: 'linear-gradient(160deg,#141414 0%,#0a0a0a 100%)',
-          border: '1px solid rgba(212,175,55,0.2)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        <div className="vc-panel" style={{
+          width: 320, marginBottom: 14, borderRadius: 22,
+          background: 'linear-gradient(165deg,#161616 0%,#0a0a0a 65%,#080808 100%)',
+          border: '1px solid rgba(212,175,55,0.16)',
+          boxShadow: '0 28px 80px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04) inset, 0 0 0 1px rgba(0,0,0,0.4)',
           overflow: 'hidden', fontFamily: 'Satoshi,sans-serif',
+          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
         }}>
-          <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{
+            padding: '16px 18px 12px',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: 'linear-gradient(180deg,rgba(212,175,55,0.05),transparent)',
+          }}>
             {fillMode ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: '#D4AF37' }}>
-                  {handsFree ? `🎧 HANDS-FREE ${queuePos}/${queueTotal} · ${fillLabel?.toUpperCase()}` : `FILLING: ${fillLabel?.toUpperCase()}`}
-                </p>
-                <button onClick={exitFill} style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  ✕ {handsFree ? 'Stop' : 'Cancel'}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                  {handsFree ? (
+                    <span style={{
+                      display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                      padding: '3px 8px', borderRadius: 999,
+                      background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.28)',
+                    }}>
+                      <HeadphonesIcon size={11} />
+                      <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.08em', color: '#D4AF37' }}>
+                        {queuePos}/{queueTotal}
+                      </span>
+                    </span>
+                  ) : (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#D4AF37', flexShrink: 0 }} />
+                  )}
+                  <p style={{
+                    fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', color: '#EFEFEF',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {fillLabel}
+                  </p>
+                </div>
+                <button
+                  onClick={exitFill}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                    fontSize: 9.5, fontWeight: 800, letterSpacing: '0.04em', color: 'rgba(255,255,255,0.45)',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 999, padding: '5px 10px', cursor: 'pointer',
+                  }}
+                >
+                  {handsFree ? 'Stop' : 'Cancel'}
                 </button>
               </div>
             ) : (
               <>
-                <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>VOICE COACH</p>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <SparkleIcon size={11} />
+                  <p style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.42)' }}>VOICE COACH</p>
+                </div>
+                <div style={{
+                  display: 'flex', gap: 3, padding: 3, borderRadius: 12,
+                  background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)',
+                }}>
                   {(Object.keys(PERSONAS) as PersonaId[]).map(id => {
                     const sel = id === persona
                     return (
@@ -337,11 +467,14 @@ export function VoiceCoach() {
                         disabled={busy}
                         onClick={() => setPersona(id)}
                         style={{
-                          flex: 1, padding: '7px 4px', borderRadius: 10, cursor: busy ? 'default' : 'pointer',
-                          border: `1px solid ${sel ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                          background: sel ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
-                          color: sel ? '#D4AF37' : 'rgba(255,255,255,0.4)',
-                          fontFamily: 'Satoshi,sans-serif', fontSize: 10, fontWeight: 800, opacity: busy ? 0.5 : 1,
+                          flex: 1, padding: '8px 4px', borderRadius: 9, cursor: busy ? 'default' : 'pointer',
+                          border: 'none',
+                          background: sel ? 'linear-gradient(160deg,#F5D070,#D4AF37)' : 'transparent',
+                          color: sel ? '#191305' : 'rgba(255,255,255,0.4)',
+                          boxShadow: sel ? '0 2px 10px rgba(212,175,55,0.35)' : 'none',
+                          fontFamily: 'Satoshi,sans-serif', fontSize: 10.5, fontWeight: 800,
+                          opacity: busy && !sel ? 0.4 : 1,
+                          transition: 'all 0.18s ease',
                         }}
                       >
                         {PERSONAS[id].name}
@@ -353,26 +486,34 @@ export function VoiceCoach() {
             )}
           </div>
 
-          <div ref={scrollRef} style={{ maxHeight: 260, minHeight: 80, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div ref={scrollRef} style={{ maxHeight: 260, minHeight: 84, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {history.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', lineHeight: 1.55 }}>
                   Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.
                 </p>
                 {availableFills.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em', marginTop: 8 }}>OR FILL THIS OUT BY VOICE</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.08em' }}>OR FILL THIS OUT BY VOICE</p>
                     {availableFills.map(f => (
                       <button
                         key={f.id}
                         onClick={() => startFill(f.id)}
                         style={{
-                          textAlign: 'left', padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
-                          border: '1px solid rgba(212,175,55,0.2)', background: 'rgba(212,175,55,0.06)',
-                          color: '#D4AF37', fontFamily: 'Satoshi,sans-serif', fontSize: 11, fontWeight: 700,
+                          display: 'flex', alignItems: 'center', gap: 9,
+                          textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                          border: '1px solid rgba(212,175,55,0.16)', background: 'rgba(212,175,55,0.05)',
                         }}
                       >
-                        🎙️ {f.label}
+                        <span style={{
+                          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                          background: 'rgba(212,175,55,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <MicIcon size={11} color="#D4AF37" />
+                        </span>
+                        <span style={{ color: '#E8CD7A', fontFamily: 'Satoshi,sans-serif', fontSize: 11.5, fontWeight: 700 }}>
+                          {f.label}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -381,9 +522,10 @@ export function VoiceCoach() {
             ) : history.map((t, i) => (
               <div key={i} style={{ alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
                 <p style={{
-                  fontSize: 12, lineHeight: 1.5, padding: '8px 12px', borderRadius: 14,
-                  background: t.role === 'user' ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.05)',
-                  color: t.role === 'user' ? '#EFEFEF' : 'rgba(255,255,255,0.75)',
+                  fontSize: 12, lineHeight: 1.55, padding: '9px 13px', borderRadius: 14,
+                  background: t.role === 'user' ? 'linear-gradient(160deg,rgba(212,175,55,0.16),rgba(212,175,55,0.08))' : 'rgba(255,255,255,0.045)',
+                  border: t.role === 'user' ? '1px solid rgba(212,175,55,0.16)' : '1px solid rgba(255,255,255,0.04)',
+                  color: t.role === 'user' ? '#F5E6B8' : 'rgba(255,255,255,0.78)',
                 }}>
                   {t.content}
                 </p>
@@ -391,23 +533,48 @@ export function VoiceCoach() {
             ))}
           </div>
 
-          <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={startListening}
-              disabled={busy || status === 'unsupported'}
-              style={{
-                width: 52, height: 52, borderRadius: '50%', border: 'none', cursor: busy ? 'default' : 'pointer',
-                background: status === 'listening'
-                  ? 'radial-gradient(circle,#f87171,#991b1b)'
-                  : 'radial-gradient(circle,#D4AF37,#9A7010)',
-                boxShadow: status === 'listening' ? '0 0 24px rgba(248,113,113,0.5)' : '0 0 20px rgba(212,175,55,0.4)',
-                fontSize: 20, opacity: status === 'unsupported' ? 0.3 : 1,
-                transition: 'box-shadow 0.2s ease',
-              }}
-            >
-              🎙️
-            </button>
-            <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{STATUS_LABEL[status]}</p>
+          <div style={{
+            padding: '14px 18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+            borderTop: '1px solid rgba(255,255,255,0.04)',
+          }}>
+            <div style={{ position: 'relative', width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {status === 'listening' && (
+                <>
+                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite' }} />
+                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite', animationDelay: '0.5s' }} />
+                </>
+              )}
+              <button
+                onClick={startListening}
+                disabled={busy || status === 'unsupported'}
+                style={{
+                  width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: busy ? 'default' : 'pointer',
+                  background: status === 'listening'
+                    ? 'linear-gradient(160deg,#f87171,#991b1b)'
+                    : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
+                  boxShadow: status === 'listening'
+                    ? '0 4px 20px rgba(248,113,113,0.4), inset 0 1px 1px rgba(255,255,255,0.25)'
+                    : '0 4px 20px rgba(212,175,55,0.38), inset 0 1px 1px rgba(255,255,255,0.35)',
+                  opacity: status === 'unsupported' ? 0.3 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'box-shadow 0.2s ease, transform 0.12s ease',
+                  position: 'relative', zIndex: 1,
+                }}
+                onTouchStart={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.94)' }}
+                onTouchEnd={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
+              >
+                <MicIcon size={21} color={status === 'listening' ? '#2a0a0a' : '#191305'} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, height: 14 }}>
+              <StatusGlyph status={status} />
+              <p style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                color: status === 'error' ? '#f87171' : status === 'listening' ? '#f87171' : 'rgba(255,255,255,0.38)',
+              }}>
+                {STATUS_LABEL[status]}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -415,14 +582,18 @@ export function VoiceCoach() {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: 56, height: 56, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.3)', cursor: 'pointer',
-          background: open ? '#141414' : 'linear-gradient(160deg,#1a1a1a,#0a0a0a)',
-          boxShadow: '0 8px 28px rgba(0,0,0,0.5), 0 0 20px rgba(212,175,55,0.15)',
-          fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 58, height: 58, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.32)', cursor: 'pointer',
+          background: open ? 'linear-gradient(160deg,#1c1c1c,#0d0d0d)' : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
+          boxShadow: open
+            ? '0 10px 32px rgba(0,0,0,0.55)'
+            : '0 10px 32px rgba(0,0,0,0.5), 0 0 22px rgba(212,175,55,0.3), inset 0 1px 1px rgba(255,255,255,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
+          transition: 'background 0.2s ease',
         }}
         aria-label="Voice coach"
       >
-        {open ? '✕' : '🎙️'}
+        {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
       </button>
     </div>
   )

@@ -895,26 +895,38 @@ function HandsFreeCard({ pendingCheckinType, nextLesson }: {
       style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 14,
         margin: '0 0 24px', padding: '16px 18px', borderRadius: 18,
-        background: 'linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))',
-        border: '1px solid rgba(212,175,55,0.22)', cursor: 'pointer',
+        background: 'linear-gradient(160deg,#161616 0%,#0d0d0d 100%)',
+        border: '1px solid rgba(212,175,55,0.2)', cursor: 'pointer',
+        boxShadow: '0 14px 34px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03) inset',
         textAlign: 'left', WebkitTapHighlightColor: 'transparent',
       }}
     >
       <div style={{
-        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-        background: 'radial-gradient(circle,#D4AF37,#9A7010)',
+        width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+        background: 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 0 18px rgba(212,175,55,0.35)',
+        boxShadow: '0 4px 16px rgba(212,175,55,0.35), inset 0 1px 1px rgba(255,255,255,0.35)',
       }}>
-        <span style={{ fontSize: 17 }}>🎧</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#191305" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 15v-3a9 9 0 0 1 18 0v3" />
+          <rect x="16" y="14" width="5" height="7" rx="2" />
+          <rect x="3" y="14" width="5" height="7" rx="2" />
+        </svg>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12.5, fontWeight: 800, color: '#EFEFEF', marginBottom: 2 }}>Go hands-free</p>
-        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          Talk through {summary} — just listen and speak
+        <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 3 }}>HANDS-FREE</p>
+        <p style={{ fontSize: 12.5, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {summary}
         </p>
       </div>
-      <span style={{ fontSize: 9, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em', flexShrink: 0 }}>START →</span>
+      <span style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        width: 28, height: 28, borderRadius: '50%', background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.22)',
+      }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </span>
     </button>
   )
 }
