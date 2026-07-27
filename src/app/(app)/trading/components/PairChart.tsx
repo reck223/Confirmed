@@ -5,6 +5,7 @@ import { useTradeChart, type Timeframe } from './useTradeChart'
 import { TimeframeSwitcher } from './TimeframeSwitcher'
 
 const DIR_COLOR = (d: string) => d === 'long' ? '#4ade80' : '#f87171'
+const MAX_HOLD_HOURS = 24 // keep in sync with BOT_MAX_HOLD_HOURS in tools/.env
 
 function Corner({ top, left, right, bottom, color }: { top?: boolean; left?: boolean; right?: boolean; bottom?: boolean; color: string }) {
   return (
@@ -41,6 +42,11 @@ export function PairChart({ trade, onExpand }: Props) {
   const priceChange = livePrice != null ? livePrice - trade.entry : null
   const priceChangePips = priceChange != null ? priceChange / (decimals === 3 ? 0.01 : 0.0001) : null
 
+  const holdHours = Math.max(0, (Date.now() - new Date(trade.opened_at).getTime()) / 3_600_000)
+  const holdPct   = Math.min(100, (holdHours / MAX_HOLD_HOURS) * 100)
+  const holdColor = holdPct >= 100 ? '#f87171' : holdPct >= 75 ? '#fbbf24' : 'rgba(255,255,255,0.25)'
+  const holdLabel = holdHours < 1 ? `${Math.round(holdHours * 60)}m` : `${holdHours.toFixed(1)}h`
+
   return (
     <div style={{
       position: 'relative', borderRadius: 14, background: 'linear-gradient(160deg,#111214 0%,#08090a 100%)',
@@ -63,6 +69,12 @@ export function PairChart({ trade, onExpand }: Props) {
             borderRadius: 5, padding: '2px 6px', letterSpacing: '0.05em',
           }}>
             {trade.direction === 'long' ? '▲ LONG' : '▼ SHORT'}
+          </span>
+          <span title="No broker-side stop-loss is set on this position — manage manually in TradeLocker" style={{
+            fontSize: 8, fontWeight: 900, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)',
+            borderRadius: 5, padding: '2px 6px', letterSpacing: '0.03em',
+          }}>
+            ⚠ NO STOP
           </span>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -99,13 +111,23 @@ export function PairChart({ trade, onExpand }: Props) {
         )}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 14px 11px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 14px 8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: 9, fontWeight: 800, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.02em' }}>
-          <span style={{ color: '#f87171' }}>SL</span> {trade.sl.toFixed(decimals)} <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span> <span style={{ color: '#4ade80' }}>TP</span> {trade.tp1.toFixed(decimals)}
+          <span style={{ color: '#f87171' }}>SL</span> {trade.sl.toFixed(decimals)} <span style={{ color: 'rgba(255,255,255,0.15)' }}>·</span> <span style={{ color: '#4ade80' }}>TP</span> {trade.tp1.toFixed(decimals)} <span style={{ color: 'rgba(255,255,255,0.15)' }}>(planned)</span>
         </span>
         <span style={{ fontSize: 10, fontWeight: 800, fontFamily: 'monospace', color: livePrice ? '#EFEFEF' : 'rgba(255,255,255,0.2)' }}>
           {livePrice ? livePrice.toFixed(decimals) : '—'}
         </span>
+      </div>
+
+      <div style={{ padding: '0 14px 11px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>
+          <span suppressHydrationWarning>Open {holdLabel}</span>
+          <span>{MAX_HOLD_HOURS}h limit</span>
+        </div>
+        <div style={{ height: 3, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${holdPct}%`, borderRadius: 999, background: holdColor, transition: 'width 0.3s ease' }} />
+        </div>
       </div>
     </div>
   )

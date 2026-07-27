@@ -48,7 +48,7 @@ function ago(dateStr: string): string {
 const DIR_COLOR  = (d: string) => d === 'long' ? '#4ade80' : '#f87171'
 const DIR_ICON   = (d: string) => d === 'long' ? '▲' : '▼'
 const LEVEL_COLOR: Record<string, string> = {
-  INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171'
+  INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171', TIME_STOP: '#fbbf24'
 }
 
 export function TradingClient({ signals, trades, logs, openCount, openTrades, totalPnl, todayPnl, winRate, totalTrades, currentStreak, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
@@ -56,7 +56,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
   const [optimisticRunning, setOptimisticRunning] = useState(botRunning)
   const [isPending, startTransition] = useTransition()
   const [fullscreen, setFullscreen] = useState<{ tradeId: string; timeframe: Timeframe } | null>(null)
-  const [logFilter, setLogFilter] = useState<'ALL' | 'INFO' | 'SIGNAL' | 'TRADE' | 'ERROR'>('ALL')
+  const [logFilter, setLogFilter] = useState<'ALL' | 'INFO' | 'SIGNAL' | 'TRADE' | 'TIME_STOP' | 'ERROR'>('ALL')
   const router = useRouter()
 
   const pendingSignals = signals.filter(s => s.status === 'pending')
@@ -126,9 +126,14 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
       {/* ── TRADING DESK: LIVE CHARTS FOR OPEN POSITIONS ────── */}
       {openTrades.length > 0 ? (
         <div style={{ position: 'relative', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span className="pulse-gold" style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF37' }} />
-            <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.3)' }}>LIVE POSITIONS · {openTrades.length}</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="pulse-gold" style={{ width: 5, height: 5, borderRadius: '50%', background: '#D4AF37' }} />
+              <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.3)' }}>LIVE POSITIONS · {openTrades.length}</p>
+            </div>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.28)' }}>
+              {openTrades.reduce((s, t) => s + (t.qty ?? 0), 0).toFixed(2)} lots total exposure
+            </p>
           </div>
           <div
             className="scroll-x"
@@ -161,7 +166,6 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
       )}
 
       <div style={{
-        maxWidth: 1100, margin: '0 auto',
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20, alignItems: 'start',
       }}>
       <div>
@@ -220,8 +224,8 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
             {[
               '1. Fill in .env with your TradeLocker credentials',
               '2. Run the SQL in web/supabase/fx_trading.sql in Supabase',
-              '3. cd CCDemo && pip install -r tools/requirements.txt',
-              '4. python tools/forex_bot.py (add BOT_DRY_RUN=false when ready)',
+              '3. Requires Node 22+ — no install needed, built-ins only',
+              '4. nohup node tools/forex_bot.mjs > /tmp/forex_bot.log 2>&1 &',
             ].map((step, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <span style={{ fontSize: 10, color: '#D4AF37', fontWeight: 900, flexShrink: 0, marginTop: 2 }}>✦</span>
@@ -364,7 +368,7 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ display: 'flex', gap: 4 }}>
-              {(['ALL', 'INFO', 'SIGNAL', 'TRADE', 'ERROR'] as const).map(f => {
+              {(['ALL', 'INFO', 'SIGNAL', 'TRADE', 'TIME_STOP', 'ERROR'] as const).map(f => {
                 const sel = logFilter === f
                 const color = f === 'ALL' ? '#D4AF37' : LEVEL_COLOR[f]
                 return (
