@@ -13,6 +13,7 @@ export async function toggleBot(running: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('bot_config') as any)
     .update({ running, updated_at: new Date().toISOString() })
+    .eq('bot_name', 'main')
 
   revalidatePath('/trading')
 }
