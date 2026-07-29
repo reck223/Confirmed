@@ -70,21 +70,32 @@ export default async function HomePage() {
     (supabase.from('daily_checkins') as any).select('energy').eq('user_id', user.id).eq('date', today).maybeSingle(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('posts') as any).select('content').eq('user_id', user.id).eq('type', 'lock_in').gte('created_at', today + 'T00:00:00').maybeSingle(),
-    // Morning focus entry for today
+    // Morning focus entry for today — matches either the home page's own
+    // "Morning Flow" ritual (morning_focus) or a check-in done via the
+    // /journal tab or voice coach (morning); both store the same
+    // intention/task1-3 fields, so either satisfies "did their morning
+    // check-in today" here. .limit(1) guards against the rare case where
+    // someone completes both in the same day.
     supabase.from('journal_entries')
       .select('content')
       .eq('user_id', user.id)
       .eq('type', 'checkin')
-      .filter('content->>checkin_type', 'eq', 'morning_focus')
+      .filter('content->>checkin_type', 'in', '(morning_focus,morning)')
       .gte('created_at', today + 'T00:00:00')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
-    // Evening reflection for today
+    // Evening reflection for today — same either/or as above; this is only
+    // read as a boolean (did they check in tonight), so the differing field
+    // shapes between evening_reflection and evening don't matter here.
     supabase.from('journal_entries')
       .select('id')
       .eq('user_id', user.id)
       .eq('type', 'checkin')
-      .filter('content->>checkin_type', 'eq', 'evening_reflection')
+      .filter('content->>checkin_type', 'in', '(evening_reflection,evening)')
       .gte('created_at', today + 'T00:00:00')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
     // Yesterday's evening score
     supabase.from('journal_entries')
