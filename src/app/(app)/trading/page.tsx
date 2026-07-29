@@ -20,26 +20,20 @@ export default async function TradingPage() {
     { data: logsRaw    },
     { data: botConfigRaw },
   ] = await Promise.all([
-    // Scoped to the 'main' bot — with more bot instances now writing to
-    // these same tables (see tools/bots/), an unfiltered query here would
-    // silently blend every strategy's trades into one meaningless aggregate.
     supabase.from('fx_signals')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,rr1,rr2,status,dry_run,notes,created_at,fib_anchor,fib_break,confluence')
-      .eq('bot_name', 'main')
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.from('fx_trades')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,qty,pnl,status,close_reason,opened_at,closed_at')
-      .eq('bot_name', 'main')
       .order('opened_at', { ascending: false })
       .limit(60),
     supabase.from('fx_bot_log')
       .select('id,level,message,created_at')
-      .eq('bot_name', 'main')
       .order('created_at', { ascending: false })
       .limit(20),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('bot_config') as any).select('running,dry_run').eq('bot_name', 'main').limit(1).single(),
+    (supabase.from('bot_config') as any).select('running,dry_run').limit(1).single(),
   ])
 
   const signals   = (signalsRaw ?? []) as FxSignal[]
