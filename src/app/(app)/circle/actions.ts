@@ -336,11 +336,20 @@ export async function addComment(postId: string, content: string) {
   const { data: post } = await supabase.from('posts').select('user_id').eq('id', postId).single()
   const { data: commenter } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
   if (post && (post as { user_id: string }).user_id !== user.id) {
-    await createNotification((post as { user_id: string }).user_id, 'reaction', {
-      reactor_name: (commenter as { full_name: string | null } | null)?.full_name ?? 'Someone',
-      reaction_type: 'comment',
-      post_preview: text.slice(0, 60),
-    })
+    const authorId = (post as { user_id: string }).user_id
+    const commenterName = (commenter as { full_name: string | null } | null)?.full_name ?? 'Someone'
+    await Promise.all([
+      createNotification(authorId, 'reaction', {
+        reactor_name: commenterName,
+        reaction_type: 'comment',
+        post_preview: text.slice(0, 60),
+      }),
+      sendPushToUser(supabase, authorId, {
+        title: `${commenterName} commented on your post`,
+        body: text.slice(0, 80),
+        url: '/circle',
+      }),
+    ])
   }
 
   revalidatePath('/circle')
@@ -407,11 +416,21 @@ export async function toggleReaction(postId: string, type: 'fire' | 'strong' | '
     const { data: reactor } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
     if (post) {
       const p = post as { user_id: string; content: string }
-      await createNotification(p.user_id, 'reaction', {
-        reactor_name: (reactor as { full_name: string | null } | null)?.full_name ?? 'Someone',
+      const reactorName = (reactor as { full_name: string | null } | null)?.full_name ?? 'Someone'
+      const emoji: Record<string, string> = { fire: '🔥', strong: '💪', relate: '🙌' }
+      const tasks = [createNotification(p.user_id, 'reaction', {
+        reactor_name: reactorName,
         reaction_type: type,
         post_preview: p.content.slice(0, 60),
-      })
+      })]
+      if (p.user_id !== user.id) {
+        tasks.push(sendPushToUser(supabase, p.user_id, {
+          title: `${reactorName} reacted ${emoji[type] ?? ''} to your post`,
+          body: p.content.slice(0, 80),
+          url: '/circle',
+        }))
+      }
+      await Promise.all(tasks)
     }
   }
 

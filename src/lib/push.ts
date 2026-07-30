@@ -1,4 +1,6 @@
 import webpush from 'web-push'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from './types/database'
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT!,
@@ -8,8 +10,12 @@ webpush.setVapidDetails(
 
 type PushPayload = { title: string; body: string; url?: string }
 
+// Typed against the plain SupabaseClient shape (not the SSR-specific
+// createClient() return type) so this works from both request-scoped
+// Server Actions and service-role contexts like cron routes, which have
+// no cookies/user session to build an SSR client from.
 export async function sendPushToUser(
-  supabase: Awaited<ReturnType<typeof import('./supabase/server').createClient>>,
+  supabase: SupabaseClient<Database>,
   userId: string,
   payload: PushPayload,
 ) {
