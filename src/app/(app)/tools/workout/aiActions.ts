@@ -7,6 +7,7 @@ export async function generateWorkoutPlan(
   types: string[],
   equipment: string[],
   goalTitle: string | null,
+  feeling?: string | null,
 ): Promise<{ exercises: AiExercise[]; error?: string }> {
   if (types.length === 0) return { exercises: [], error: 'Select a training type first' }
 
@@ -17,19 +18,26 @@ export async function generateWorkoutPlan(
     : 'Equipment: full gym access'
 
   const goalLine = goalTitle ? `Fitness goal context: "${goalTitle}"` : ''
+  const feelingLine = feeling?.trim()
+    ? `How they say they're feeling right now: "${feeling.trim()}" — actually adjust the session for this. Sore, tired, low energy, stressed, or injured means fewer sets, lighter suggested loads, more mobility/stretch-style movements, or swapping high-impact exercises for gentler ones. Energetic or "ready to go" means you can push volume/intensity normally. Don't just acknowledge the feeling — let it change what you generate.`
+    : ''
+
+  const isStretchOrMobility = types.some(t => t === 'Stretch' || t === 'Mobility')
 
   const prompt = `You are creating a personalized workout session.
 
 Training type(s): ${types.join(' + ')}
 ${equipmentLine}
 ${goalLine}
+${feelingLine}
 
 Generate 6–9 exercises for a focused, effective session. Rules:
 - Match the training type(s) exactly
 - Only use exercises that match available equipment
 - Order: compound movements first, isolation last, cardio at end if included
-- For cardio use: sets:1, reps like "20 min" or "400m", isCardio:true
-- For strength: sets 3–5, reps like "8–10" or "12" or "5", isCardio:false
+${isStretchOrMobility
+  ? '- This is a stretch/mobility session, not a lifting session: use sets:1-2, reps like "30 sec hold" or "10 each side", isCardio:false, and real stretch/mobility movement names (e.g. "Hamstring Stretch", "Hip Circles", "Cat-Cow", "World\'s Greatest Stretch")'
+  : '- For cardio use: sets:1, reps like "20 min" or "400m", isCardio:true\n- For strength: sets 3–5, reps like "8–10" or "12" or "5", isCardio:false'}
 - Use real exercise names (e.g. "Bench Press", "Pull-ups", "Romanian Deadlift")
 
 Reply with ONLY a valid JSON array, no markdown, no other text:

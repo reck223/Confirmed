@@ -141,6 +141,8 @@ const TYPE_STYLE: Record<string, TypeStyle> = {
   'Arms':            { from:'#ef4444', to:'#8b5cf6', border:'rgba(239,68,68,0.3)',   glow:'rgba(239,68,68,0.2)',   text:'#f87171', bg:'rgba(239,68,68,0.06)',  icon:'💪' },
   'Shoulders':       { from:'#8b5cf6', to:'#06b6d4', border:'rgba(139,92,246,0.35)', glow:'rgba(139,92,246,0.25)', text:'#c084fc', bg:'rgba(139,92,246,0.07)', icon:'🤸' },
   'Active Recovery': { from:'#22c55e', to:'#06b6d4', border:'rgba(34,197,94,0.25)',  glow:'rgba(34,197,94,0.15)',  text:'#4ade80', bg:'rgba(34,197,94,0.05)',  icon:'🧘' },
+  'Stretch':         { from:'#06b6d4', to:'#22c55e', border:'rgba(6,182,212,0.3)',   glow:'rgba(6,182,212,0.2)',   text:'#22d3ee', bg:'rgba(6,182,212,0.06)',  icon:'🤸‍♀️' },
+  'Mobility':        { from:'#8b5cf6', to:'#06b6d4', border:'rgba(139,92,246,0.3)',  glow:'rgba(139,92,246,0.2)',  text:'#a78bfa', bg:'rgba(139,92,246,0.06)', icon:'🌀' },
 }
 function getTypeStyle(types: string[]): TypeStyle {
   return TYPE_STYLE[types[0]] ?? { from:'#ef4444', to:'#f97316', border:'rgba(239,68,68,0.3)', glow:'rgba(239,68,68,0.2)', text:'#ef4444', bg:'rgba(239,68,68,0.06)', icon:'💪' }
@@ -175,6 +177,8 @@ const PRESET_EXERCISES: Record<string, string[]> = {
   'Arms':            ['Bicep Curls', 'Hammer Curls', 'Concentration Curls', 'Zottman Curls', 'Incline Curls', 'Cable Bicep Curls', 'Skull Crushers', 'Tricep Kickbacks', 'Tricep Dips', 'Diamond Push-ups', 'Tricep Pushdowns', 'Close-Grip Bench Press'],
   'Shoulders':       ['Overhead Press', 'Arnold Press', 'Lateral Raises', 'Reverse Flyes', 'Face Pulls', 'Pike Push-ups', 'Upright Rows', 'Front Raises', 'Barbell Shrugs'],
   'Active Recovery': ['Rowing', 'Cycling', 'Jump Rope', 'Running', 'Glute Bridges', 'Superman'],
+  'Stretch':         ['Hamstring Stretch', "Child's Pose", 'Cat Stretch', 'Chest And Front Of Shoulder Stretch', 'Calf Stretch Hands Against Wall', 'IT Band and Glute Stretch', 'Groin and Back Stretch', 'Chin To Chest Stretch'],
+  'Mobility':        ['Ankle Circles', 'Hip Circles (prone)', 'Arm Circles', 'Inchworm', 'Dynamic Back Stretch', 'Dynamic Chest Stretch', 'Groiners', 'Frog Hops'],
 }
 
 // ── Exercise demo data ────────────────────────────────────────────────────────
@@ -308,13 +312,34 @@ function MuscleDiagram({ muscles, secondary }: { muscles: string[]; secondary: s
 }
 
 // ── Exercise demo modal ───────────────────────────────────────────────────────
-type ExerciseApiData = { images: [string, string] | null; description: string | null; instructions: string[] | null }
+type ExerciseApiData = {
+  images: string[] | null
+  description: string | null
+  instructions: string[] | null
+  muscles: string[] | null
+  secondary: string[] | null
+  difficulty: string | null
+  equipment: string | null
+}
 
-function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo; onClose: () => void }) {
-  const diffColor  = info.difficulty === 'Beginner' ? '#4ade80' : info.difficulty === 'Intermediate' ? '#f97316' : '#ef4444'
+function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; info: ExInfo | null; onClose: () => void }) {
+  const [apiData, setApiData] = useState<ExerciseApiData | null>(null)
+
+  // Prefer our hand-curated info (has hand-written form-cue tips); fall back
+  // to whatever the exercise-lookup API matched for anything not in our list
+  // — this is what makes AI-generated exercise names still show real muscle
+  // groups and a difficulty badge instead of nothing at all.
+  const info: ExInfo | null = localInfo ?? (apiData?.muscles ? {
+    muscles: apiData.muscles,
+    secondary: apiData.secondary ?? [],
+    tips: [],
+    difficulty: (apiData.difficulty as ExInfo['difficulty']) ?? 'Beginner',
+    equipment: apiData.equipment ?? '',
+  } : null)
+
+  const diffColor  = info?.difficulty === 'Beginner' ? '#4ade80' : info?.difficulty === 'Intermediate' ? '#f97316' : info?.difficulty === 'Advanced' ? '#ef4444' : 'rgba(255,255,255,0.4)'
   const ytQuery    = encodeURIComponent(name + ' proper form tutorial')
 
-  const [apiData, setApiData]     = useState<ExerciseApiData | null>(null)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [frame, setFrame]         = useState(0)   // 0 or 1 — toggles between start/end image
   const frameRef  = useRef(frame)
@@ -382,9 +407,11 @@ function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite' }} />
             )}
             {/* Muscle overlay badge */}
-            <div style={{ position: 'absolute', bottom: 10, left: 12, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-              {info.muscles.map(m => <span key={m} style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', textTransform: 'capitalize', backdropFilter: 'blur(4px)' }}>{m}</span>)}
-            </div>
+            {info && (
+              <div style={{ position: 'absolute', bottom: 10, left: 12, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {info.muscles.map(m => <span key={m} style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', textTransform: 'capitalize', backdropFilter: 'blur(4px)' }}>{m}</span>)}
+              </div>
+            )}
             {/* Animation indicator */}
             {imgLoaded && (
               <div style={{ position: 'absolute', bottom: 10, right: 12, display: 'flex', gap: 3 }}>
@@ -392,9 +419,13 @@ function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo
               </div>
             )}
           </div>
-        ) : (
+        ) : info ? (
           <div style={{ height: 160, background: '#0a0a0a', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <MuscleDiagram muscles={info.muscles} secondary={info.secondary} />
+          </div>
+        ) : (
+          <div style={{ height: 160, background: '#0a0a0a', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, opacity: 0.3 }}>
+            🏋️
           </div>
         )}
 
@@ -405,15 +436,15 @@ function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo
             <div>
               <p style={{ fontSize: 18, fontWeight: 900, color: '#EFEFEF', marginBottom: 6 }}>{name}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: diffColor }}>{info.difficulty}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.42)' }}>{info.equipment}</span>
+                {info && <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: diffColor }}>{info.difficulty}</span>}
+                {info && <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.42)' }}>{info.equipment}</span>}
               </div>
             </div>
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 22, cursor: 'pointer', paddingTop: 2 }}>×</button>
           </div>
 
           {/* Muscle badges — only show if no image (otherwise shown as overlay) */}
-          {!hasImages && (
+          {!hasImages && info && (
             <>
               <div style={{ marginBottom: 4 }}>
                 <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)' }}>PRIMARY </span>
@@ -434,7 +465,7 @@ function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo
           )}
 
           {/* Muscle diagram (only when no photo) */}
-          {hasImages && (
+          {hasImages && info && (
             <div style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>MUSCLES WORKED</p>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -444,20 +475,22 @@ function ExerciseDemoModal({ name, info, onClose }: { name: string; info: ExInfo
             </div>
           )}
 
-          {/* Instructions — prefer ExerciseDB, fallback to our tips */}
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>
-              {apiData?.instructions ? 'STEP-BY-STEP' : 'KEY FORM CUES'}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(apiData?.instructions ?? info.tips).map((tip, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 900, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
-                  <p style={{ fontSize: 13, color: '#EFEFEF', lineHeight: 1.4 }}>{tip}</p>
-                </div>
-              ))}
+          {/* Instructions — prefer ExerciseDB, fallback to our curated tips if we have them */}
+          {(apiData?.instructions ?? info?.tips ?? []).length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>
+                {apiData?.instructions ? 'STEP-BY-STEP' : 'KEY FORM CUES'}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(apiData?.instructions ?? info?.tips ?? []).map((tip, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 900, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+                    <p style={{ fontSize: 13, color: '#EFEFEF', lineHeight: 1.4 }}>{tip}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* YouTube link */}
           <a href={`https://www.youtube.com/results?search_query=${ytQuery}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, fontWeight: 700, color: '#ef4444', textDecoration: 'none', fontFamily: 'Satoshi,sans-serif', boxSizing: 'border-box' }}>
@@ -616,6 +649,25 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
   // AI workout generation
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError]           = useState<string | null>(null)
+  const [feeling, setFeeling]           = useState('')
+  const [feelingListening, setFeelingListening] = useState(false)
+
+  function startFeelingVoice() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) return
+    const rec = new SR()
+    rec.continuous = false
+    rec.interimResults = false
+    rec.lang = 'en-US'
+    rec.onresult = (e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {
+      setFeeling(e.results[0][0].transcript)
+    }
+    rec.onerror = () => setFeelingListening(false)
+    rec.onend = () => setFeelingListening(false)
+    rec.start()
+    setFeelingListening(true)
+  }
 
   // Workout overview panel
   const [showOverview, setShowOverview] = useState(false)
@@ -806,6 +858,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
       selectedTypes,
       [...equipment],
       goalTitle,
+      feeling,
     )
     if (error || aiExs.length === 0) {
       setAiError(error ?? 'No exercises returned')
@@ -1187,7 +1240,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           }} style={{ padding: '13px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.22)', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}>Reset Week</button>
         </div>
 
-        {demoEx && EXERCISE_INFO[demoEx] && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx]} onClose={() => setDemoEx(null)} />}
+        {demoEx && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx] ?? null} onClose={() => setDemoEx(null)} />}
       </div>
     )
   }
@@ -1276,6 +1329,30 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
       {/* ── AI WORKOUT BUILDER ── */}
       {selectedTypes.length > 0 && (
         <div style={{ marginBottom: 28 }}>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>
+            HOW ARE YOU FEELING? <span style={{ color: 'rgba(255,255,255,0.12)', fontWeight: 600, letterSpacing: 0 }}>(optional — shapes today's session)</span>
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <input
+              value={feeling}
+              onChange={e => setFeeling(e.target.value)}
+              placeholder="e.g. sore legs, low energy, ready to push hard…"
+              style={{ flex: 1, minWidth: 0, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${feeling ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.07)'}`, color: '#EFEFEF', fontSize: 13, boxSizing: 'border-box', fontFamily: 'Satoshi,sans-serif', outline: 'none', transition: 'border-color 0.15s' }}
+            />
+            <button
+              onClick={startFeelingVoice}
+              disabled={feelingListening}
+              style={{
+                flexShrink: 0, width: 42, height: 42, borderRadius: 12, border: 'none', cursor: feelingListening ? 'default' : 'pointer',
+                background: feelingListening ? 'radial-gradient(circle,#f87171,#991b1b)' : 'rgba(99,102,241,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                boxShadow: feelingListening ? '0 0 14px rgba(248,113,113,0.4)' : 'none',
+              }}
+              title="Speak how you're feeling"
+            >
+              🎙️
+            </button>
+          </div>
           <button
             onClick={buildWithAi}
             disabled={aiGenerating}
@@ -1479,7 +1556,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           </div>
         </div>
       )}
-      {demoEx && EXERCISE_INFO[demoEx] && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx]} onClose={() => setDemoEx(null)} />}
+      {demoEx && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx] ?? null} onClose={() => setDemoEx(null)} />}
     </div>
   )
 
@@ -1803,7 +1880,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           </div>
         </div>
       )}
-      {demoEx && EXERCISE_INFO[demoEx] && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx]} onClose={() => setDemoEx(null)} />}
+      {demoEx && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx] ?? null} onClose={() => setDemoEx(null)} />}
     </div>
   )
 
@@ -2065,7 +2142,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                             <button onClick={() => setTrendEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'rgba(255,255,255,0.42)', cursor: trend.length >= 2 ? 'pointer' : 'default', textDecoration: 'none', fontFamily: 'Satoshi,sans-serif', flexShrink: 0 }}>
                               {ex.name}{trend.length >= 2 && <span style={{ color: 'rgba(255,255,255,0.22)', marginLeft: 4 }}>📈</span>}
                             </button>
-                            {EXERCISE_INFO[ex.name] && <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.22)', fontSize: 10, cursor: 'pointer', padding: '0 2px', flexShrink: 0, fontFamily: 'Satoshi,sans-serif' }}>ℹ</button>}
+                            <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.22)', fontSize: 10, cursor: 'pointer', padding: '0 2px', flexShrink: 0, fontFamily: 'Satoshi,sans-serif' }}>ℹ</button>
                             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontWeight: 700, marginLeft: 2 }}>{fmtSets(ex.sets)}</span>
                           </div>
                         )
@@ -2111,7 +2188,7 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           </div>
         </div>
       )}
-      {demoEx && EXERCISE_INFO[demoEx] && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx]} onClose={() => setDemoEx(null)} />}
+      {demoEx && <ExerciseDemoModal name={demoEx} info={EXERCISE_INFO[demoEx] ?? null} onClose={() => setDemoEx(null)} />}
       {shareCaption !== null && <ShareToFeedSheet defaultCaption={shareCaption} onClose={() => setShareCaption(null)} />}
     </div>
   )

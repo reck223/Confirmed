@@ -1,54 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Maps our exercise names → free-exercise-db IDs (images at 0.jpg and 1.jpg)
-const EXERCISE_DB_IDS: Record<string, string> = {
-  'Bench Press':            'Barbell_Bench_Press_-_Medium_Grip',
-  'Overhead Press':         'Seated_Barbell_Military_Press',
-  'Incline Dumbbell Press': 'Incline_Dumbbell_Press',
-  'Tricep Dips':            'Parallel_Bar_Dip',
-  'Push-ups':               'Pushups',
-  'Cable Flyes':            'Flat_Bench_Cable_Flyes',
-  'Lateral Raises':         'Cable_Seated_Lateral_Raise',
-  'Skull Crushers':         'Band_Skull_Crusher',
-  'Deadlift':               'Barbell_Deadlift',
-  'Pull-ups':               'Pullups',
-  'Bent-over Rows':         'Reverse_Grip_Bent-Over_Rows',
-  'Lat Pulldown':           'Close-Grip_Front_Lat_Pulldown',
-  'Face Pulls':             'Face_Pull',
-  'Bicep Curls':            'Barbell_Curl',
-  'Hammer Curls':           'Cable_Hammer_Curls_-_Rope_Attachment',
-  'Cable Rows':             'Elevated_Cable_Rows',
-  'Squats':                 'Barbell_Squat',
-  'Romanian Deadlift':      'Romanian_Deadlift',
-  'Leg Press':              'Leg_Press',
-  'Lunges':                 'Dumbbell_Lunges',
-  'Leg Extensions':         'Leg_Extensions',
-  'Hamstring Curls':        'Seated_Band_Hamstring_Curl',
-  'Calf Raises':            'Calf_Raises_-_With_Bands',
-  'Hip Thrusts':            'Barbell_Hip_Thrust',
-  'Plank':                  'Plank',
-  'Russian Twists':         'Cable_Russian_Twists',
-  'Hanging Leg Raises':     'Hanging_Leg_Raise',
-  'Dips':                   'Parallel_Bar_Dip',
-  'Battle Ropes':           'Battling_Ropes',
-  'Sled Push':              'Sled_Push',
-  'Running':                'Running_Treadmill',
-  'Rowing':                 'Rowing_Stationary',
-  'Jump Rope':              'Rope_Jumping',
+// free-exercise-db ships a single index of ~870 exercises with real photos,
+// instructions, muscles, difficulty, and equipment for every one of them —
+// no API key, no rate limit. Fuzzy-matching against this whole index (instead
+// of a small hand-maintained name→id dictionary) is what makes AI-generated
+// exercise names resolve to a real demo instead of just showing plain text.
+const INDEX_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json'
+const IMG_BASE   = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises'
+
+type FreeExercise = {
+  name: string
+  level: string
+  equipment: string | null
+  primaryMuscles: string[]
+  secondaryMuscles: string[]
+  instructions: string[]
+  images: string[]
 }
 
-const BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises'
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+// Squashed (no spaces at all) form catches cases normalize() alone misses —
+// e.g. "Push-ups" -> "push ups" doesn't match the DB's "Pushups" -> "pushups"
+// under plain normalize(), but both squash to "pushups". Checked before the
+// token-overlap fallback so an exact-but-differently-spaced name always
+// wins over a same-topic-but-wrong exercise (e.g. "Handstand Push-Ups").
+function squash(s: string): string {
+  return normalize(s).replace(/ /g, '')
+}
+
+function findBestMatch(name: string, exercises: FreeExercise[]): FreeExercise | null {
+  const target = normalize(name)
+  if (!target) return null
+
+  const exact = exercises.find(e => normalize(e.name) === target)
+  if (exact) return exact
+
+  const targetSquashed = squash(name)
+  const squashedExact = exercises.find(e => squash(e.name) === targetSquashed)
+  if (squashedExact) return squashedExact
+
+  const targetTokens = new Set(target.split(' ').filter(Boolean))
+  const substringMatches = exercises.filter(e => {
+    const n = normalize(e.name)
+    return n.includes(target) || target.includes(n)
+  })
+  if (substringMatches.length > 0) {
+    substringMatches.sort((a, b) => normalize(a.name).length - normalize(b.name).length)
+    return substringMatches[0]
+  }
+
+  let best: FreeExercise | null = null
+  let bestScore = 0
+  for (const e of exercises) {
+    const tokens = new Set(normalize(e.name).split(' ').filter(Boolean))
+    const overlap = [...targetTokens].filter(t => tokens.has(t)).length
+    const score = overlap / Math.max(targetTokens.size, tokens.size, 1)
+    if (score > bestScore) { bestScore = score; best = e }
+  }
+  return bestScore >= 0.5 ? best : null
+}
+
+const DIFFICULTY_MAP: Record<string, string> = {
+  beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Advanced',
+}
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name') ?? ''
-  const id = EXERCISE_DB_IDS[name]
-
-  if (!id) {
+  if (!name) {
     return NextResponse.json({ images: null }, { headers: { 'Cache-Control': 'public, max-age=86400' } })
   }
 
-  // Also enrich with ExerciseDB data if available
-  let exerciseData = null
+  let match: FreeExercise | null = null
+  try {
+    const res = await fetch(INDEX_URL, { next: { revalidate: 86400 } })
+    if (res.ok) {
+      const all = await res.json() as FreeExercise[]
+      match = findBestMatch(name, all)
+    }
+  } catch {
+    // index unavailable — fall through with no match
+  }
+
+  // Secondary enrichment: ExerciseDB has better prose descriptions than
+  // free-exercise-db's instructions-only format, when it has this exercise.
+  let description: string | null = null
   try {
     const res = await fetch(
       `https://exercisedb.p.rapidapi.com/exercises/name/${encodeURIComponent(name.toLowerCase())}?limit=1`,
@@ -62,17 +100,28 @@ export async function GET(req: NextRequest) {
     )
     if (res.ok) {
       const data = await res.json()
-      if (data?.[0]) exerciseData = data[0]
+      description = data?.[0]?.description ?? null
     }
   } catch {
-    // ExerciseDB unavailable — images still work
+    // ExerciseDB unavailable — free-exercise-db data still works
+  }
+
+  if (!match) {
+    return NextResponse.json(
+      { images: null, description, instructions: null, muscles: null, secondary: null, difficulty: null, equipment: null },
+      { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } }
+    )
   }
 
   return NextResponse.json(
     {
-      images: [`${BASE}/${id}/0.jpg`, `${BASE}/${id}/1.jpg`],
-      description: exerciseData?.description ?? null,
-      instructions: exerciseData?.instructions ?? null,
+      images: match.images.map(p => `${IMG_BASE}/${p}`),
+      description,
+      instructions: match.instructions,
+      muscles: match.primaryMuscles,
+      secondary: match.secondaryMuscles,
+      difficulty: DIFFICULTY_MAP[match.level] ?? null,
+      equipment: match.equipment,
     },
     { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' } }
   )
