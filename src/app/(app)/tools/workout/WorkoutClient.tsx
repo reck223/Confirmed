@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { saveWorkoutSession, deleteWorkoutSession, saveTemplate, deleteTemplate, logBodyWeight, upsertBodyMetrics } from './actions'
 import { generateWorkoutPlan } from './aiActions'
@@ -443,7 +444,13 @@ function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; i
 
   const hasImages = apiData?.images != null
 
-  return (
+  // Portal straight to document.body — rendered inline, this would sit
+  // under SwipeNavigator's page wrapper, which sets a transform during
+  // route-slide animations (and briefly leaves one in place afterward).
+  // Any ancestor transform turns position:fixed into "relative to that
+  // ancestor" instead of the viewport, which is exactly what made this
+  // modal render off-center instead of centered on screen.
+  return createPortal(
     <div className="modal-open" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150, padding: '20px 16px' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ width: '100%', maxWidth: 480, borderRadius: 24, background: '#111', border: '1px solid rgba(255,255,255,0.08)', animation: 'scaleIn 0.2s ease both', maxHeight: '90dvh', overflowY: 'auto' }}>
 
@@ -567,7 +574,8 @@ function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; i
           </a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
