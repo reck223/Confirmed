@@ -322,6 +322,75 @@ type ExerciseApiData = {
   equipment: string | null
 }
 
+// Shared across every exercise card on the page (plan review, active
+// workout, history) so the same exercise name is only ever fetched once,
+// no matter how many cards happen to show it at the same time.
+type ExerciseFallback = { muscles: string[]; secondary: string[]; image: string | null }
+const exerciseFallbackCache = new Map<string, ExerciseFallback | null>()
+
+function useExerciseFallback(name: string, skip: boolean) {
+  const [data, setData] = useState<ExerciseFallback | null | undefined>(exerciseFallbackCache.get(name))
+  useEffect(() => {
+    if (skip) return
+    const cached = exerciseFallbackCache.get(name)
+    if (cached !== undefined) { setData(cached); return }
+    let cancelled = false
+    fetch(`/api/exercise?name=${encodeURIComponent(name)}`)
+      .then(r => r.json())
+      .then((d: ExerciseApiData) => {
+        const result = d.muscles && d.muscles.length > 0
+          ? { muscles: d.muscles, secondary: d.secondary ?? [], image: d.images?.[0] ?? null }
+          : null
+        exerciseFallbackCache.set(name, result)
+        if (!cancelled) setData(result)
+      })
+      .catch(() => { exerciseFallbackCache.set(name, null); if (!cancelled) setData(null) })
+    return () => { cancelled = true }
+  }, [name, skip])
+  return data
+}
+
+// Small muscle-tag row used on exercise cards that don't already show the
+// full demo modal's info — prefers the hand-curated dictionary (instant,
+// no fetch), falls back to the exercise-lookup API for anything else.
+function ExerciseMuscleTags({ name, max = 2 }: { name: string; max?: number }) {
+  const local = EXERCISE_INFO[name]
+  const fallback = useExerciseFallback(name, !!local)
+  const muscles = local?.muscles ?? fallback?.muscles ?? []
+  if (muscles.length === 0) return null
+  return (
+    <>
+      {muscles.slice(0, max).map(m => (
+        <span key={m} style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: '#ef4444', textTransform: 'capitalize' }}>{m}</span>
+      ))}
+    </>
+  )
+}
+
+// Compact thumbnail shown directly on exercise cards (not just inside the
+// tap-to-open demo modal) — this is the actual photo, not a placeholder,
+// so the card itself shows what the movement looks like at a glance.
+function ExerciseThumb({ name, onClick }: { name: string; onClick: () => void }) {
+  const fallback = useExerciseFallback(name, false)
+  const src = fallback?.image
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: 44, height: 44, borderRadius: 10, flexShrink: 0, padding: 0, cursor: 'pointer',
+        border: '1px solid rgba(255,255,255,0.08)', background: '#0a0a0a', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {src ? (
+        <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
+      ) : (
+        <span style={{ fontSize: 16, opacity: 0.25 }}>🏋️</span>
+      )}
+    </button>
+  )
+}
+
 function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; info: ExInfo | null; onClose: () => void }) {
   const [apiData, setApiData] = useState<ExerciseApiData | null>(null)
 
@@ -1411,7 +1480,6 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#ef4444', marginBottom: 12 }}>YOUR PLAN · {exercises.length} EXERCISE{exercises.length !== 1 ? 'S' : ''}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {exercises.map((ex, i) => {
-              const info = EXERCISE_INFO[ex.name]
               const hint = (() => {
                 for (const s of [...sessions].reverse()) {
                   const prev = s.exercises.find(e => e.name === ex.name)
@@ -1424,15 +1492,12 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
               })()
               return (
                 <div key={ex.id} style={{ borderRadius: 16, background: '#0d0d0d', border: '1px solid rgba(239,68,68,0.12)', padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 12, animation: `fadeUp 0.2s ${i * 0.04}s ease both` }}>
+                  <ExerciseThumb name={ex.name} onClick={() => setDemoEx(ex.name)} />
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {info ? (
-                      <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 800, color: '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)', textAlign: 'left', display: 'block', marginBottom: 5 }}>{ex.name}</button>
-                    ) : (
-                      <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF', marginBottom: 5 }}>{ex.name}</p>
-                    )}
+                    <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 800, color: '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)', textAlign: 'left', display: 'block', marginBottom: 5 }}>{ex.name}</button>
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {info?.muscles.slice(0, 2).map(m => <span key={m} style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: '#ef4444', textTransform: 'capitalize' }}>{m}</span>)}
+                      <ExerciseMuscleTags name={ex.name} />
                       {hint && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>{hint}</span>}
                     </div>
                   </div>
@@ -1668,23 +1733,21 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
             const oneRM    = compute1RM(ex.sets)
             return (
               <div key={ex.id} style={{ borderRadius: 20, background: allDone ? 'rgba(74,222,128,0.04)' : '#0d0d0d', border: `1px solid ${allDone ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.15)'}`, overflow: 'hidden', animation: `fadeUp 0.3s ${i*0.04}s ease both` }}>
-                <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div>
+                <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <ExerciseThumb name={ex.name} onClick={() => setDemoEx(ex.name)} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      {EXERCISE_INFO[ex.name] ? (
-                        <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)' }}>{ex.name}</button>
-                      ) : (
-                        <span style={{ fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF' }}>{ex.name}</span>
-                      )}
+                      <button onClick={() => setDemoEx(ex.name)} style={{ background: 'none', border: 'none', padding: 0, fontSize: 15, fontWeight: 800, color: allDone ? '#4ade80' : '#EFEFEF', cursor: 'pointer', fontFamily: 'Satoshi,sans-serif', textDecoration: 'underline', textDecorationStyle: 'dotted', textDecorationColor: 'rgba(255,255,255,0.28)' }}>{ex.name}</button>
                       {pr && !allDone && <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>PR {pr}lbs</span>}
                       {allDone && <span style={{ fontSize: 11, color: '#4ade80' }}>✓</span>}
                     </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
+                    <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                      <ExerciseMuscleTags name={ex.name} />
                       <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>{doneCt}/{ex.sets.length} sets</p>
                       {oneRM && <p style={{ fontSize: 10, color: '#f97316' }}>Est. 1RM: ~{oneRM}lbs</p>}
                     </div>
                   </div>
-                  <button onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}>×</button>
+                  <button onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', fontSize: 20, cursor: 'pointer', padding: '4px 8px', flexShrink: 0 }}>×</button>
                 </div>
 
                 <div style={{ padding: '8px 16px 0' }}>
