@@ -434,13 +434,29 @@ function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; i
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current) }, [])
 
-  const img0ref = useRef<HTMLImageElement>(null)
-  const img1ref = useRef<HTMLImageElement>(null)
-  const loaded0 = useRef(false)
-  const loaded1 = useRef(false)
-  const checkBothLoaded = useCallback(() => {
-    if (loaded0.current && loaded1.current) { setImgLoaded(true); startAnim() }
-  }, [startAnim])
+  // Preload via a plain Image()+decode() rather than relying on a rendered
+  // <img>'s onLoad — onLoad never fires for an image the browser already
+  // had cached before this element existed, which is exactly why the
+  // animation used to get stuck forever on the first frame instead of
+  // ever cross-fading to the second.
+  useEffect(() => {
+    const images = apiData?.images
+    if (!images || images.length === 0) return
+    let cancelled = false
+    setImgLoaded(false)
+    frameRef.current = 0
+    setFrame(0)
+    Promise.all(images.map(src => {
+      const img = new window.Image()
+      img.src = src
+      return img.decode().catch(() => {})
+    })).then(() => {
+      if (cancelled) return
+      setImgLoaded(true)
+      startAnim()
+    })
+    return () => { cancelled = true }
+  }, [apiData, startAnim])
 
   const hasImages = apiData?.images != null
 
@@ -461,15 +477,15 @@ function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; i
           </div>
         ) : hasImages ? (
           <div style={{ position: 'relative', height: 220, background: '#0a0a0a', borderRadius: '24px 24px 0 0', overflow: 'hidden' }}>
-            {/* Preload both frames, swap visibility */}
+            {/* Both frames render as soon as they're in the DOM; opacity
+                cross-fades between them once preloading confirms both are
+                actually decoded and ready — see the Image()/decode() effect
+                above for why this doesn't use <img onLoad>. */}
             {apiData.images!.map((src, i) => (
               <img
                 key={i}
-                ref={i === 0 ? img0ref : img1ref}
                 src={src}
                 alt={i === 0 ? `${name} start position` : `${name} end position`}
-                onLoad={() => { if (i === 0) { loaded0.current = true } else { loaded1.current = true }; checkBothLoaded() }}
-                onError={() => { if (i === 0) { loaded0.current = true } else { loaded1.current = true }; checkBothLoaded() }}
                 style={{
                   position: 'absolute', inset: 0, width: '100%', height: '100%',
                   objectFit: 'cover', objectPosition: 'top',
