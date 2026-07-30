@@ -17,3 +17,15 @@ export type Trade = {
 export type Log = { id: string; level: string; message: string; created_at: string }
 
 export type PairStat = { pair: string; count: number; wins: number; pnl: number }
+
+// Mirrors tools/bots/*.env — each running bot instance, its TradeLocker
+// account, and what makes it a distinct "style". Update this alongside
+// adding/removing a bot config so the dashboard selector stays accurate.
+export type BotInfo = { name: string; label: string; account: string; style: string }
+export const BOT_REGISTRY: BotInfo[] = [
+  { name: 'main',         label: 'Main',         account: '2', style: 'Mixed engine, high risk' },
+  { name: 'breakout',     label: 'Breakout',     account: '3', style: 'Setup A+B only · London/NY' },
+  { name: 'range',        label: 'Range',        account: '4', style: 'Setup C only · Sydney/Tokyo' },
+  { name: 'conservative', label: 'Conservative', account: '6', style: 'Production criteria · live-readiness check' },
+  { name: 'scalper',      label: 'Scalper',      account: '7', style: '30s scans · 6h max hold' },
+]

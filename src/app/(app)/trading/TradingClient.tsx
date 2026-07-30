@@ -9,7 +9,7 @@ import { WinRateRing } from './components/WinRateRing'
 import { RangeBar } from './components/RangeBar'
 import { FibLadder } from './components/FibLadder'
 import { PairPerformance } from './components/PairPerformance'
-import type { Signal, Trade, Log, PairStat } from './types'
+import type { Signal, Trade, Log, PairStat, BotInfo } from './types'
 import type { Timeframe } from './components/useTradeChart'
 
 const PairChart  = dynamic(() => import('./components/PairChart').then(m => m.PairChart), { ssr: false })
@@ -18,6 +18,8 @@ const ChartModal = dynamic(() => import('./components/ChartModal').then(m => m.C
 interface Streak { type: 'win' | 'loss' | null; count: number }
 
 interface Props {
+  bots:        BotInfo[]
+  selectedBot: string
   signals:     Signal[]
   trades:      Trade[]
   logs:        Log[]
@@ -29,7 +31,7 @@ interface Props {
   totalTrades: number
   currentStreak: Streak
   botRunning:  boolean
-  toggleBot:   (running: boolean) => Promise<void>
+  toggleBot:   (botName: string, running: boolean) => Promise<void>
   equityCurve: number[]
   pairStats:   PairStat[]
   bestTrade:   Trade | null
@@ -51,7 +53,7 @@ const LEVEL_COLOR: Record<string, string> = {
   INFO: 'rgba(255,255,255,0.3)', SIGNAL: '#D4AF37', TRADE: '#4ade80', ERROR: '#f87171', TIME_STOP: '#fbbf24'
 }
 
-export function TradingClient({ signals, trades, logs, openCount, openTrades, totalPnl, todayPnl, winRate, totalTrades, currentStreak, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
+export function TradingClient({ bots, selectedBot, signals, trades, logs, openCount, openTrades, totalPnl, todayPnl, winRate, totalTrades, currentStreak, botRunning, toggleBot, equityCurve, pairStats, bestTrade }: Props) {
   const [tab, setTab] = useState<'signals' | 'trades' | 'log'>('signals')
   const [optimisticRunning, setOptimisticRunning] = useState(botRunning)
   const [isPending, startTransition] = useTransition()
@@ -70,13 +72,25 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
     if (tab === 'log') logPanelRef.current?.scrollTo({ top: logPanelRef.current.scrollHeight })
   }, [tab, filteredLogs.length])
 
+  // optimisticRunning only takes its initial value from the first render —
+  // switching bots (a prop change, not a remount) needs this synced or the
+  // Start/Stop button keeps showing the previously-selected bot's state.
+  useEffect(() => { setOptimisticRunning(botRunning) }, [botRunning, selectedBot])
+
   function handleToggle() {
     const next = !optimisticRunning
     setOptimisticRunning(next)
     startTransition(async () => {
-      await toggleBot(next)
+      await toggleBot(selectedBot, next)
     })
   }
+
+  function switchBot(name: string) {
+    if (name === selectedBot) return
+    router.push(`/trading?bot=${name}`)
+  }
+
+  const currentBotInfo = bots.find(b => b.name === selectedBot)
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 20px 100px', fontFamily: 'Satoshi,sans-serif' }} className="view-panel">
@@ -91,6 +105,35 @@ export function TradingClient({ signals, trades, logs, openCount, openTrades, to
           Forex<br />
           <span className="shimmer-gold">Trading Bot</span>
         </h1>
+
+        {/* ── BOT SELECTOR ── */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 16, paddingBottom: 2 }}>
+          {bots.map(b => {
+            const sel = b.name === selectedBot
+            return (
+              <button
+                key={b.name}
+                onClick={() => switchBot(b.name)}
+                title={`${b.style} · Account #${b.account}`}
+                style={{
+                  flexShrink: 0, padding: '7px 14px', borderRadius: 10, cursor: 'pointer',
+                  border: `1px solid ${sel ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  background: sel ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: sel ? '#D4AF37' : 'rgba(255,255,255,0.45)',
+                  fontFamily: 'Satoshi,sans-serif', fontSize: 11.5, fontWeight: 800,
+                }}
+              >
+                {b.label}
+              </button>
+            )
+          })}
+        </div>
+        {currentBotInfo && (
+          <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.32)', fontWeight: 600, marginBottom: 14 }}>
+            Account #{currentBotInfo.account} · {currentBotInfo.style}
+          </p>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: optimisticRunning ? '#4ade80' : 'rgba(255,255,255,0.2)', boxShadow: optimisticRunning ? '0 0 8px #4ade80' : 'none', transition: 'all 0.3s ease' }} />

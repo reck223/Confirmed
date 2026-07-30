@@ -2,17 +2,21 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect }     from 'next/navigation'
 import { TradingClient } from './TradingClient'
 import { toggleBot }     from './actions'
-import type { Signal as FxSignal, Trade as FxTrade, Log as BotLog, PairStat } from './types'
+import { BOT_REGISTRY, type Signal as FxSignal, type Trade as FxTrade, type Log as BotLog, type PairStat } from './types'
 
 type Streak = { type: 'win' | 'loss' | null; count: number }
 
 const CREATOR_EMAIL = 'graysdarius@gmail.com'
 
-export default async function TradingPage() {
+export default async function TradingPage({ searchParams }: { searchParams?: Promise<{ bot?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
   if (user.email !== CREATOR_EMAIL) redirect('/home')
+
+  const resolvedParams = await searchParams
+  const requestedBot = resolvedParams?.bot
+  const selectedBot = BOT_REGISTRY.some(b => b.name === requestedBot) ? requestedBot! : 'main'
 
   const [
     { data: signalsRaw },
@@ -22,24 +26,29 @@ export default async function TradingPage() {
   ] = await Promise.all([
     supabase.from('fx_signals')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,rr1,rr2,status,dry_run,notes,created_at,fib_anchor,fib_break,confluence')
+      .eq('bot_name', selectedBot)
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.from('fx_trades')
       .select('id,pair,setup,direction,entry,sl,tp1,tp2,qty,pnl,status,close_reason,opened_at,closed_at')
+      .eq('bot_name', selectedBot)
       .order('opened_at', { ascending: false })
       .limit(60),
     supabase.from('fx_bot_log')
       .select('id,level,message,created_at')
+      .eq('bot_name', selectedBot)
       .order('created_at', { ascending: false })
       .limit(20),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('bot_config') as any).select('running,dry_run').limit(1).single(),
+    (supabase.from('bot_config') as any).select('running,dry_run').eq('bot_name', selectedBot).limit(1).maybeSingle(),
   ])
 
   const signals   = (signalsRaw ?? []) as FxSignal[]
   const trades    = (tradesRaw  ?? []) as FxTrade[]
   const logs      = (logsRaw    ?? []) as BotLog[]
-  const botRunning = (botConfigRaw as { running?: boolean } | null)?.running ?? false
+  // No bot_config row yet for this bot defaults to "running" — matches the
+  // bot process's own isBotEnabled() fallback (no row = don't block it).
+  const botRunning = (botConfigRaw as { running?: boolean } | null)?.running ?? true
 
   // Summary stats
   const closedTrades  = trades.filter(t => t.status === 'closed')
@@ -92,6 +101,8 @@ export default async function TradingPage() {
 
   return (
     <TradingClient
+      bots={BOT_REGISTRY}
+      selectedBot={selectedBot}
       signals={signals}
       trades={trades}
       logs={logs}
