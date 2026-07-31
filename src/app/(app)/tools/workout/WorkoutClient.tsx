@@ -556,13 +556,21 @@ function ExerciseDemoModal({ name, info: localInfo, onClose }: { name: string; i
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5, marginBottom: 16 }}>{apiData.description}</p>
           )}
 
-          {/* Muscle diagram (only when no photo) */}
+          {/* Muscle diagram — shown alongside the photo too now, not just as
+              a fallback when there's no photo, so you get "what it looks
+              like" and "what it's working" together instead of one
+              replacing the other. */}
           {hasImages && info && (
-            <div style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>MUSCLES WORKED</p>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
-                {info.muscles.map(m => <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', textTransform: 'capitalize' }}>{m}</span>)}
-                {info.secondary.map(m => <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', textTransform: 'capitalize' }}>{m}</span>)}
+            <div style={{ marginBottom: 14, padding: '14px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 14, alignItems: 'center' }}>
+              <div style={{ flexShrink: 0 }}>
+                <MuscleDiagram muscles={info.muscles} secondary={info.secondary} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 8 }}>MUSCLES WORKED</p>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {info.muscles.map(m => <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', textTransform: 'capitalize' }}>{m}</span>)}
+                  {info.secondary.map(m => <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', textTransform: 'capitalize' }}>{m}</span>)}
+                </div>
               </div>
             </div>
           )}
