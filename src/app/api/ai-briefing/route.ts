@@ -106,27 +106,56 @@ async function buildContext(supabase: Awaited<ReturnType<typeof createClient>>, 
   return ctx
 }
 
+type Turn = { role: 'user' | 'assistant'; text: string }
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ text: null }, { status: 401 })
 
+  const today = new Date().toISOString().split('T')[0]
+
   try {
-    const { message, history } = await req.json().catch(() => ({})) as {
-      message?: string; history?: { role: 'user' | 'assistant'; text: string }[]
+    const { message } = await req.json().catch(() => ({})) as { message?: string }
+    const isFollowUp = !!message?.trim()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: todayRow } = await (supabase.from('coach_briefings') as any)
+      .select('briefing, history').eq('user_id', user.id).eq('date', today).maybeSingle()
+    const row = todayRow as { briefing: string; history: Turn[] } | null
+
+    // Opening briefing already generated today — serve the persisted copy.
+    // This is now the real cache (works across devices/sessions), replacing
+    // the old sessionStorage cache which only covered one browser tab.
+    if (!isFollowUp && row) {
+      return NextResponse.json({ text: row.briefing, history: row.history ?? [] })
     }
 
     const ctx = await buildContext(supabase, user.id)
-    const isFollowUp = Array.isArray(history) && history.length > 0
+
+    // Give the coach a memory of what it already told this person, not just
+    // what the data says — real continuity instead of restarting cold every
+    // morning. Only relevant for a fresh opening briefing; a same-day
+    // follow-up already has that continuity via the message history below.
+    let priorContext = ''
+    if (!isFollowUp) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: yesterdayRow } = await (supabase.from('coach_briefings') as any)
+        .select('briefing').eq('user_id', user.id).eq('date', daysAgoDate(1)).maybeSingle()
+      const yb = yesterdayRow as { briefing: string } | null
+      if (yb?.briefing) priorContext = `\n\nWhat you told them yesterday: "${yb.briefing}"`
+    }
+
+    const priorHistory = row?.history ?? []
 
     const messages: Anthropic.MessageParam[] = isFollowUp
       ? [
-          { role: 'user', content: `Context about this user:\n${ctx}` },
-          { role: 'assistant', content: 'Got it, I\'ll keep that in mind.' },
-          ...history!.map(h => ({ role: h.role, content: h.text })),
-          { role: 'user', content: message ?? '' },
+          { role: 'user', content: `Context about this user:\n${ctx}${priorContext}` },
+          { role: 'assistant', content: row?.briefing ?? 'Got it, I\'ll keep that in mind.' },
+          ...priorHistory.map(h => ({ role: h.role, content: h.text })),
+          { role: 'user', content: message! },
         ]
-      : [{ role: 'user', content: `Context about this user:\n${ctx}\n\nWrite the opening briefing.` }]
+      : [{ role: 'user', content: `Context about this user:\n${ctx}${priorContext}\n\nWrite the opening briefing.` }]
 
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -136,7 +165,18 @@ export async function POST(req: NextRequest) {
     })
 
     const text = (msg.content[0] as { type: string; text: string }).text.trim()
-    return NextResponse.json({ text })
+    const newHistory = isFollowUp ? [...priorHistory, { role: 'user' as const, text: message! }, { role: 'assistant' as const, text }] : []
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('coach_briefings') as any).upsert({
+      user_id: user.id,
+      date: today,
+      briefing: isFollowUp ? (row?.briefing ?? text) : text,
+      history: newHistory,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,date' })
+
+    return NextResponse.json({ text, history: newHistory })
   } catch (e) {
     console.error('ai-briefing error:', e)
     return NextResponse.json({ text: null })

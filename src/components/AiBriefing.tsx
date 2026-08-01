@@ -12,23 +12,20 @@ export function AiBriefing() {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const cacheKey = `briefing:${new Date().toISOString().split('T')[0]}`
-    try {
-      const cached = sessionStorage.getItem(cacheKey)
-      if (cached) { setText(cached); setLoading(false); return }
-    } catch { /* */ }
-
+    // No client-side cache needed anymore — the server persists today's
+    // briefing (and conversation) in the database, so this is instant on a
+    // second load and consistent across devices/sessions, not just one tab.
     fetch('/api/ai-briefing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(r => r.json())
       .then(d => {
         if (d.text) {
-          try { sessionStorage.setItem(cacheKey, d.text) } catch { /* */ }
           setText(d.text)
+          if (Array.isArray(d.history)) setHistory(d.history)
         }
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -38,22 +35,22 @@ export function AiBriefing() {
     const msg = reply.trim()
     if (!msg || replying || !text) return
     setReply('')
-    const nextHistory: Turn[] = [...history, { role: 'user', text: msg }]
-    setHistory(nextHistory)
+    setHistory(h => [...h, { role: 'user', text: msg }])
     setReplying(true)
     try {
       const r = await fetch('/api/ai-briefing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: msg,
-          history: [{ role: 'assistant', text }, ...history],
-        }),
+        body: JSON.stringify({ message: msg }),
       })
       const d = await r.json()
-      setHistory([...nextHistory, { role: 'assistant', text: d.text || "Sorry, I didn't catch that — try again?" }])
+      if (Array.isArray(d.history)) {
+        setHistory(d.history)
+      } else {
+        setHistory(h => [...h, { role: 'assistant', text: d.text || "Sorry, I didn't catch that — try again?" }])
+      }
     } catch {
-      setHistory([...nextHistory, { role: 'assistant', text: "Something went wrong on my end — try again?" }])
+      setHistory(h => [...h, { role: 'assistant', text: "Something went wrong on my end — try again?" }])
     } finally {
       setReplying(false)
     }
