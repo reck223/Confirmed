@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { HomeClient } from './HomeClient'
 import { PLAYBOOK } from '../playbook/content'
-import { getLevelInfo } from '@/lib/xp'
 import type { Profile, Goal } from '@/lib/types/database'
 
 function getTodayLabel() {
@@ -189,32 +188,6 @@ export default async function HomePage() {
   type EveningContent = { score?: number }
   const yesterdayScore = (yesterdayEveningRow as { content: EveningContent } | null)?.content?.score ?? null
 
-  // Circle health: is the user posting to their accountability circle this week?
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: membershipRow } = await (supabase.from('circle_members') as any)
-    .select('circle_id').eq('user_id', user.id).limit(1).maybeSingle()
-  let circleName: string | null = null
-  let circlePostsThisWeek = 0
-  if (membershipRow?.circle_id) {
-    const [{ data: circleRow }, { data: weekPosts }] = await Promise.all([
-      supabase.from('circles').select('name').eq('id', membershipRow.circle_id).maybeSingle(),
-      supabase.from('posts').select('id').eq('user_id', user.id).eq('circle_id', membershipRow.circle_id).gte('created_at', getWeekStart() + 'T00:00:00'),
-    ])
-    circleName = (circleRow as { name: string } | null)?.name ?? null
-    circlePostsThisWeek = (weekPosts ?? []).length
-  }
-
-  // Goal-type awareness: does the user have an active reading goal / a letter to self yet?
-  const { data: readingLetterGoals } = await supabase
-    .from('goals')
-    .select('goal_type, status')
-    .eq('user_id', user.id)
-    .in('goal_type', ['reading', 'letter'])
-  const hasReadingGoal = (readingLetterGoals ?? []).some((g: { goal_type: string; status: string }) => g.goal_type === 'reading' && g.status !== 'complete')
-  const hasLetterGoal = (readingLetterGoals ?? []).some((g: { goal_type: string; status: string }) => g.goal_type === 'letter')
-
-  const levelTitle = getLevelInfo(profile?.xp ?? 0).title
-
   // Which voice-fillable check-in (if any) is still open today — used to
   // offer it as a hands-free step. Morning stays available until evening
   // check-in becomes the natural next one.
@@ -244,11 +217,6 @@ export default async function HomePage() {
       morningFocus={morningFocus}
       eveningDone={eveningDone}
       yesterdayScore={yesterdayScore}
-      circleName={circleName}
-      circlePostsThisWeek={circlePostsThisWeek}
-      levelTitle={levelTitle}
-      hasReadingGoal={hasReadingGoal}
-      hasLetterGoal={hasLetterGoal}
       pendingCheckinType={pendingCheckinType}
     />
   )

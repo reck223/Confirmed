@@ -46,11 +46,6 @@ interface Props {
   morningFocus: DailyFocus | null
   eveningDone: boolean
   yesterdayScore: number | null
-  circleName: string | null
-  circlePostsThisWeek: number
-  levelTitle: string
-  hasReadingGoal: boolean
-  hasLetterGoal: boolean
   pendingCheckinType: 'morning' | 'evening' | null
 }
 
@@ -940,7 +935,7 @@ const ENERGY_OPTS = [
   { value: 10, emoji: '🚀', label: 'Peak' },
 ]
 
-export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, circleName, circlePostsThisWeek, levelTitle, hasReadingGoal, hasLetterGoal, pendingCheckinType }: Props) {
+export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, pendingCheckinType }: Props) {
   const greeting = getGreeting()
   const subline   = getSubline(streak)
   const activeDays = momentumDays.filter(d => d.done).length
@@ -1035,17 +1030,7 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
 
       {/* ── AI BRIEFING ────────────────────────────────────── */}
       <div style={{ margin: '0 -20px' }}>
-        <AiBriefing
-          firstName={firstName}
-          topGoalTitle={missionGoal?.title ?? null}
-          streak={streak}
-          circleName={circleName}
-          circlePostsThisWeek={circlePostsThisWeek}
-          xp={xp}
-          level={levelTitle}
-          hasReadingGoal={hasReadingGoal}
-          hasLetterGoal={hasLetterGoal}
-        />
+        <AiBriefing />
       </div>
 
       <HandsFreeCard pendingCheckinType={pendingCheckinType} nextLesson={nextLesson} />

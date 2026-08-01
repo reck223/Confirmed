@@ -3,25 +3,13 @@ import { useState, useEffect, useRef } from 'react'
 
 type Turn = { role: 'user' | 'assistant'; text: string }
 
-export function AiBriefing({
-  firstName, topGoalTitle, streak, circleName, circlePostsThisWeek,
-  xp, level, hasReadingGoal, hasLetterGoal,
-}: {
-  firstName: string; topGoalTitle: string | null; streak: number
-  circleName: string | null; circlePostsThisWeek: number
-  xp?: number; level?: string | null; hasReadingGoal?: boolean; hasLetterGoal?: boolean
-}) {
+export function AiBriefing() {
   const [text, setText]       = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [history, setHistory] = useState<Turn[]>([])
   const [reply, setReply]     = useState('')
   const [replying, setReplying] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  const baseCtx = {
-    firstName, topGoal: topGoalTitle, energy: null, streak,
-    circleName, circlePostsThisWeek, xp, level, hasReadingGoal, hasLetterGoal,
-  }
 
   useEffect(() => {
     const cacheKey = `briefing:${new Date().toISOString().split('T')[0]}`
@@ -30,22 +18,7 @@ export function AiBriefing({
       if (cached) { setText(cached); setLoading(false); return }
     } catch { /* */ }
 
-    let workout: string | null = null
-    try {
-      const wp = localStorage.getItem('weekPlan')
-      if (wp) {
-        const plan = JSON.parse(wp)
-        const todayIdx = (new Date().getDay() + 6) % 7
-        const td = plan[todayIdx]
-        if (td && !td.restDay && td.types?.length > 0) workout = (td.types as string[]).join(' + ')
-      }
-    } catch { /* */ }
-
-    fetch('/api/ai-briefing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...baseCtx, workout }),
-    })
+    fetch('/api/ai-briefing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(r => r.json())
       .then(d => {
         if (d.text) {
@@ -73,7 +46,6 @@ export function AiBriefing({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...baseCtx,
           message: msg,
           history: [{ role: 'assistant', text }, ...history],
         }),
