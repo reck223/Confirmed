@@ -1072,15 +1072,24 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext, 
       </div>
 
       {!isDone ? (
-        <button onClick={handleComplete} disabled={completing} style={{
-          width: '100%', padding: '15px', borderRadius: 14,
-          background: `linear-gradient(135deg, ${module.color} 0%, ${module.color}bb 100%)`,
-          border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 900,
-          color: '#000', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.08em',
-          boxShadow: `0 4px 24px ${module.color}45`, transition: 'all 0.2s', opacity: completing ? 0.7 : 1,
-        }}>
-          {completing ? 'SAVING…' : '✓ MARK COMPLETE · +20 XP'}
-        </button>
+        <>
+          <button onClick={handleComplete} disabled={completing || !reflectionText.trim()} style={{
+            width: '100%', padding: '15px', borderRadius: 14,
+            background: reflectionText.trim()
+              ? `linear-gradient(135deg, ${module.color} 0%, ${module.color}bb 100%)`
+              : 'rgba(255,255,255,0.06)',
+            border: 'none', cursor: (completing || !reflectionText.trim()) ? 'default' : 'pointer', fontSize: 12, fontWeight: 900,
+            color: reflectionText.trim() ? '#000' : 'rgba(255,255,255,0.3)', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.08em',
+            boxShadow: reflectionText.trim() ? `0 4px 24px ${module.color}45` : 'none', transition: 'all 0.2s', opacity: completing ? 0.7 : 1,
+          }}>
+            {completing ? 'SAVING…' : '✓ MARK COMPLETE · +20 XP'}
+          </button>
+          {!reflectionText.trim() && (
+            <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.32)', marginTop: 10 }}>
+              Write a reflection above to mark this lesson complete
+            </p>
+          )}
+        </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ padding: '14px', borderRadius: 14, background: `${module.color}10`, border: `1px solid ${module.color}25`, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center' }}>
