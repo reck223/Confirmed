@@ -46,7 +46,7 @@ export async function proposeConnection(
       commitment,
       duration_days: String(durationDays),
       connection_id: connectionId,
-      message: `${myName} wants to make a Connection with you: "${title}"`,
+      message: `${myName} wants to team up with you: "${title}"`,
     },
   })
 
@@ -86,7 +86,7 @@ export async function acceptConnection(connectionId: string) {
     type: 'connection_accepted',
     data: {
       author_name: myName,
-      message: `${myName} accepted your Connection: "${(conn as { proposer_id: string; title: string }).title}"`,
+      message: `${myName} said yes — you're officially connected on "${(conn as { proposer_id: string; title: string }).title}"`,
     },
   })
 
@@ -108,6 +108,66 @@ export async function declineConnection(connectionId: string) {
   if (error) return { error: error.message }
   revalidatePath('/inbox')
   return { success: true }
+}
+
+export async function recordConnectionOutcome(connectionId: string, outcome: 'kept' | 'broken') {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: conn } = await (supabase.from('connections') as any)
+    .select('proposer_id, receiver_id, title, status, outcome_proposer, outcome_receiver')
+    .eq('id', connectionId)
+    .single()
+
+  type Conn = { proposer_id: string; receiver_id: string; title: string; status: string; outcome_proposer: string | null; outcome_receiver: string | null }
+  const row = conn as Conn | null
+  if (!row) return { error: 'Connection not found' }
+  const isProposer = row.proposer_id === user.id
+  const isReceiver = row.receiver_id === user.id
+  if (!isProposer && !isReceiver) return { error: 'Not part of this connection' }
+
+  const partnerId = isProposer ? row.receiver_id : row.proposer_id
+  const partnerOutcome = isProposer ? row.outcome_receiver : row.outcome_proposer
+  const bothRecorded = !!partnerOutcome
+
+  const update: Record<string, string> = { updated_at: new Date().toISOString() }
+  update[isProposer ? 'outcome_proposer' : 'outcome_receiver'] = outcome
+  if (bothRecorded) update.status = 'completed'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('connections') as any)
+    .update(update)
+    .eq('id', connectionId)
+
+  if (error) return { error: error.message }
+
+  const { data: myProfile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
+  const myName = (myProfile as { full_name: string | null } | null)?.full_name ?? 'Someone'
+
+  const message = bothRecorded
+    ? (outcome === 'kept' && partnerOutcome === 'kept'
+        ? `You and ${myName} both kept "${row.title}" — that's a win 🎉`
+        : `"${row.title}" is wrapped up — you and ${myName} both closed it out`)
+    : `${myName} wrapped up "${row.title}" — add your side to close it out`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('notifications') as any).insert({
+    to_user_id: partnerId,
+    from_user_id: user.id,
+    type: bothRecorded ? 'connection_completed' : 'connection_wrapup',
+    data: {
+      author_name: myName,
+      title: row.title,
+      connection_id: connectionId,
+      message,
+    },
+  })
+
+  revalidatePath('/profile')
+  revalidatePath(`/profile/${partnerId}`)
+  return { success: true, completed: bothRecorded }
 }
 
 export async function getMyConnections() {

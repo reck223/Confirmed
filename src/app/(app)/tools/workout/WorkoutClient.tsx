@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { saveWorkoutSession, deleteWorkoutSession, saveTemplate, deleteTemplate, logBodyWeight, upsertBodyMetrics } from './actions'
 import { generateWorkoutPlan } from './aiActions'
 import ShareToFeedSheet from '@/components/ShareToFeedSheet'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SetRow   = { id: string; set_number: number; reps: number | null; weight_lbs: number | null; duration_mins: number | null }
@@ -753,22 +754,12 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
   const [feeling, setFeeling]           = useState('')
   const [feelingListening, setFeelingListening] = useState(false)
 
-  function startFeelingVoice() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) return
-    const rec = new SR()
-    rec.continuous = false
-    rec.interimResults = false
-    rec.lang = 'en-US'
-    rec.onresult = (e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {
-      setFeeling(e.results[0][0].transcript)
-    }
-    rec.onerror = () => setFeelingListening(false)
-    rec.onend = () => setFeelingListening(false)
-    rec.start()
-    setFeelingListening(true)
-  }
+  const { start: startFeelingVoice } = useSpeechRecognition({
+    onResult: setFeeling,
+    onStart: () => setFeelingListening(true),
+    onError: () => setFeelingListening(false),
+    onEnd: () => setFeelingListening(false),
+  })
 
   // Workout overview panel
   const [showOverview, setShowOverview] = useState(false)

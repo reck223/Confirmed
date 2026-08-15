@@ -9,6 +9,10 @@ webpush.setVapidDetails(
 )
 
 type PushPayload = { title: string; body: string; url?: string }
+// Matches the boolean columns added in supabase/notification_prefs.sql —
+// pass the one relevant to what's being sent so a user who muted, say,
+// circle activity still gets their streak reminder.
+type PrefColumn = 'notify_circle_activity' | 'notify_streak_reminder' | 'notify_goal_recommendations' | 'notify_stale_goal_nudge'
 
 // Typed against the plain SupabaseClient shape (not the SSR-specific
 // createClient() return type) so this works from both request-scoped
@@ -18,7 +22,13 @@ export async function sendPushToUser(
   supabase: SupabaseClient<Database>,
   userId: string,
   payload: PushPayload,
+  prefColumn?: PrefColumn,
 ) {
+  if (prefColumn) {
+    const { data: profile } = await supabase.from('profiles').select(prefColumn).eq('id', userId).maybeSingle()
+    if (profile?.[prefColumn] === false) return
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: subs } = await (supabase as any)
     .from('push_subscriptions')

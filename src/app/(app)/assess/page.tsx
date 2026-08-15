@@ -99,7 +99,7 @@ export default async function AssessPage() {
 
   // Generate AI coaching insight if user has submitted this week and has history
   const coachInsight = existing && assessments.length >= 2
-    ? await generateCoachInsight(assessments)
+    ? await generateCoachInsight(assessments, supabase, user.id)
     : null
 
   // ── This Week content ──

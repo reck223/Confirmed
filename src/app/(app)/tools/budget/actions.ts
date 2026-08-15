@@ -17,7 +17,7 @@ export async function addTransaction(
     user_id: user.id, txn_date: txnDate, amount, type, category,
     description: description || null,
   })
-  revalidatePath('/tools/study')
+  revalidatePath('/tools/budget')
   revalidatePath('/tools')
 }
 
@@ -28,6 +28,6 @@ export async function deleteTransaction(id: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('budget_transactions') as any)
     .delete().eq('id', id).eq('user_id', user.id)
-  revalidatePath('/tools/study')
+  revalidatePath('/tools/budget')
   revalidatePath('/tools')
 }

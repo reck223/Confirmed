@@ -1,4 +1,10 @@
+import { createClient } from '@/lib/supabase/server'
+
 export async function GET(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({}, { status: 401 })
+
   const url = new URL(request.url).searchParams.get('url')
   if (!url) return Response.json({})
 

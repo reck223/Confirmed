@@ -30,6 +30,25 @@ export async function updateProfile(formData: FormData) {
   return { success: true }
 }
 
+export async function updateNotificationPrefs(prefs: {
+  notify_circle_activity: boolean
+  notify_streak_reminder: boolean
+  notify_weekly_digest: boolean
+  notify_goal_recommendations: boolean
+  notify_stale_goal_nudge: boolean
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('profiles') as any).update(prefs).eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return { success: true }
+}
+
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()

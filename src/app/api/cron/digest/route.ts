@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
 
   const { data: profiles, error: profilesErr } = await supabase
     .from('profiles')
-    .select('id, full_name, streak, goals_complete, assessments_submitted')
+    .select('id, full_name, streak, goals_complete, assessments_submitted, notify_weekly_digest')
     .limit(500)
 
   if (profilesErr || !profiles) {
@@ -121,9 +121,12 @@ export async function GET(req: NextRequest) {
 
   let sent = 0
   let emailed = 0
+  let skipped = 0
   const errors: string[] = []
 
   for (const profile of profiles) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((profile as any).notify_weekly_digest === false) { skipped++; continue }
     try {
       const [
         { data: weekAssessment },
@@ -188,5 +191,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ sent, emailed, errors: errors.slice(0, 10), total: profiles.length })
+  return NextResponse.json({ sent, emailed, skipped, errors: errors.slice(0, 10), total: profiles.length })
 }

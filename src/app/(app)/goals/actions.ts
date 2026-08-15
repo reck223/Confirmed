@@ -147,6 +147,7 @@ export async function toggleMilestone(milestoneId: string, done: boolean, goalId
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('goals') as any).update({
       progress,
+      updated_at: new Date().toISOString(),
       ...(allDone ? { status: 'complete', completed_date: new Date().toISOString().split('T')[0] } : {}),
     }).eq('id', goalId).eq('user_id', user.id)
   }
@@ -284,7 +285,7 @@ export async function markBookDone(bookId: string, goalId: string, rating: numbe
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('goals') as any)
-    .update({ progress, next_action: null }).eq('id', goalId).eq('user_id', user.id)
+    .update({ progress, next_action: null, updated_at: new Date().toISOString() }).eq('id', goalId).eq('user_id', user.id)
 
   revalidatePath('/goals')
   revalidatePath('/home')
@@ -515,7 +516,7 @@ async function recalcEntryProgress(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase.from('goals') as any).update({ progress }).eq('id', goalId)
+  await (supabase.from('goals') as any).update({ progress, updated_at: new Date().toISOString() }).eq('id', goalId)
 }
 
 export async function addGoalEntry(goalId: string, type: string, content: EntryContent) {

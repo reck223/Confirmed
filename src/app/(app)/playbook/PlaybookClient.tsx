@@ -1,7 +1,7 @@
 'use client'
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { completeLesson } from './actions'
+import { completeLesson, saveReflection } from './actions'
 import type { Module, Lesson, LessonLink } from './content'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -13,6 +13,16 @@ interface CustomLesson extends Lesson {
 
 type AnyLesson = Lesson | CustomLesson
 type LessonCtx = { module: Module; lesson: AnyLesson }
+
+interface AnswerRecord {
+  answer: string
+  coachResponse: string | null
+  lessonTitle: string
+  moduleTitle: string
+  moduleColor: string
+  moduleEmoji: string
+  updatedAt: string
+}
 
 // ── YouTube embed helper ──────────────────────────────────────────────────────
 
@@ -51,20 +61,40 @@ function Stars({ count }: { count: number }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export function PlaybookClient({ modules, completedLessonIds, totalLessons, completedCount }: {
+export function PlaybookClient({ modules, completedLessonIds, totalLessons, completedCount, initialAnswers }: {
   modules: Module[]
   completedLessonIds: string[]
   totalLessons: number
   completedCount: number
+  initialAnswers: Record<string, AnswerRecord>
 }) {
   const [active, setActive] = useState<LessonCtx | null>(null)
   const [done, setDone] = useState(new Set(completedLessonIds))
   const [customDone, setCustomDone] = useState(new Set<string>())
   const [custom, setCustom] = useState<CustomLesson[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
+  const [answers, setAnswers] = useState<Record<string, AnswerRecord>>(initialAnswers)
   const [, startTransition] = useTransition()
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  function upsertAnswer(lessonId: string, rec: AnswerRecord) {
+    setAnswers(prev => ({ ...prev, [lessonId]: rec }))
+  }
+
+  function findLessonCtx(lessonId: string): LessonCtx | null {
+    for (const m of modules) {
+      const l = m.lessons.find(x => x.id === lessonId)
+      if (l) return { module: m, lesson: l }
+    }
+    const c = custom.find(x => x.id === lessonId)
+    if (c) {
+      const m = modules.find(mm => mm.id === c.moduleId)
+      if (m) return { module: m, lesson: c }
+    }
+    return null
+  }
 
   useEffect(() => {
     try {
@@ -139,6 +169,21 @@ export function PlaybookClient({ modules, completedLessonIds, totalLessons, comp
         onBack={() => setActive(null)}
         next={flat[idx + 1] ?? null}
         onNext={setActive}
+        initialAnswer={answers[active.lesson.id]}
+        onSaveAnswer={upsertAnswer}
+      />
+    )
+  }
+
+  if (showArchive) {
+    return (
+      <AnswersArchive
+        answers={answers}
+        onBack={() => setShowArchive(false)}
+        onOpenLesson={(lessonId) => {
+          const ctx = findLessonCtx(lessonId)
+          if (ctx) { setShowArchive(false); open(ctx) }
+        }}
       />
     )
   }
@@ -165,7 +210,22 @@ export function PlaybookClient({ modules, completedLessonIds, totalLessons, comp
 
       {/* ── Top HUD ── */}
       <div style={{ padding: '28px 20px 0' }}>
-        <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: '#D4AF37', marginBottom: 10 }}>PLAYBOOK</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: '#D4AF37' }}>THE PATH</p>
+          <button
+            onClick={() => setShowArchive(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 11px', borderRadius: 999,
+              background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)',
+              cursor: 'pointer', color: '#D4AF37',
+              fontSize: 10, fontWeight: 800, fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.04em',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            📔 My Answers
+          </button>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
           {/* XP gem */}
@@ -745,7 +805,7 @@ function CreateModal({ modules, onSave, onClose }: {
               </div>
 
               {err && <p style={{ fontSize: 12, color: '#f87171', fontWeight: 600 }}>{err}</p>}
-              <button className="btn-gold" onClick={handleSave} style={{ marginTop: 4 }}>ADD TO PLAYBOOK</button>
+              <button className="btn-gold" onClick={handleSave} style={{ marginTop: 4 }}>ADD TO THE PATH</button>
             </div>
           )}
         </div>
@@ -756,10 +816,12 @@ function CreateModal({ modules, onSave, onClose }: {
 
 // ── Lesson view ───────────────────────────────────────────────────────────────
 
-function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext }: {
+function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext, initialAnswer, onSaveAnswer }: {
   module: Module; lesson: AnyLesson; isDone: boolean
   onComplete: () => void; onBack: () => void
   next: LessonCtx | null; onNext: (ctx: LessonCtx) => void
+  initialAnswer?: AnswerRecord
+  onSaveAnswer: (lessonId: string, rec: AnswerRecord) => void
 }) {
   const [completing, setCompleting] = useState(false)
   const [reflectionText, setReflectionText] = useState('')
@@ -769,25 +831,52 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext }
   const isCustom = 'isCustom' in lesson
   const pullQuote = 'pullQuote' in lesson ? (lesson as Lesson).pullQuote : undefined
   const storageKey = `manifest:reflection-${lesson.id}`
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    if (initialAnswer?.answer) {
+      setReflectionText(initialAnswer.answer)
+      if (initialAnswer.coachResponse) setCoachResponse(initialAnswer.coachResponse)
+      return
+    }
     try {
       const stored = localStorage.getItem(storageKey)
       if (stored) setReflectionText(stored)
       const storedCoach = localStorage.getItem(`${storageKey}-coach`)
       if (storedCoach) setCoachResponse(storedCoach)
     } catch { /* */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey])
+
+  function persist(answer: string, coach: string | null) {
+    onSaveAnswer(lesson.id, {
+      answer, coachResponse: coach,
+      lessonTitle: lesson.title, moduleTitle: module.title,
+      moduleColor: module.color, moduleEmoji: module.emoji,
+      updatedAt: new Date().toISOString(),
+    })
+    saveReflection({
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      moduleTitle: module.title,
+      moduleColor: module.color,
+      moduleEmoji: module.emoji,
+      answer,
+      coachResponse: coach,
+    })
+  }
 
   function handleReflectionChange(val: string) {
     setReflectionText(val)
     setSaved(false)
     setCoachResponse(null)
-    try {
-      localStorage.setItem(storageKey, val)
+    try { localStorage.setItem(storageKey, val) } catch { /* */ }
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      persist(val, null)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch { /* */ }
+    }, 700)
   }
 
   async function getCoaching() {
@@ -809,6 +898,8 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext }
       if (text) {
         setCoachResponse(text)
         try { localStorage.setItem(`${storageKey}-coach`, text) } catch { /* */ }
+        if (saveTimer.current) clearTimeout(saveTimer.current)
+        persist(reflectionText, text)
       }
     } finally {
       setCoaching(false)
@@ -825,7 +916,7 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext }
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '20px 20px 60px' }} className="view-panel">
       <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.42)', fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', marginBottom: 24, WebkitTapHighlightColor: 'transparent' }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-        Playbook
+        The Path
       </button>
 
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 999, background: `${module.color}12`, border: `1px solid ${module.color}28`, marginBottom: 16 }}>
@@ -1003,9 +1094,88 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext }
             </button>
           ) : (
             <button onClick={onBack} style={{ width: '100%', padding: '15px', borderRadius: 14, background: 'linear-gradient(135deg,#D4AF37,#f97316)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 900, color: '#000', fontFamily: 'Satoshi,sans-serif', letterSpacing: '0.08em' }}>
-              🎓 PLAYBOOK COMPLETE
+              🎓 THE PATH COMPLETE
             </button>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Answers archive ───────────────────────────────────────────────────────────
+
+function AnswersArchive({ answers, onBack, onOpenLesson }: {
+  answers: Record<string, AnswerRecord>
+  onBack: () => void
+  onOpenLesson: (lessonId: string) => void
+}) {
+  const entries = Object.entries(answers)
+    .filter(([, rec]) => rec.answer.trim().length > 0)
+    .sort(([, a], [, b]) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+
+  return (
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '20px 20px 60px' }} className="view-panel">
+      <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.42)', fontSize: 12, fontWeight: 600, fontFamily: 'Satoshi,sans-serif', marginBottom: 24, WebkitTapHighlightColor: 'transparent' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        The Path
+      </button>
+
+      <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: '#D4AF37', marginBottom: 6 }}>ARCHIVE</p>
+      <h1 style={{ fontSize: 24, fontWeight: 900, color: '#EFEFEF', letterSpacing: '-0.02em', marginBottom: 8 }}>My Answers</h1>
+      <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 28 }}>
+        Every reflection you&apos;ve written, saved automatically so you can look back on it.
+      </p>
+
+      {entries.length === 0 ? (
+        <div style={{ padding: '32px 20px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>No reflections yet. Write one in any lesson and it&apos;ll show up here.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {entries.map(([lessonId, rec]) => (
+            <div key={lessonId} style={{
+              borderRadius: 16, padding: '16px 18px',
+              background: `${rec.moduleColor || '#D4AF37'}08`,
+              border: `1px solid ${rec.moduleColor || '#D4AF37'}20`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 14 }}>{rec.moduleEmoji || '📔'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: rec.moduleColor || '#D4AF37', marginBottom: 2 }}>
+                    {(rec.moduleTitle || '').toUpperCase()}
+                  </p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#EFEFEF' }}>{rec.lessonTitle}</p>
+                </div>
+                <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
+                  {new Date(rec.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+
+              <p style={{ fontSize: 13.5, color: '#CCC', lineHeight: 1.65, whiteSpace: 'pre-wrap', marginBottom: rec.coachResponse ? 10 : 0 }}>
+                {rec.answer}
+              </p>
+
+              {rec.coachResponse && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.3)', border: `1px solid ${rec.moduleColor || '#D4AF37'}20` }}>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: rec.moduleColor || '#D4AF37', opacity: 0.7, marginBottom: 6 }}>AI COACH</p>
+                  <p style={{ fontSize: 13, color: '#CCC', lineHeight: 1.65 }}>{rec.coachResponse}</p>
+                </div>
+              )}
+
+              <button
+                onClick={() => onOpenLesson(lessonId)}
+                style={{
+                  marginTop: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  fontSize: 11, fontWeight: 700, color: rec.moduleColor || '#D4AF37',
+                  fontFamily: 'Satoshi,sans-serif', display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                Open lesson
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

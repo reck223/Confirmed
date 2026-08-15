@@ -14,7 +14,30 @@ type Stats = {
   totalFollows: number; follows7d: number
   totalCircleJoins: number
 }
-type Builder = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; xp: number; level: number; streak: number; goals_complete: number; created_at: string }
+type BuilderUsage = {
+  workout: number; budget: number; challenges: number; meals: number; reading: number
+  journal: number; posts: number; playbook: number; inCircle: boolean
+  lastActiveDaysAgo: number | null
+}
+type Builder = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; xp: number; level: number; streak: number; goals_complete: number; created_at: string; usage: BuilderUsage }
+
+const USAGE_META: { key: keyof BuilderUsage; label: string; emoji: string; color: string }[] = [
+  { key: 'workout',    label: 'Workout',    emoji: '🏋️', color: '#ef4444' },
+  { key: 'budget',     label: 'Budget',     emoji: '💰', color: '#22c55e' },
+  { key: 'challenges', label: 'Challenges', emoji: '🏆', color: '#D4AF37' },
+  { key: 'meals',      label: 'Meals',      emoji: '🥗', color: '#f97316' },
+  { key: 'reading',    label: 'Reading',    emoji: '📖', color: '#38bdf8' },
+  { key: 'playbook',   label: 'The Path',   emoji: '📚', color: '#a78bfa' },
+  { key: 'journal',    label: 'Journal',    emoji: '📓', color: '#f472b6' },
+  { key: 'posts',      label: 'Posts',      emoji: '📣', color: '#fb923c' },
+]
+function lastActiveLabel(d: number | null): { text: string; color: string } {
+  if (d === null) return { text: 'inactive 30+d', color: 'rgba(255,255,255,0.3)' }
+  if (d === 0) return { text: 'active today', color: '#4ade80' }
+  if (d <= 3) return { text: `active ${d}d ago`, color: '#4ade80' }
+  if (d <= 10) return { text: `active ${d}d ago`, color: '#fbbf24' }
+  return { text: `active ${d}d ago`, color: '#f87171' }
+}
 type CircleReq = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; streak: number; goals_complete: number; circle_module_complete: boolean; created_at: string }
 type RetentionData = { dau: number; wau: number; mau: number }
 type ToolUsage = { tool: string; emoji: string; count: number; color: string }
@@ -135,24 +158,56 @@ function HorizBar({ label, count, total, color, emoji }: { label: string; count:
 // ── Builder avatar row ────────────────────────────────────────────────────────
 
 function BuilderRow({ b, rank }: { b: Builder; rank: number }) {
+  const [open, setOpen] = useState(false)
+  const active = lastActiveLabel(b.usage.lastActiveDaysAgo)
   return (
-    <Link href={`/profile/${b.id}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: rank === 0 ? 'rgba(212,175,55,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${rank === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
-      <span style={{ fontSize: 11, fontWeight: 900, color: rank === 0 ? '#D4AF37' : rank === 1 ? '#aaa' : rank === 2 ? '#fb923c' : 'rgba(255,255,255,0.35)', minWidth: 18, textAlign: 'center' }}>
-        {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
-      </span>
-      <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarGrad(b.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
-        {b.avatar_url ? <Image src={b.avatar_url} alt={b.full_name ?? ''} fill style={{ objectFit: 'cover' }} /> : initials(b.full_name)}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.full_name ?? 'Builder'}</p>
-        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)' }}>{b.username ? `@${b.username}` : `Level ${b.level}`} · joined {new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
-      </div>
-      <div style={{ display: 'flex', gap: 12, flexShrink: 0, textAlign: 'right' }}>
-        <div><p style={{ fontSize: 13, fontWeight: 900, color: '#D4AF37', lineHeight: 1 }}>{b.xp.toLocaleString()}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>XP</p></div>
-        <div><p style={{ fontSize: 13, fontWeight: 900, color: '#fbbf24', lineHeight: 1 }}>{b.streak}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>WKS</p></div>
-        <div><p style={{ fontSize: 13, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{b.goals_complete}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>DONE</p></div>
-      </div>
-    </Link>
+    <div style={{ borderRadius: 16, background: rank === 0 ? 'rgba(212,175,55,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${rank === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.06)'}`, overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+      >
+        <span style={{ fontSize: 11, fontWeight: 900, color: rank === 0 ? '#D4AF37' : rank === 1 ? '#aaa' : rank === 2 ? '#fb923c' : 'rgba(255,255,255,0.35)', minWidth: 18, textAlign: 'center' }}>
+          {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
+        </span>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarGrad(b.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+          {b.avatar_url ? <Image src={b.avatar_url} alt={b.full_name ?? ''} fill style={{ objectFit: 'cover' }} /> : initials(b.full_name)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.full_name ?? 'Builder'}</p>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {b.username ? `@${b.username}` : `Level ${b.level}`} · <span style={{ color: active.color, fontWeight: 700 }}>{active.text}</span>
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0, textAlign: 'right' }}>
+          <div><p style={{ fontSize: 13, fontWeight: 900, color: '#D4AF37', lineHeight: 1 }}>{b.xp.toLocaleString()}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>XP</p></div>
+          <div><p style={{ fontSize: 13, fontWeight: 900, color: '#fbbf24', lineHeight: 1 }}>{b.streak}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>WKS</p></div>
+          <div><p style={{ fontSize: 13, fontWeight: 900, color: '#4ade80', lineHeight: 1 }}>{b.goals_complete}</p><p style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>DONE</p></div>
+        </div>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ padding: '4px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12, marginBottom: 12 }}>
+            {USAGE_META.map(u => (
+              <div key={u.key} style={{ borderRadius: 12, background: `${u.color}0d`, border: `1px solid ${u.color}22`, padding: '8px 6px', textAlign: 'center' }}>
+                <p style={{ fontSize: 14 }}>{u.emoji}</p>
+                <p style={{ fontSize: 13, fontWeight: 900, color: u.color, lineHeight: 1.2 }}>{b.usage[u.key] as number}</p>
+                <p style={{ fontSize: 7, fontWeight: 700, letterSpacing: '0.06em', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{u.label.toUpperCase()}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: b.usage.inCircle ? '#4ade80' : 'rgba(255,255,255,0.35)' }}>
+              {b.usage.inCircle ? '⭕ In a circle' : 'Not in a circle'}
+            </span>
+            <Link href={`/profile/${b.id}`} style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8', textDecoration: 'none' }}>
+              View public profile →
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -485,8 +540,8 @@ export function CreatorClient({ stats, topBuilders, signupChart, categoryBreakdo
         ))}
       </div>
 
-      {/* ── PLAYBOOK ANALYTICS ── */}
-      <SectionLabel label="PLAYBOOK COMPLETION" color="#a78bfa" />
+      {/* ── THE PATH ANALYTICS ── */}
+      <SectionLabel label="THE PATH COMPLETION" color="#a78bfa" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
         {Object.entries(playbookModules).map(([modTitle, mod]) => {
           const maxC = Math.max(...mod.lessons.map(l => l.completed), 1)

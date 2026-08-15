@@ -114,6 +114,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
   const [connectDuration, setConnectDuration] = useState(30)
   const [connectSending, setConnectSending] = useState(false)
   const [connectSent, setConnectSent] = useState(existingConnectionStatus !== 'none')
+  const [connectError, setConnectError] = useState('')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
@@ -128,9 +129,12 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
   async function handleConnect() {
     if (!connectTitle.trim() || !connectCommitment.trim()) return
     setConnectSending(true)
+    setConnectError('')
     const result = await proposeConnection(profile.id, connectTitle, connectCommitment, connectDuration)
     setConnectSending(false)
-    if (!result.error) {
+    if (result.error) {
+      setConnectError(result.error)
+    } else {
       setConnectSent(true)
       setShowConnectSheet(false)
       startTransition(() => { router.refresh() })
@@ -405,7 +409,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
                   Make a covenant with {firstName}
                 </p>
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', marginTop: 6, fontWeight: 300 }}>
-                  A time-bound mutual commitment. They can accept or decline.
+                  A promise you keep together, for a set stretch of time. {firstName} can accept whenever they&apos;re ready.
                 </p>
               </div>
 
@@ -456,6 +460,13 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
                   ))}
                 </div>
               </div>
+
+              {/* Error */}
+              {connectError && (
+                <p style={{ fontSize: 13, color: '#f87171', marginBottom: 12, padding: '10px 14px', background: 'rgba(248,113,113,0.08)', borderRadius: 10, border: '1px solid rgba(248,113,113,0.2)' }}>
+                  {connectError}
+                </p>
+              )}
 
               {/* Send button */}
               <button

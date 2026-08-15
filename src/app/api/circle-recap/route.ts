@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { buildCircleSummary } from '@/lib/circleSummary'
 import Anthropic from '@anthropic-ai/sdk'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
-  try {
-    const {
-      circleName, covenant, seasonDuration, members, totalPosts,
-      topContributors, weeklyHighs, creatorName,
-    } = await req.json()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ text: null }, { status: 401 })
 
-    const memberLines = (members as { full_name: string | null; post_count_total: number; streak: number }[])
-      .sort((a, b) => b.post_count_total - a.post_count_total)
-      .map(m => `- ${m.full_name ?? 'Member'}: ${m.post_count_total} posts, ${m.streak}-week streak`)
+  try {
+    const { circleId } = await req.json() as { circleId: string }
+    if (!circleId) return NextResponse.json({ text: null }, { status: 400 })
+
+    const summary = await buildCircleSummary(supabase, user.id, circleId)
+    if (!summary) return NextResponse.json({ text: null }, { status: 403 })
+    const { circleName, covenant, seasonDuration, members, totalPostsSeason, topContributors, creatorName } = summary
+
+    const memberLines = [...members]
+      .sort((a, b) => b.post_count_season - a.post_count_season)
+      .map(m => `- ${m.full_name ?? 'Member'}: ${m.post_count_season} posts, ${m.streak}-week streak`)
       .join('\n')
 
     const ctx = [
@@ -20,11 +28,10 @@ export async function POST(req: NextRequest) {
       covenant ? `Covenant: "${covenant}"` : '',
       `Season length: ${seasonDuration} days`,
       `Creator: ${creatorName ?? 'the leader'}`,
-      `Total posts this season: ${totalPosts}`,
+      `Total posts this season: ${totalPostsSeason}`,
       `Members (${members.length} total):`,
       memberLines,
-      topContributors?.length ? `\nTop contributors: ${(topContributors as string[]).join(', ')}` : '',
-      weeklyHighs?.length ? `\nWeekly highlights: ${(weeklyHighs as string[]).join('; ')}` : '',
+      topContributors.length ? `\nTop contributors: ${topContributors.join(', ')}` : '',
     ].filter(Boolean).join('\n')
 
     const msg = await client.messages.create({

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import confetti from 'canvas-confetti'
@@ -9,6 +9,7 @@ import { generateMilestones } from './aiActions'
 import { CATEGORIES, categoryLabel } from '@/lib/categories'
 import { getLevelInfo, LEVELS } from '@/lib/xp'
 import type { Goal, GoalMilestone, GoalBook } from '@/lib/types/database'
+import { usePageVoiceContext } from '@/lib/pageVoiceContext'
 
 type CeremonyData = {
   goalTitle: string
@@ -693,6 +694,19 @@ function GoalTemplatePicker({ onSelect, onSkip }: { onSelect: (t: GoalTemplateIt
 type TrackerBook = { id: string; title: string; author: string | null; total_pages: number | null; current_page: number; status: string; goal_id: string }
 
 export function GoalsClient({ goals, milestones, books: allBooks, entries: allEntries, trackerBooks: allTrackerBooks = [], initialGoalId, firstName, streak }: { goals: Goal[]; milestones: GoalMilestone[]; books: GoalBook[]; entries: GoalEntry[]; trackerBooks?: TrackerBook[]; initialGoalId?: string | null; firstName?: string; streak?: number }) {
+  const pageSummary = useMemo(() => {
+    const active = goals.filter(g => g.status === 'active')
+    const complete = goals.filter(g => g.status === 'complete')
+    if (!goals.length) return 'No goals yet. This is where you can create your first one.'
+    const parts: string[] = [`You have ${active.length} active goal${active.length === 1 ? '' : 's'}`]
+    parts.push(active.length
+      ? `: ${active.slice(0, 5).map(g => `"${g.title}" at ${g.progress}%`).join(', ')}${active.length > 5 ? `, and ${active.length - 5} more` : ''}.`
+      : '.')
+    if (complete.length) parts.push(`${complete.length} completed so far.`)
+    return parts.join(' ')
+  }, [goals])
+  usePageVoiceContext('Goals', pageSummary)
+
   const [showCreate, setShowCreate] = useState(false)
   const [createView, setCreateView] = useState<'templates' | 'form'>('templates')
   const [tmplTitle, setTmplTitle] = useState('')

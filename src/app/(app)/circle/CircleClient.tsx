@@ -1,5 +1,6 @@
 'use client'
 import { useState, useTransition, useRef, useEffect, type ChangeEvent } from 'react'
+import confetti from 'canvas-confetti'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -324,6 +325,7 @@ export function CircleClient({
   const [showRecap, setShowRecap] = useState(false)
   const [recapText, setRecapText] = useState<string | null>(null)
   const [recapLoading, setRecapLoading] = useState(false)
+  const [circleCelebration, setCircleCelebration] = useState(false)
   const router = useRouter()
   const postFileRef = useRef<HTMLInputElement>(null)
 
@@ -335,6 +337,36 @@ export function CircleClient({
   const nonMemberProfiles = discoverProfiles.filter(p => !memberIdSet.has(p.id))
   const myCommitment = localCommitments.find(c => c.user_id === userId) ?? null
   const othersCommitments = localCommitments.filter(c => c.user_id !== userId)
+
+  // Circle-wide celebration: everyone in the circle has a "done" commitment
+  // for the current week. Fires once per circle per week (localStorage-gated
+  // so reloading the page, or another member finishing after you, doesn't
+  // replay it every visit).
+  const primaryCircleCommitments = primaryCircle ? localCommitments.filter(c => c.circle_id === primaryCircle.id) : []
+  const circleFullyCommitted = !!primaryCircle
+    && memberStatuses.length > 1
+    && primaryCircleCommitments.length === memberStatuses.length
+    && primaryCircleCommitments.every(c => c.status === 'done')
+  const celebrationWeekStart = primaryCircleCommitments[0]?.week_start ?? null
+
+  useEffect(() => {
+    if (!circleFullyCommitted || !primaryCircle || !celebrationWeekStart) return
+    const key = `circle-celebrated-${primaryCircle.id}-${celebrationWeekStart}`
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+
+    const end = Date.now() + 700
+    ;(function frame() {
+      confetti({ particleCount: 3, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors: ['#D4AF37', '#4ade80', '#a78bfa', '#38bdf8'] })
+      confetti({ particleCount: 3, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors: ['#D4AF37', '#4ade80', '#a78bfa', '#38bdf8'] })
+      if (Date.now() < end) requestAnimationFrame(frame)
+    })()
+
+    setCircleCelebration(true)
+    const timer = setTimeout(() => setCircleCelebration(false), 4000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circleFullyCommitted, primaryCircle?.id, celebrationWeekStart])
 
   // Season + health derived values
   const today = new Date()
@@ -409,17 +441,7 @@ export function CircleClient({
     const res = await fetch('/api/circle-coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        circleName: primaryCircle.name,
-        covenant: primaryCircle.covenant,
-        healthScore,
-        daysLeft,
-        seasonDuration: primaryCircle.season_duration,
-        members: memberStatuses,
-        commitments: weekCommitments.map(c => ({ full_name: c.full_name, text: c.text })),
-        recentPosts: posts.slice(0, 8).map(p => ({ author_name: p.author_name, type: p.type, content: p.content })),
-        creatorName: userName,
-      }),
+      body: JSON.stringify({ circleId: primaryCircle.id }),
     })
     const data = await res.json()
     setCoachText(data.text ?? 'Unable to generate insights right now.')
@@ -429,22 +451,10 @@ export function CircleClient({
   async function fetchRecap() {
     if (!primaryCircle) return
     setRecapLoading(true); setShowRecap(true); setRecapText(null)
-    const totalPosts = posts.length
-    const sorted = [...memberStatuses].sort((a, b) => (b.post_count_week ?? 0) - (a.post_count_week ?? 0))
-    const topContributors = sorted.slice(0, 3).map(m => m.full_name ?? 'Member')
     const res = await fetch('/api/circle-recap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        circleName: primaryCircle.name,
-        covenant: primaryCircle.covenant,
-        seasonDuration: primaryCircle.season_duration,
-        members: memberStatuses.map(m => ({ full_name: m.full_name, post_count_total: m.post_count_week, streak: m.streak })),
-        totalPosts,
-        topContributors,
-        weeklyHighs: [],
-        creatorName: userName,
-      }),
+      body: JSON.stringify({ circleId: primaryCircle.id }),
     })
     const data = await res.json()
     setRecapText(data.text ?? 'Unable to generate recap right now.')
@@ -478,10 +488,10 @@ export function CircleClient({
 
   // ── Tab navigation ──
   const TABS = [
-    { k: 'board' as const,    l: '⚔️ Board' },
-    { k: 'feed' as const,     l: '💬 Feed' },
-    { k: 'sessions' as const, l: '📅 Sessions' },
-    { k: 'discover' as const, l: '🔍 Discover' },
+    { k: 'board' as const,    l: '⚡ This Week' },
+    { k: 'feed' as const,     l: '💬 Posts' },
+    { k: 'sessions' as const, l: '📅 Calls' },
+    { k: 'discover' as const, l: '🌍 Explore' },
   ]
 
   const inviteLink = primaryCircle ? `https://confirmedcreations.com/join/${primaryCircle.code}` : ''
@@ -819,7 +829,47 @@ export function CircleClient({
               <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${healthScore}%`, background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`, borderRadius: 99, boxShadow: `0 0 8px ${healthColor}55`, transition: 'width 1.2s cubic-bezier(0.4,0,0.2,1)' }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 7 }}>
+
+              {/* Health breakdown — shows what drives the score */}
+              {memberStatuses.length > 0 && (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {(() => {
+                    const postsCount = memberStatuses.filter(m => m.post_count_week > 0).length
+                    const commitCount = new Set(weekCommitments.map(c => c.user_id)).size
+                    const total = memberStatuses.length
+                    const postsPct = Math.round((postsCount / total) * 100)
+                    const commitPct = Math.round((commitCount / total) * 100)
+                    const myPosted = memberStatuses.some(m => m.user_id === userId && m.post_count_week > 0)
+                    const myCommitted = weekCommitments.some(c => c.user_id === userId)
+                    return (
+                      <>
+                        {[
+                          { label: 'Posts this week', count: postsCount, total, pct: postsPct, color: '#4ade80', weight: '60%', done: myPosted, cta: 'Post an update →' },
+                          { label: 'Commitments set', count: commitCount, total, pct: commitPct, color: '#D4AF37', weight: '40%', done: myCommitted, cta: 'Set your commitment →' },
+                        ].map(row => (
+                          <div key={row.label}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: row.color, display: 'inline-block', flexShrink: 0 }} />
+                                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', fontWeight: 500 }}>{row.label}</span>
+                                {!row.done && (
+                                  <span style={{ fontSize: 9, fontWeight: 800, color: row.color, padding: '1px 6px', borderRadius: 99, background: `${row.color}14`, border: `1px solid ${row.color}30` }}>YOU</span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{row.count}/{row.total} · <span style={{ color: 'rgba(255,255,255,0.22)' }}>{row.weight} of score</span></span>
+                            </div>
+                            <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${row.pct}%`, background: row.color, borderRadius: 99, transition: 'width 0.8s ease', opacity: 0.8 }} />
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>
                   {daysLeft === null ? 'Season active' : daysLeft === 0 ? 'Last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}{primaryCircle.season_duration ? ` · ${primaryCircle.season_duration}d season` : ''}
                 </span>
@@ -1006,7 +1056,32 @@ export function CircleClient({
         <>
           {/* ── Weekly Commitments ── */}
           <div style={{ marginBottom: 28 }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>THIS WEEK&apos;S COMMITMENTS</p>
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 2 }}>THIS WEEK&apos;S COMMITMENTS</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 400 }}>One thing you&apos;re locking in. Your circle holds you to it.</p>
+            </div>
+
+            {/* First-time guide — show when no one has committed yet this week */}
+            {!myCommitment && localCommitments.length === 0 && (
+              <div style={{ borderRadius: 16, border: '1px solid rgba(212,175,55,0.15)', background: 'rgba(212,175,55,0.04)', padding: '16px 18px', marginBottom: 14 }}>
+                <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: '#D4AF37', marginBottom: 12 }}>HOW YOUR CIRCLE WORKS</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { step: '1', label: 'Commit', desc: 'Each week, declare the one thing you\'ll get done. Your circle witnesses it.' },
+                    { step: '2', label: 'Show up', desc: 'Post wins, lessons, progress, or questions as you work through the week.' },
+                    { step: '3', label: 'Reflect', desc: 'Do a weekly reflection. Rate your week, title it, and share what you learned.' },
+                  ].map(item => (
+                    <div key={item.step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: '#D4AF37', flexShrink: 0, marginTop: 1 }}>{item.step}</div>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: '#EFEFEF', marginBottom: 2 }}>{item.label}</p>
+                        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 }}>{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* My commitment or CTA */}
             {myCommitment ? (
@@ -1040,16 +1115,14 @@ export function CircleClient({
               />
             ))}
 
-            {localCommitments.length === 0 && (
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', textAlign: 'center', paddingTop: 4 }}>
-                Be the first to post your commitment this week.
-              </p>
-            )}
           </div>
 
           {/* Who's Showing Up — member status grid */}
           <div style={{ marginBottom: 28 }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 14 }}>WHO&apos;S SHOWING UP</p>
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 2 }}>WHO&apos;S SHOWING UP</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 400 }}>Active this week — gold ring means they posted today.</p>
+            </div>
             {memberStatuses.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <p style={{ fontSize: 32, marginBottom: 12 }}>👥</p>
@@ -1068,7 +1141,10 @@ export function CircleClient({
           {/* Weekly leaderboard */}
           {leaderboard.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>THIS WEEK&apos;S BOARD</p>
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)', marginBottom: 2 }}>THIS WEEK&apos;S BOARD</p>
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 400 }}>2 pts per post · 5 pts per reflection</p>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {leaderboard.map((entry, i) => (
                   <div key={entry.user_id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: i === 0 ? 'rgba(212,175,55,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${i === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
@@ -1222,9 +1298,9 @@ export function CircleClient({
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', fontWeight: 300 }}>Be the first to share a win or update.</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filteredPosts.map(post => (
-                <FeedGridCell key={post.id} post={post} onClick={() => setExpandedPost(post)} />
+                <FeedListRow key={post.id} post={post} onClick={() => setExpandedPost(post)} />
               ))}
             </div>
           )}
@@ -1565,6 +1641,29 @@ export function CircleClient({
           <button type="submit" disabled={isPending} className="btn-gold">{isPending ? 'JOINING...' : 'JOIN CIRCLE'}</button>
         </form>
       </CCModal>
+
+      {/* Circle-wide completion celebration */}
+      {circleCelebration && primaryCircle && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 3000, pointerEvents: 'none',
+          background: 'rgba(20,20,20,0.95)', border: '1px solid rgba(212,175,55,0.35)',
+          borderRadius: 40, padding: '12px 22px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.1)',
+          animation: 'circleCelebrateIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
+          maxWidth: 'calc(100vw - 48px)',
+        }}>
+          <style>{`@keyframes circleCelebrateIn { from{opacity:0;transform:translate(-50%,12px) scale(0.94)} to{opacity:1;transform:translate(-50%,0) scale(1)} }`}</style>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>🎉</span>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.04em', lineHeight: 1, marginBottom: 2 }}>EVERYONE SHOWED UP</p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.50)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
+              {primaryCircle.name} completed every commitment this week
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2330,6 +2429,57 @@ function FeedGridCell({ post, onClick }: { post: PostWithMeta; onClick: () => vo
           🔥{post.reactions.fire + post.reactions.strong + post.reactions.relate}
         </div>
       )}
+    </div>
+  )
+}
+
+function FeedListRow({ post, onClick }: { post: PostWithMeta; onClick: () => void }) {
+  const meta = TYPE_META[post.type] ?? TYPE_META['win']
+  const totalReactions = post.reactions.fire + post.reactions.strong + post.reactions.relate
+  const totalComments = post.comments.length
+  const timeAgo = (() => {
+    const diffMs = Date.now() - new Date(post.created_at).getTime()
+    const mins = Math.floor(diffMs / 60000)
+    if (mins < 60) return `${mins}m`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h`
+    return `${Math.floor(hrs / 24)}d`
+  })()
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ display: 'flex', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', transition: 'background 0.15s' }}
+    >
+      {/* Media thumbnail or type badge */}
+      {post.media_url ? (
+        <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+          <img src={post.media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      ) : (
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: meta.bg, border: `1px solid ${meta.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 18 }}>
+          {meta.emoji}
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Author + type + time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#EFEFEF' }}>{post.author_name ?? 'Member'}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, padding: '1px 7px', borderRadius: 99, background: meta.bg, border: `1px solid ${meta.border}` }}>{meta.label}</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginLeft: 'auto', flexShrink: 0 }}>{timeAgo}</span>
+        </div>
+        {/* Content preview */}
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, margin: 0 }}>
+          {post.content}
+        </p>
+        {/* Reactions + comments */}
+        {(totalReactions > 0 || totalComments > 0) && (
+          <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+            {totalReactions > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>🔥 {totalReactions}</span>}
+            {totalComments > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>💬 {totalComments}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

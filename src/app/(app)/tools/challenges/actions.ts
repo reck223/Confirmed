@@ -19,7 +19,7 @@ export async function createChallenge(
     category, duration_days: durationDays, start_date: startDate,
     goal_id: goalId || null,
   })
-  revalidatePath('/tools/habits')
+  revalidatePath('/tools/challenges')
   revalidatePath('/tools')
 }
 
@@ -29,7 +29,7 @@ export async function deleteChallenge(challengeId: string) {
   if (!user) throw new Error('Not authenticated')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('challenges') as any).delete().eq('id', challengeId).eq('user_id', user.id)
-  revalidatePath('/tools/habits')
+  revalidatePath('/tools/challenges')
   revalidatePath('/tools')
 }
 
@@ -56,6 +56,6 @@ export async function toggleChallengeLog(
       log_date: logDate, note: note ?? null,
     })
   }
-  revalidatePath('/tools/habits')
+  revalidatePath('/tools/challenges')
   revalidatePath('/tools')
 }

@@ -15,15 +15,21 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ reply: null }, { status: 401 })
 
   try {
-    const { schemaId, message, history, lessonId } = await req.json() as {
-      schemaId: PromptSchemaId; message: string; history: HistoryTurn[]; lessonId?: string
+    const { schemaId, message, history, lessonId, qodQuestion } = await req.json() as {
+      schemaId: PromptSchemaId; message: string; history: HistoryTurn[]; lessonId?: string; qodQuestion?: string
     }
 
     const lesson = lessonId
       ? PLAYBOOK.flatMap(m => m.lessons).find(l => l.id === lessonId)
       : undefined
 
-    const schema = buildSchemas(getTodayQod().q, lesson ? {
+    // Prefer the client's own value — computed from the browser's local
+    // date, matching what the Journal/Home page actually shows on screen.
+    // Falling back to a server-side new Date() here can pick a different
+    // weekday than the client for hours around any UTC day boundary that
+    // doesn't line up with the user's local one; only used as a fallback
+    // so this route still works for any caller that doesn't pass it.
+    const schema = buildSchemas(qodQuestion?.trim() || getTodayQod().q, lesson ? {
       title: lesson.title, content: lesson.content, reflection: lesson.reflection, pullQuote: lesson.pullQuote,
     } : undefined)[schemaId]
     if (!schema) return NextResponse.json({ reply: null }, { status: 400 })

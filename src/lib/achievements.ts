@@ -12,7 +12,7 @@ export const ACHIEVEMENT_META: Record<AchievementType, { emoji: string; title: s
   connector:        { emoji: '🤝', title: 'Connector',         desc: 'Followed 5 builders',                        color: '#f472b6' },
   coach:            { emoji: '🎙️', title: 'Coach',             desc: 'Left 10 comments for your circle',           color: '#818cf8' },
   reflector:        { emoji: '🧘', title: 'Reflector',         desc: 'Completed 4 weekly reflections',             color: '#34d399' },
-  scholar:          { emoji: '📚', title: 'Scholar',           desc: 'Finished every Playbook lesson',             color: '#fbbf24' },
+  scholar:          { emoji: '📚', title: 'Scholar',           desc: 'Finished every lesson on The Path',          color: '#fbbf24' },
   streak_4w:        { emoji: '🔥', title: '4-Week Streak',     desc: 'Showed up for 4 consecutive weeks',          color: '#f97316' },
   streak_8w:        { emoji: '🚀', title: '8-Week Streak',     desc: '8 weeks of consistent action',               color: '#f97316' },
   streak_12w:       { emoji: '👑', title: '12-Week Streak',    desc: 'A full quarter of unstoppable momentum',     color: '#D4AF37' },

@@ -14,7 +14,7 @@ const TOOLS = (p: Props) => [
   {
     href: '/playbook',
     emoji: '📚',
-    label: 'Playbook',
+    label: 'The Path',
     desc: 'Lessons · frameworks · systems',
     accent: '#D4AF37',
     shadow: 'rgba(212,175,55,0.18)',
@@ -42,7 +42,7 @@ const TOOLS = (p: Props) => [
     statDot: '#38bdf8',
   },
   {
-    href: '/tools/habits',
+    href: '/tools/challenges',
     emoji: '🏆',
     label: 'Challenges',
     desc: '30/60/90-day streaks',
@@ -52,7 +52,7 @@ const TOOLS = (p: Props) => [
     statDot: '#D4AF37',
   },
   {
-    href: '/tools/study',
+    href: '/tools/budget',
     emoji: '💰',
     label: 'Budget',
     desc: 'Income & expenses',

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 // free-exercise-db ships a single index of ~870 exercises with real photos,
 // instructions, muscles, difficulty, and equipment for every one of them —
@@ -68,6 +69,10 @@ const DIFFICULTY_MAP: Record<string, string> = {
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ images: null }, { status: 401 })
+
   const name = req.nextUrl.searchParams.get('name') ?? ''
   if (!name) {
     return NextResponse.json({ images: null }, { headers: { 'Cache-Control': 'public, max-age=86400' } })

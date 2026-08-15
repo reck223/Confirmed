@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         title: `${profile.streak}-week streak ends today, ${firstName}`,
         body: 'Do your weekly reflection before the day is out to keep it alive.',
         url: '/assess',
-      })
+      }, 'notify_streak_reminder')
       sent++
     } catch (err) {
       errors.push(`${profile.id}: ${String(err)}`)

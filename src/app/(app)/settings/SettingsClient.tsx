@@ -1,6 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { updateProfile, signOut } from './actions'
+import { useRouter } from 'next/navigation'
+import { updateProfile, updateNotificationPrefs, signOut } from './actions'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types/database'
 
@@ -71,6 +72,30 @@ function Field({ emoji, color, label, children, last }: {
   )
 }
 
+function Toggle({ checked, onChange, color }: { checked: boolean; onChange: (v: boolean) => void; color: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 42, height: 24, borderRadius: 999, flexShrink: 0, cursor: 'pointer',
+        border: `1px solid ${checked ? `${color}55` : 'rgba(255,255,255,0.1)'}`,
+        background: checked ? `${color}33` : 'rgba(255,255,255,0.06)',
+        position: 'relative', transition: 'all 0.2s', padding: 0,
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 2, left: checked ? 20 : 2,
+        width: 18, height: 18, borderRadius: '50%',
+        background: checked ? color : 'rgba(255,255,255,0.4)',
+        transition: 'left 0.2s',
+      }} />
+    </button>
+  )
+}
+
 const inp: React.CSSProperties = {
   width: '100%', padding: '10px 12px', borderRadius: 10,
   background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.07)',
@@ -92,6 +117,33 @@ export function SettingsClient({ profile }: { profile: Profile }) {
   const [pwError, setPwError]                 = useState('')
   const [pwSaved, setPwSaved]                 = useState(false)
   const [pwPending, setPwPending]             = useState(false)
+
+  const [notifyCircle, setNotifyCircle] = useState(profile.notify_circle_activity ?? true)
+  const [notifyStreak, setNotifyStreak] = useState(profile.notify_streak_reminder ?? true)
+  const [notifyDigest, setNotifyDigest] = useState(profile.notify_weekly_digest ?? true)
+  const [notifyGoalRecs, setNotifyGoalRecs] = useState(profile.notify_goal_recommendations ?? true)
+  const [notifyStaleGoal, setNotifyStaleGoal] = useState(profile.notify_stale_goal_nudge ?? true)
+  const [notifSaving, startNotifSave]   = useTransition()
+
+  const router = useRouter()
+  const [deleteArmed, setDeleteArmed]     = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting]           = useState(false)
+  const [deleteError, setDeleteError]     = useState('')
+
+  async function handleDeleteAccount() {
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' })
+      const result = await res.json()
+      if (!res.ok) { setDeleteError(result.error ?? 'Failed to delete account'); setDeleting(false); return }
+      router.replace('/signin')
+    } catch {
+      setDeleteError('Failed to delete account')
+      setDeleting(false)
+    }
+  }
 
   const initials = (profile.full_name ?? profile.username ?? '?').slice(0, 2).toUpperCase()
 
@@ -117,6 +169,22 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     })
+  }
+
+  function handleNotifToggle(field: 'notify_circle_activity' | 'notify_streak_reminder' | 'notify_weekly_digest' | 'notify_goal_recommendations' | 'notify_stale_goal_nudge', value: boolean) {
+    const next = {
+      notify_circle_activity: field === 'notify_circle_activity' ? value : notifyCircle,
+      notify_streak_reminder: field === 'notify_streak_reminder' ? value : notifyStreak,
+      notify_weekly_digest:   field === 'notify_weekly_digest'   ? value : notifyDigest,
+      notify_goal_recommendations: field === 'notify_goal_recommendations' ? value : notifyGoalRecs,
+      notify_stale_goal_nudge:     field === 'notify_stale_goal_nudge'     ? value : notifyStaleGoal,
+    }
+    if (field === 'notify_circle_activity') setNotifyCircle(value)
+    if (field === 'notify_streak_reminder') setNotifyStreak(value)
+    if (field === 'notify_weekly_digest')   setNotifyDigest(value)
+    if (field === 'notify_goal_recommendations') setNotifyGoalRecs(value)
+    if (field === 'notify_stale_goal_nudge')     setNotifyStaleGoal(value)
+    startNotifSave(async () => { await updateNotificationPrefs(next) })
   }
 
   return (
@@ -400,6 +468,46 @@ export function SettingsClient({ profile }: { profile: Profile }) {
         </button>
       </form>
 
+      {/* ── Notifications ── */}
+      <div style={{ marginTop: 20, animation: 'fadeUp 0.3s 0.24s ease both' }}>
+        <SectionLabel label="NOTIFICATIONS" color="#4ade80" />
+        <Card>
+          <Field emoji="👥" color="#4ade80" label="CIRCLE ACTIVITY">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Posts, comments &amp; reactions from your circle</p>
+              <Toggle checked={notifyCircle} onChange={v => handleNotifToggle('notify_circle_activity', v)} color="#4ade80" />
+            </div>
+          </Field>
+          <Field emoji="🔥" color="#fbbf24" label="STREAK REMINDER">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Nudge on your last chance to keep a streak alive</p>
+              <Toggle checked={notifyStreak} onChange={v => handleNotifToggle('notify_streak_reminder', v)} color="#fbbf24" />
+            </div>
+          </Field>
+          <Field emoji="📬" color="#38bdf8" label="WEEKLY DIGEST">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Email &amp; in-app recap of your week</p>
+              <Toggle checked={notifyDigest} onChange={v => handleNotifToggle('notify_weekly_digest', v)} color="#38bdf8" />
+            </div>
+          </Field>
+          <Field emoji="🎯" color="#38bdf8" label="GOAL RECOMMENDATIONS">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>When a friend thinks you&apos;d crush one of their goals</p>
+              <Toggle checked={notifyGoalRecs} onChange={v => handleNotifToggle('notify_goal_recommendations', v)} color="#38bdf8" />
+            </div>
+          </Field>
+          <Field emoji="👋" color="#fbbf24" label="GOAL CHECK-INS" last>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>A nudge when one of your goals has gone quiet</p>
+              <Toggle checked={notifyStaleGoal} onChange={v => handleNotifToggle('notify_stale_goal_nudge', v)} color="#fbbf24" />
+            </div>
+          </Field>
+        </Card>
+        {notifSaving && (
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 8, paddingLeft: 4 }}>Saving…</p>
+        )}
+      </div>
+
       {/* ── Security ── */}
       <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ animation: 'fadeUp 0.3s 0.26s ease both' }}>
@@ -474,6 +582,87 @@ export function SettingsClient({ profile }: { profile: Profile }) {
               >
                 {signingOut ? 'Signing out…' : '🚪  Sign Out'}
               </button>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Your Data ── */}
+        <div style={{ animation: 'fadeUp 0.3s 0.34s ease both' }}>
+          <SectionLabel label="YOUR DATA" color="#38bdf8" />
+          <Card>
+            <div style={{ padding: '16px' }}>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)', marginBottom: 14, lineHeight: 1.65 }}>
+                Download a copy of everything you&apos;ve added to Manifest — goals, posts, assessments, and more — as a JSON file.
+              </p>
+              <a
+                href="/api/account/export"
+                className="signout-btn"
+                style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
+              >
+                ⬇️  Export My Data
+              </a>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Danger Zone ── */}
+        <div style={{ animation: 'fadeUp 0.3s 0.38s ease both' }}>
+          <SectionLabel label="DANGER ZONE" color="#f87171" />
+          <Card>
+            <div style={{ padding: '16px' }}>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)', marginBottom: 14, lineHeight: 1.65 }}>
+                Permanently deletes your account and everything tied to it — profile, goals, posts, circle history. This cannot be undone.
+              </p>
+              {!deleteArmed ? (
+                <button
+                  type="button"
+                  className="signout-btn"
+                  style={{ color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}
+                  onClick={() => setDeleteArmed(true)}
+                >
+                  🗑️  Delete Account
+                </button>
+              ) : (
+                <div>
+                  <p style={{ fontSize: 12, color: '#f87171', fontWeight: 600, marginBottom: 8 }}>
+                    Type DELETE to confirm.
+                  </p>
+                  <input
+                    value={deleteConfirm}
+                    onChange={e => setDeleteConfirm(e.target.value)}
+                    placeholder="DELETE"
+                    className="s-input"
+                    style={{ ...inp, marginBottom: 10, borderColor: 'rgba(248,113,113,0.3)' }}
+                  />
+                  {deleteError && (
+                    <p style={{ fontSize: 12, color: '#f87171', fontWeight: 600, marginBottom: 8 }}>{deleteError}</p>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="signout-btn"
+                      style={{ flex: 1 }}
+                      onClick={() => { setDeleteArmed(false); setDeleteConfirm(''); setDeleteError('') }}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="signout-btn"
+                      style={{
+                        flex: 1, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)',
+                        opacity: deleteConfirm !== 'DELETE' ? 0.4 : 1,
+                        cursor: deleteConfirm !== 'DELETE' ? 'not-allowed' : 'pointer',
+                      }}
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirm !== 'DELETE' || deleting}
+                    >
+                      {deleting ? 'Deleting…' : 'Confirm Delete'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>

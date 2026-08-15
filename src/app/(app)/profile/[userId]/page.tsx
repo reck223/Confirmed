@@ -24,7 +24,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       .select('status')
       .or(`and(proposer_id.eq.${user.id},receiver_id.eq.${targetId}),and(proposer_id.eq.${targetId},receiver_id.eq.${user.id})`)
       .in('status', ['pending', 'active'])
-      .maybeSingle(),
+      .maybeSingle()
+      .then((r: { data: unknown; error: { code?: string } | null }) =>
+        r.error?.code === '42P01' ? { data: null, error: null } : r
+      ),
     supabase.from('assessments').select('week_start, rating').eq('user_id', targetId).order('week_start', { ascending: false }).limit(26),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('posts') as any).select('id, content, type, created_at, media_url, media_type').eq('user_id', targetId).eq('visibility', 'public').order('created_at', { ascending: false }).limit(30),

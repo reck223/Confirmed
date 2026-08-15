@@ -303,7 +303,7 @@ export async function createPost(circleId: string, formData: FormData) {
       title: `${posterName} shared a ${typeLabel[postType] ?? 'post'}`,
       body: content.slice(0, 80),
       url: '/circle',
-    }),
+    }, 'notify_circle_activity'),
   ]))
 
   revalidatePath('/circle')
@@ -348,7 +348,7 @@ export async function addComment(postId: string, content: string) {
         title: `${commenterName} commented on your post`,
         body: text.slice(0, 80),
         url: '/circle',
-      }),
+      }, 'notify_circle_activity'),
     ])
   }
 
@@ -428,7 +428,7 @@ export async function toggleReaction(postId: string, type: 'fire' | 'strong' | '
           title: `${reactorName} reacted ${emoji[type] ?? ''} to your post`,
           body: p.content.slice(0, 80),
           url: '/circle',
-        }))
+        }, 'notify_circle_activity'))
       }
       await Promise.all(tasks)
     }

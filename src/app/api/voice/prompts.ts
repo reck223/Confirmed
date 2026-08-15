@@ -85,7 +85,7 @@ export function buildSchemas(qodQuestion: string, lesson?: LessonForVoice): Reco
     },
     lesson: lesson ? {
       id: 'lesson', title: `Lesson: ${lesson.title}`, route: '/playbook',
-      guidance: `Walk them through today's playbook lesson, "${lesson.title}", by voice. Here is the lesson content, for your reference only — do NOT read it verbatim, that's tedious to listen to: ${lesson.pullQuote ? `Key idea: "${lesson.pullQuote}" ` : ''}${lesson.content.join(' ')}
+      guidance: `Walk them through today's Path lesson, "${lesson.title}", by voice. Here is the lesson content, for your reference only — do NOT read it verbatim, that's tedious to listen to: ${lesson.pullQuote ? `Key idea: "${lesson.pullQuote}" ` : ''}${lesson.content.join(' ')}
 First, in your own words, give a tight 2-3 sentence spoken summary of the lesson's core idea — natural and conversational, like you're explaining it to a friend, not reciting it. Then ask them this exact reflection question: "${lesson.reflection}" Let them answer however they want, at whatever length. Once they've given a real answer (not just "I don't know" — if they say that, gently prompt once more), wrap up warmly and finish.`,
       fields: [
         { id: 'reflection', label: "Their answer to the reflection question, in their own words" },

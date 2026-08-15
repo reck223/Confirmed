@@ -22,8 +22,8 @@ export default async function ExplorePage() {
 
   const goalIds = ((publicGoalsRaw ?? []) as { id: string }[]).map(g => g.id)
 
-  // Profiles of goal authors + watcher data (parallel)
-  const [{ data: profilesRaw }, { data: watchersRaw }, { data: myWatchesRaw }] = await Promise.all([
+  // Profiles of goal authors + watcher data + recommendation-adopt counts (parallel)
+  const [{ data: profilesRaw }, { data: watchersRaw }, { data: myWatchesRaw }, { data: adoptsRaw }] = await Promise.all([
     authorIds.length > 0
       ? supabase.from('profiles').select('id, full_name, avatar_url, xp, level').in('id', authorIds)
       : Promise.resolve({ data: [] }),
@@ -34,6 +34,11 @@ export default async function ExplorePage() {
     goalIds.length > 0
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (supabase.from('goal_watchers') as any).select('goal_id').in('goal_id', goalIds).eq('user_id', user.id)
+      : Promise.resolve({ data: [] }),
+    goalIds.length > 0
+      // "N people started this because of you" — count adopted recommendations per source goal
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_recommendations') as any).select('source_goal_id').in('source_goal_id', goalIds).eq('status', 'adopted')
       : Promise.resolve({ data: [] }),
   ])
 
@@ -49,6 +54,12 @@ export default async function ExplorePage() {
     watcherCountMap.set(w.goal_id, (watcherCountMap.get(w.goal_id) ?? 0) + 1)
   }
   const myWatchSet = new Set(((myWatchesRaw ?? []) as { goal_id: string }[]).map(w => w.goal_id))
+
+  const adoptedCountMap = new Map<string, number>()
+  for (const a of (adoptsRaw ?? []) as { source_goal_id: string | null }[]) {
+    if (!a.source_goal_id) continue
+    adoptedCountMap.set(a.source_goal_id, (adoptedCountMap.get(a.source_goal_id) ?? 0) + 1)
+  }
 
   // Build builders (grouped by user, sorted by XP)
   const builderMap = new Map<string, {
@@ -78,6 +89,7 @@ export default async function ExplorePage() {
       authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1,
       watcherCount: watcherCountMap.get(g.id) ?? 0,
       isWatching: myWatchSet.has(g.id),
+      adoptedCount: adoptedCountMap.get(g.id) ?? 0,
     }
   })
 

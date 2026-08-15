@@ -75,17 +75,17 @@ export default async function CreatorPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('goals') as any).select('category'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('journal_entries') as any).select('type'),
+    (supabase.from('journal_entries') as any).select('type, user_id'),
   ])
 
   // ── BATCH 2: new feature data ─────────────────────────────────────────
   const [
     { data: checkInRows },
-    { count: workoutCount },
-    { count: budgetCount },
-    { count: challengeLogCount },
-    { count: mealCount },
-    { count: bookSessionCount },
+    { data: workoutRows },
+    { data: budgetRows },
+    { data: challengeLogRows },
+    { data: mealRows },
+    { data: bookSessionRows },
     { data: playbookProgressData },
     { data: goalUserData },
     { data: completedGoalData },
@@ -94,24 +94,26 @@ export default async function CreatorPage() {
     { data: circleData },
     { data: circleMemberData },
     { data: circlePostData },
+    { data: postsAllRows },
   ] = await Promise.all([
-    // Check-ins last 30 days → DAU/WAU/MAU
+    // Check-ins last 30 days → DAU/WAU/MAU, and per-user "last active"
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('check_ins') as any).select('user_id, date').gte('date', day30s),
-    // Tool usage counts
+    // Tool usage — row-level (not head:true count) so we can also group by
+    // user_id below for the per-builder usage breakdown.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('workout_sessions') as any).select('id', { count: 'exact', head: true }),
+    (supabase.from('workout_sessions') as any).select('user_id'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('budget_transactions') as any).select('id', { count: 'exact', head: true }),
+    (supabase.from('budget_transactions') as any).select('user_id'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('challenge_logs') as any).select('id', { count: 'exact', head: true }),
+    (supabase.from('challenge_logs') as any).select('user_id'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('meal_entries') as any).select('id', { count: 'exact', head: true }),
+    (supabase.from('meal_entries') as any).select('user_id'),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('book_sessions') as any).select('id', { count: 'exact', head: true }),
-    // Playbook completions per lesson
+    (supabase.from('book_sessions') as any).select('user_id'),
+    // Playbook completions per lesson + per user
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from('playbook_progress') as any).select('lesson_id'),
+    (supabase.from('playbook_progress') as any).select('lesson_id, user_id'),
     // Funnel: distinct users at each stage
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('goals') as any).select('user_id'),
@@ -135,6 +137,9 @@ export default async function CreatorPage() {
       .select('circle_id')
       .not('circle_id', 'is', null)
       .gte('created_at', day30),
+    // All posts, per user (for the usage breakdown)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from('posts') as any).select('user_id'),
   ])
 
   // ── COMPUTED: retention ───────────────────────────────────────────────
@@ -161,16 +166,38 @@ export default async function CreatorPage() {
     { label: 'Completed a goal', count: usersCompleted,  icon: '✅', pct: totalU ? Math.round(usersCompleted / totalU * 100) : 0 },
   ]
 
-  // ── COMPUTED: tool usage ──────────────────────────────────────────────
+  // ── COMPUTED: tool usage (+ per-user breakdown for the builder list) ───
+  type UserIdRow = { user_id: string }
+  function countByUser(rows: UserIdRow[] | null): Record<string, number> {
+    const m: Record<string, number> = {}
+    for (const r of rows ?? []) m[r.user_id] = (m[r.user_id] ?? 0) + 1
+    return m
+  }
+  const workoutByUser    = countByUser(workoutRows)
+  const budgetByUser     = countByUser(budgetRows)
+  const challengeByUser  = countByUser(challengeLogRows)
+  const mealByUser       = countByUser(mealRows)
+  const bookByUser       = countByUser(bookSessionRows)
+  const postsByUser      = countByUser(postsAllRows)
+  const journalByUser    = countByUser((journalTypeRows ?? []) as UserIdRow[])
+  const playbookByUser   = countByUser((playbookProgressData ?? []) as UserIdRow[])
+  const inCircleUserSet  = new Set((circleUserData ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const lastActiveByUser: Record<string, string> = {}
+  for (const r of ciRows) {
+    if (!lastActiveByUser[r.user_id] || r.date > lastActiveByUser[r.user_id]) lastActiveByUser[r.user_id] = r.date
+  }
+
   const playbookLessonCompletions = (playbookProgressData ?? []).length
+  const journalTotal = (journalTypeRows ?? []).length
   const toolUsage = [
-    { tool: 'Workout',    emoji: '🏋️', count: workoutCount     ?? 0, color: '#ef4444' },
-    { tool: 'Budget',     emoji: '💰', count: budgetCount      ?? 0, color: '#22c55e' },
-    { tool: 'Challenges', emoji: '🏆', count: challengeLogCount ?? 0, color: '#D4AF37' },
-    { tool: 'Meals',      emoji: '🥗', count: mealCount        ?? 0, color: '#f97316' },
-    { tool: 'Reading',    emoji: '📖', count: bookSessionCount ?? 0, color: '#38bdf8' },
+    { tool: 'Workout',    emoji: '🏋️', count: workoutRows?.length      ?? 0, color: '#ef4444' },
+    { tool: 'Budget',     emoji: '💰', count: budgetRows?.length       ?? 0, color: '#22c55e' },
+    { tool: 'Challenges', emoji: '🏆', count: challengeLogRows?.length ?? 0, color: '#D4AF37' },
+    { tool: 'Meals',      emoji: '🥗', count: mealRows?.length         ?? 0, color: '#f97316' },
+    { tool: 'Reading',    emoji: '📖', count: bookSessionRows?.length  ?? 0, color: '#38bdf8' },
     { tool: 'Playbook',   emoji: '📚', count: playbookLessonCompletions, color: '#a78bfa' },
-    { tool: 'Journal',    emoji: '📓', count: (totalJournal ?? 0) + (journal7d ?? 0), color: '#f472b6' },
+    { tool: 'Journal',    emoji: '📓', count: journalTotal,              color: '#f472b6' },
   ].sort((a, b) => b.count - a.count)
 
   // ── COMPUTED: playbook funnel ─────────────────────────────────────────
@@ -244,8 +271,34 @@ export default async function CreatorPage() {
   type CircleRequest = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; streak: number; goals_complete: number; circle_module_complete: boolean; created_at: string }
   const circleRequests = (requestRows ?? []) as CircleRequest[]
 
-  type Builder = { id: string; full_name: string | null; username: string | null; avatar_url: string | null; xp: number; level: number; streak: number; goals_complete: number; created_at: string }
-  const allBuilders = (profileRows ?? []) as Builder[]
+  type BuilderUsage = {
+    workout: number; budget: number; challenges: number; meals: number; reading: number
+    journal: number; posts: number; playbook: number; inCircle: boolean
+    lastActiveDaysAgo: number | null
+  }
+  type Builder = {
+    id: string; full_name: string | null; username: string | null; avatar_url: string | null
+    xp: number; level: number; streak: number; goals_complete: number; created_at: string
+    usage: BuilderUsage
+  }
+  const allBuilders = ((profileRows ?? []) as Omit<Builder, 'usage'>[]).map(b => {
+    const lastActive = lastActiveByUser[b.id]
+    return {
+      ...b,
+      usage: {
+        workout: workoutByUser[b.id] ?? 0,
+        budget: budgetByUser[b.id] ?? 0,
+        challenges: challengeByUser[b.id] ?? 0,
+        meals: mealByUser[b.id] ?? 0,
+        reading: bookByUser[b.id] ?? 0,
+        journal: journalByUser[b.id] ?? 0,
+        posts: postsByUser[b.id] ?? 0,
+        playbook: playbookByUser[b.id] ?? 0,
+        inCircle: inCircleUserSet.has(b.id),
+        lastActiveDaysAgo: lastActive ? Math.floor((now.getTime() - new Date(lastActive).getTime()) / 86400000) : null,
+      },
+    }
+  })
 
   type RecentPost = { id: string; user_id: string; type: string; content: string; created_at: string }
   const recentPosts = (recentPostData ?? []) as RecentPost[]

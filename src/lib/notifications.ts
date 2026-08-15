@@ -1,7 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 
-export type NotifType = 'follow' | 'circle_join' | 'circle_invite' | 'message' | 'reaction' | 'assessment' | 'comment' | 'goal_complete' | 'new_session' | 'win_posted' | 'goal_reaction' | 'goal_comment' | 'witness' | 'connection_request' | 'connection_accepted'
+export type NotifType = 'follow' | 'circle_join' | 'circle_invite' | 'message' | 'reaction' | 'assessment' | 'comment' | 'goal_complete' | 'new_session' | 'win_posted' | 'goal_reaction' | 'goal_comment' | 'witness' | 'connection_request' | 'connection_accepted' | 'goal_recommendation' | 'goal_recommendation_adopted' | 'stale_goal_nudge'
 
 export async function createNotification(
   toUserId: string,

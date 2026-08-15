@@ -10,10 +10,14 @@ import { saveWorkoutSession } from '@/app/(app)/tools/workout/actions'
 import { createGoalFromVoice } from '@/app/(app)/goals/actions'
 import { completeLesson } from '@/app/(app)/playbook/actions'
 import { onHandsFreeRequest, type HandsFreeItem } from '@/lib/voiceCoachBus'
+import { onPageVoiceContextChange, type PageVoiceContext } from '@/lib/pageVoiceContext'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 type Status = 'idle' | 'listening' | 'thinking' | 'speaking' | 'unsupported' | 'error'
 type FillData = Record<string, unknown>
+
+const ERROR_MESSAGE = "Something went wrong there — give it a moment and try again."
 
 const STATUS_LABEL: Record<Status, string> = {
   idle: 'Tap to talk',
@@ -113,9 +117,48 @@ export function VoiceCoach() {
   const handsFreeRef = useRef(false)
   const queueRef = useRef<HandsFreeItem[]>([])
   const lessonIdRef = useRef<string | null>(null)
+  // Captured once, client-side, when a morning check-in session starts —
+  // and reused for every turn of that session, including the save at the
+  // end. getTodayQod() uses new Date(), which is fine called once here
+  // (the browser's real local day), but calling it independently on the
+  // server (fill/route.ts, which runs in UTC on Vercel) can pick a
+  // different weekday than what's on screen for hours around any UTC day
+  // boundary that doesn't line up with the user's local one — that's what
+  // was asking a different question than the Journal/Home page shows.
+  const qodTextRef = useRef<string | null>(null)
   const startListeningRef = useRef<() => void>(() => {})
+  const pageContextRef = useRef<PageVoiceContext | null>(null)
+  const [liveAnnouncement, setLiveAnnouncement] = useState('')
 
   const availableFills = FILL_OPTIONS.filter(f => pathname?.startsWith(f.route))
+
+  // Whatever page is currently mounted (see usePageVoiceContext) — a ref,
+  // not state, since only speak/announcePage/handleUserMessage read it
+  // inside callbacks, and none of them should need to re-render or
+  // re-memoize just because the page context changed underneath them.
+  useEffect(() => {
+    return onPageVoiceContextChange(ctx => { pageContextRef.current = ctx })
+  }, [])
+
+  // Browser-native speech synthesis — not the ElevenLabs voice, deliberately.
+  // This is the fallback for when the *primary* voice pipeline itself can't
+  // run (no SpeechRecognition support, or a fetch/network failure), so it
+  // can't depend on that same pipeline working. Near-universally available,
+  // unlike SpeechRecognition. Also mirrored into an aria-live region so a
+  // screen reader (VoiceOver/TalkBack) announces it too, for anyone pairing
+  // one with this instead of relying solely on our TTS.
+  const speakFallback = useCallback((text: string, onDone?: () => void) => {
+    setLiveAnnouncement(text)
+    try {
+      if (typeof window === 'undefined' || !window.speechSynthesis) { onDone?.(); return }
+      window.speechSynthesis.cancel()
+      const utter = new SpeechSynthesisUtterance(text)
+      utter.onend = () => onDone?.()
+      utter.onerror = () => onDone?.()
+      setStatus('speaking')
+      window.speechSynthesis.speak(utter)
+    } catch { onDone?.() }
+  }, [])
 
   // Fade the button while the page is actively being scrolled — keeps it
   // out of the way of content, back at full opacity ~500ms after scrolling
@@ -139,43 +182,41 @@ export function VoiceCoach() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [history])
 
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) setStatus('unsupported')
-  }, [])
 
   // `onDone` lets a caller run something exactly when the spoken audio
   // finishes playing (not when playback merely starts, which is when the
   // returned promise resolves) — needed so hands-free mode never starts
   // fetching the next question while the current one is still being read.
+  // Falls back to the browser's own speech synthesis — still speaking the
+  // actual reply, not just an error tone — so a network hiccup or a dead
+  // ElevenLabs call doesn't go completely silent on someone who can't see
+  // the on-screen error text either.
   const speak = useCallback(async (text: string, onDone?: () => void) => {
     setStatus('speaking')
+    const onFinish = () => {
+      if (onDone) { onDone(); return }
+      if (handsFreeRef.current) { startListeningRef.current() }
+      else { setStatus('idle') }
+    }
     try {
       const res = await fetch('/api/voice/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, persona }),
       })
-      if (!res.ok) { setStatus('error'); onDone?.(); return }
+      if (!res.ok) { speakFallback(text, onFinish); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = audioRef.current ?? new Audio()
       audioRef.current = audio
       audio.src = url
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        if (onDone) { onDone(); return }
-        if (handsFreeRef.current) { startListeningRef.current() }
-        else { setStatus('idle') }
-      }
-      audio.onerror = () => { URL.revokeObjectURL(url); setStatus('error'); onDone?.() }
+      audio.onended = () => { URL.revokeObjectURL(url); onFinish() }
+      audio.onerror = () => { URL.revokeObjectURL(url); speakFallback(text, onFinish) }
       await audio.play()
     } catch {
-      setStatus('error')
-      onDone?.()
+      speakFallback(text, onFinish)
     }
-  }, [persona])
+  }, [persona, speakFallback])
 
   const saveFillData = useCallback(async (schemaId: PromptSchemaId, data: FillData, lessonId?: string | null) => {
     const num = (v: unknown): number | null => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() ? Number(v) : null))
@@ -186,7 +227,7 @@ export function VoiceCoach() {
         checkin_type: 'morning', mood: '',
         intention: str(data.intention), task1: str(data.task1), task2: str(data.task2), task3: str(data.task3),
         excited: str(data.excited),
-        qod_question: getTodayQod().q, qod_answer: str(data.qod_answer),
+        qod_question: qodTextRef.current ?? getTodayQod().q, qod_answer: str(data.qod_answer),
       })
     } else if (schemaId === 'checkin_evening') {
       await createJournalEntryFromVoice('checkin', {
@@ -233,6 +274,7 @@ export function VoiceCoach() {
 
   const startFill = useCallback(async (schemaId: PromptSchemaId, lessonId?: string | null) => {
     lessonIdRef.current = lessonId ?? null
+    qodTextRef.current = schemaId === 'checkin_morning' ? getTodayQod().q : null
     setFillMode(schemaId)
     setHistory([])
     historyRef.current = []
@@ -241,16 +283,16 @@ export function VoiceCoach() {
       const res = await fetch('/api/voice/fill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schemaId, message: "Let's begin.", history: [], lessonId: lessonIdRef.current ?? undefined }),
+        body: JSON.stringify({ schemaId, message: "Let's begin.", history: [], lessonId: lessonIdRef.current ?? undefined, qodQuestion: qodTextRef.current ?? undefined }),
       })
       const data = await res.json()
-      if (!data.reply) { setStatus('error'); return }
+      if (!data.reply) { speakFallback(ERROR_MESSAGE); return }
       setHistory([{ role: 'assistant', content: data.reply }])
       await speak(data.reply)
     } catch {
-      setStatus('error')
+      speakFallback(ERROR_MESSAGE)
     }
-  }, [speak])
+  }, [speak, speakFallback])
 
   // Hands-free mode walks through a queue of items (e.g. morning check-in,
   // then today's lesson) end to end with no taps — each speak() auto-starts
@@ -278,10 +320,10 @@ export function VoiceCoach() {
         const res = await fetch('/api/voice/fill', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ schemaId: fillMode, message, history: historyRef.current, lessonId: lessonIdRef.current ?? undefined }),
+          body: JSON.stringify({ schemaId: fillMode, message, history: historyRef.current, lessonId: lessonIdRef.current ?? undefined, qodQuestion: qodTextRef.current ?? undefined }),
         })
         const data = await res.json()
-        if (!data.reply) { setStatus('error'); return }
+        if (!data.reply) { speakFallback(ERROR_MESSAGE); return }
         setHistory([...nextHistory, { role: 'assistant', content: data.reply }])
         if (data.done && data.data) {
           await saveFillData(fillMode, data.data, lessonIdRef.current)
@@ -301,16 +343,16 @@ export function VoiceCoach() {
       const res = await fetch('/api/voice/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history: historyRef.current, persona }),
+        body: JSON.stringify({ message, history: historyRef.current, persona, pageContext: pageContextRef.current }),
       })
       const data = await res.json()
-      if (!data.text) { setStatus('error'); return }
+      if (!data.text) { speakFallback(ERROR_MESSAGE); return }
       setHistory([...nextHistory, { role: 'assistant', content: data.text }])
       await speak(data.text)
     } catch {
-      setStatus('error')
+      speakFallback(ERROR_MESSAGE)
     }
-  }, [fillMode, persona, speak, saveFillData, advanceQueue])
+  }, [fillMode, persona, speak, speakFallback, saveFillData, advanceQueue])
 
   const exitFill = useCallback(() => {
     setFillMode(null)
@@ -323,25 +365,15 @@ export function VoiceCoach() {
     lessonIdRef.current = null
   }, [])
 
-  const startListening = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) { setStatus('unsupported'); return }
-    const rec = new SR()
-    rec.continuous = false
-    rec.interimResults = false
-    rec.lang = 'en-US'
-    rec.onresult = (e: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {
-      const transcript = e.results[0][0].transcript
-      handleUserMessage(transcript)
-    }
-    rec.onerror = () => setStatus('idle')
-    rec.onend = () => setStatus(s => s === 'listening' ? 'idle' : s)
-    rec.start()
-    setStatus('listening')
-  }, [handleUserMessage])
+  const { start: startListening, supported: speechSupported } = useSpeechRecognition({
+    onResult: handleUserMessage,
+    onStart: () => setStatus('listening'),
+    onError: () => setStatus('idle'),
+    onEnd: () => setStatus(s => s === 'listening' ? 'idle' : s),
+  })
 
   useEffect(() => { startListeningRef.current = startListening }, [startListening])
+  useEffect(() => { if (!speechSupported) setStatus('unsupported') }, [speechSupported])
 
   // Lets the home page (or any other component) start a hands-free run —
   // e.g. "morning check-in, then today's lesson" — via a decoupled event
@@ -358,6 +390,37 @@ export function VoiceCoach() {
       startFill(items[0].schemaId, items[0].lessonId ?? null)
     })
   }, [startFill])
+
+  // Speaks a greeting + description of what's on the current page, using
+  // pageContext — doesn't need SpeechRecognition at all (no listening
+  // involved), so it still works even when status is 'unsupported'. This is
+  // the whole point of the "usable without looking at it" redesign: opening
+  // the coach itself tells you what's here, instead of sitting silent until
+  // you already know to ask.
+  const announcePage = useCallback(async () => {
+    setStatus('thinking')
+    try {
+      const res = await fetch('/api/voice/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ announce: true, history: [], persona, pageContext: pageContextRef.current }),
+      })
+      const data = await res.json()
+      if (!data.text) { speakFallback(ERROR_MESSAGE); return }
+      setHistory([{ role: 'assistant', content: data.text }])
+      await speak(data.text)
+    } catch {
+      speakFallback(ERROR_MESSAGE)
+    }
+  }, [persona, speak, speakFallback])
+
+  // Opening fresh (no fill session, no history yet) always announces the
+  // page — reopening mid-conversation just reopens the panel as-is.
+  function toggleOpen() {
+    const opening = !open
+    setOpen(opening)
+    if (opening && !fillMode && history.length === 0) announcePage()
+  }
 
   const p = PERSONAS[persona]
   const busy = status === 'thinking' || status === 'speaking' || status === 'listening'
@@ -490,7 +553,9 @@ export function VoiceCoach() {
             {history.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', lineHeight: 1.55 }}>
-                  Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.
+                  {status === 'thinking' || status === 'speaking'
+                    ? `${p.name} is getting oriented on this page…`
+                    : <>Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.</>}
                 </p>
                 {availableFills.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 7, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -547,6 +612,7 @@ export function VoiceCoach() {
               <button
                 onClick={startListening}
                 disabled={busy || status === 'unsupported'}
+                aria-label={status === 'listening' ? 'Stop listening' : 'Speak to your coach'}
                 style={{
                   width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: busy ? 'default' : 'pointer',
                   background: status === 'listening'
@@ -566,7 +632,7 @@ export function VoiceCoach() {
                 <MicIcon size={21} color={status === 'listening' ? '#2a0a0a' : '#191305'} />
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, height: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, height: 14 }} role="status" aria-live="polite">
               <StatusGlyph status={status} />
               <p style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
@@ -579,8 +645,17 @@ export function VoiceCoach() {
         </div>
       )}
 
+      {/* Screen-reader-only live region for spoken fallbacks (speakFallback)
+          — separate from the visual status text above, which a screen
+          reader already gets via role="status". This carries the actual
+          fallback message content so VoiceOver/TalkBack announce it even
+          though it's not shown anywhere on screen. */}
+      <div aria-live="assertive" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>
+        {liveAnnouncement}
+      </div>
+
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={toggleOpen}
         style={{
           width: 58, height: 58, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.32)', cursor: 'pointer',
           background: open ? 'linear-gradient(160deg,#1c1c1c,#0d0d0d)' : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
@@ -591,7 +666,7 @@ export function VoiceCoach() {
           animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
           transition: 'background 0.2s ease',
         }}
-        aria-label="Voice coach"
+        aria-label={open ? 'Close voice coach' : 'Open voice coach — describes this page out loud'}
       >
         {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
       </button>

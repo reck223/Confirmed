@@ -32,3 +32,34 @@ export async function completeLesson(lessonId: string) {
   revalidatePath('/playbook')
   return { success: true }
 }
+
+export async function saveReflection(input: {
+  lessonId: string
+  lessonTitle: string
+  moduleTitle: string
+  moduleColor: string
+  moduleEmoji: string
+  answer: string
+  coachResponse?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('playbook_answers') as any)
+    .upsert({
+      user_id: user.id,
+      lesson_id: input.lessonId,
+      lesson_title: input.lessonTitle,
+      module_title: input.moduleTitle,
+      module_color: input.moduleColor,
+      module_emoji: input.moduleEmoji,
+      answer: input.answer,
+      coach_response: input.coachResponse ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,lesson_id' })
+
+  if (error) return { error: error.message }
+  return { success: true }
+}

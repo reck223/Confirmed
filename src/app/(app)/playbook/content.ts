@@ -381,7 +381,7 @@ export const PLAYBOOK: Module[] = [
           'Most goal-setting focuses on what you want to have or achieve: a title, a body, a bank balance, a relationship. These are fine targets. But they\'re not really what you\'re after. What you\'re after is the version of yourself that having those things represents.',
           'The person you become is a function of what you practice. Not what you intend to practice, or what you plan to practice when life settles down. What you actually do, repeatedly, over time. That\'s who you\'re becoming — right now, in the choices you make today, this week, this year.',
           'The highest-leverage question in goal achievement isn\'t "What do I want?" It\'s "Who do I need to become to get there, and would I want to be that person even if I never got the outcome?" Because the process shapes you regardless of whether the outcome arrives on schedule.',
-          'This is the last lesson in the Playbook, but it\'s really the first one. Every other skill, framework, and habit here is in service of a single thing: becoming someone who shows up for the life they actually want, consistently, over time. Not perfectly. Consistently. That\'s the whole game.',
+          'This is the last lesson in The Path, but it\'s really the first one. Every other skill, framework, and habit here is in service of a single thing: becoming someone who shows up for the life they actually want, consistently, over time. Not perfectly. Consistently. That\'s the whole game.',
         ],
       },
     ],

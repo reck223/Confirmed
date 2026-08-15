@@ -2,6 +2,7 @@
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { watchGoal, unwatchGoal } from '@/app/(app)/goals/watch-actions'
+import { recommendGoal } from '@/app/(app)/goals/recommend-actions'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getLevelInfo } from '@/lib/xp'
@@ -17,6 +18,7 @@ export type PublicGoal = {
   created_at: string; user_id: string
   authorName: string | null; authorAvatar: string | null; authorLevel: number
   watcherCount: number; isWatching: boolean
+  adoptedCount: number
 }
 
 // ── Category meta — exact match with GoalsClient ──────────────────────────
@@ -72,7 +74,7 @@ export function ExploreClient({
   circleCode?: string | null
   embedded?: boolean
 }) {
-  void currentUserId
+  const [recommendTarget, setRecommendTarget] = useState<PublicGoal | null>(null)
   const [tab, setTab] = useState<'goals' | 'builders' | 'leaders'>('goals')
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<string | null>(null)
@@ -273,7 +275,7 @@ export function ExploreClient({
                 <div style={{ flex: 1, height: 1, background: 'rgba(74,222,128,0.12)' }} />
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{newGoals.length}</span>
               </div>
-              {newGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
+              {newGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
               {olderGoals.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 2 }}>
                   <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.35)' }}>ALL GOALS</p>
@@ -281,11 +283,11 @@ export function ExploreClient({
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{olderGoals.length}</span>
                 </div>
               )}
-              {olderGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
+              {olderGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
             </>
           )}
           {/* Flat list when searching/filtering */}
-          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g}  />)}
+          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
           {isEmpty && <EmptyState tab="goals" hasFilter={!!catFilter || !!search} />}
         </div>
       )}
@@ -352,6 +354,15 @@ export function ExploreClient({
             })}
           {leaderboard.length === 0 && <EmptyState tab="leaders" hasFilter={!!search} />}
         </div>
+      )}
+
+      {recommendTarget && (
+        <RecommendModal
+          goal={recommendTarget}
+          builders={builders}
+          currentUserId={currentUserId}
+          onClose={() => setRecommendTarget(null)}
+        />
       )}
     </div>
   )
@@ -468,7 +479,7 @@ function BuilderCard({ builder: b, circleCode }: { builder: Builder; circleCode?
 }
 
 // ── Goal Card ──────────────────────────────────────────────────────────────
-function GoalCard({ goal: g }: { goal: PublicGoal }) {
+function GoalCard({ goal: g, onRecommend }: { goal: PublicGoal; onRecommend: (g: PublicGoal) => void }) {
   const m = cat(g.category)
   const authorLevel = getLevelInfo(g.authorLevel === 1 ? 0 : g.authorLevel === 2 ? 150 : g.authorLevel === 3 ? 350 : g.authorLevel === 4 ? 700 : g.authorLevel === 5 ? 1200 : g.authorLevel === 6 ? 2000 : 3500)
   const dotsFilled = Math.round(g.progress / 10)
@@ -528,6 +539,12 @@ function GoalCard({ goal: g }: { goal: PublicGoal }) {
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 300, marginLeft: 4 }}>{g.progress}%</span>
         </div>
 
+        {g.adoptedCount > 0 && (
+          <p style={{ fontSize: 10.5, color: '#D4AF37', fontWeight: 700, marginBottom: 12 }}>
+            🎯 {g.adoptedCount} {g.adoptedCount === 1 ? 'person' : 'people'} started this because of {g.authorName ?? 'them'}
+          </p>
+        )}
+
         {/* Author row + watch button */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
           <Link href={`/profile/${g.user_id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -546,22 +563,136 @@ function GoalCard({ goal: g }: { goal: PublicGoal }) {
             <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>{g.authorName ?? 'Builder'}</span>
           </Link>
 
-          <button
-            onClick={e => { e.stopPropagation(); handleWatch() }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 12px', borderRadius: 9, border: '1px solid',
-              borderColor: watching ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.1)',
-              background: watching ? 'rgba(56,189,248,0.1)' : 'transparent',
-              color: watching ? '#38bdf8' : 'rgba(255,255,255,0.42)',
-              fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
-              transition: 'all 0.2s',
-            }}
-          >
-            {watching ? '👁 Watching' : '+ Watch'}
-            {watchCount > 0 && <span style={{ fontSize: 10, opacity: 0.7 }}>{watchCount}</span>}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={e => { e.stopPropagation(); onRecommend(g) }}
+              title="Recommend to a friend"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'transparent', color: 'rgba(255,255,255,0.42)',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+                transition: 'all 0.2s',
+              }}
+            >
+              ↗
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); handleWatch() }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', borderRadius: 9, border: '1px solid',
+                borderColor: watching ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.1)',
+                background: watching ? 'rgba(56,189,248,0.1)' : 'transparent',
+                color: watching ? '#38bdf8' : 'rgba(255,255,255,0.42)',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+                transition: 'all 0.2s',
+              }}
+            >
+              {watching ? '👁 Watching' : '+ Watch'}
+              {watchCount > 0 && <span style={{ fontSize: 10, opacity: 0.7 }}>{watchCount}</span>}
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Recommend-to-a-friend modal ─────────────────────────────────────────────
+function RecommendModal({ goal, builders, currentUserId, onClose }: {
+  goal: PublicGoal; builders: Builder[]; currentUserId: string; onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [recipientId, setRecipientId] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  const candidates = builders.filter(b =>
+    b.id !== currentUserId &&
+    (!search.trim() || b.full_name?.toLowerCase().includes(search.toLowerCase()))
+  ).slice(0, 20)
+
+  function handleSend() {
+    if (!recipientId) return
+    setSending(true)
+    setError('')
+    recommendGoal(goal.id, recipientId, note).then(res => {
+      setSending(false)
+      if (res.error) { setError(res.error); return }
+      setSent(true)
+    })
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', padding: '20px 16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: '24px 20px', maxHeight: '85dvh', overflowY: 'auto' }}>
+        {sent ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <p style={{ fontSize: 36, marginBottom: 12 }}>✓</p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#EFEFEF', marginBottom: 6 }}>Sent</p>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', marginBottom: 20 }}>They'll see it in their inbox.</p>
+            <button onClick={onClose} className="btn-ghost" style={{ width: '100%' }}>Done</button>
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: '#D4AF37', marginBottom: 6 }}>RECOMMEND</p>
+            <h3 style={{ fontSize: 18, fontWeight: 900, color: '#EFEFEF', marginBottom: 4, lineHeight: 1.3 }}>{goal.title}</h3>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginBottom: 18 }}>Send this goal to a friend — they can adopt it with one tap.</p>
+
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name…"
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#EFEFEF', fontSize: 13, fontFamily: 'Satoshi,sans-serif', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+            />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto', marginBottom: 14 }}>
+              {candidates.length === 0 && (
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '12px 0' }}>No builders found</p>
+              )}
+              {candidates.map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => setRecipientId(b.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12,
+                    border: `1px solid ${recipientId === b.id ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
+                    background: recipientId === b.id ? 'rgba(212,175,55,0.08)' : 'transparent',
+                    cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                  }}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: avatarGrad(b.id), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff', overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+                    {b.avatar_url ? <Image src={b.avatar_url} alt="" fill style={{ objectFit: 'cover' }} /> : initials(b.full_name)}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#EFEFEF' }}>{b.full_name ?? 'Builder'}</span>
+                  {recipientId === b.id && <span style={{ marginLeft: 'auto', color: '#D4AF37' }}>✓</span>}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value.slice(0, 300))}
+              placeholder="Add a note (optional) — why do you think they'd be great at this?"
+              rows={2}
+              style={{ width: '100%', padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#EFEFEF', fontSize: 13, fontFamily: 'Satoshi,sans-serif', outline: 'none', boxSizing: 'border-box', resize: 'none', marginBottom: 14 }}
+            />
+
+            {error && <p style={{ color: '#f87171', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+
+            <button
+              onClick={handleSend}
+              disabled={!recipientId || sending}
+              className="btn-gold"
+              style={{ width: '100%', opacity: !recipientId ? 0.4 : 1 }}
+            >
+              {sending ? 'SENDING…' : 'SEND RECOMMENDATION'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

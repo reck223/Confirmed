@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { markAllNotifsRead } from './actions'
 import { acceptConnection, declineConnection } from '@/app/(app)/profile/connection-actions'
 import { joinCircleById } from '@/app/(app)/circle/actions'
+import { adoptRecommendation, passRecommendation } from '@/app/(app)/goals/recommend-actions'
 
 type Conversation = {
   otherId: string
@@ -147,12 +148,47 @@ const NOTIF_META: Record<string, { emoji: string; color: string; label: (n: Noti
     sub: n => n.data.message ?? '',
     href: n => n.from_user_id ? `/profile/${n.from_user_id}` : '/inbox',
   },
+  connection_wrapup: {
+    emoji: '🤝',
+    color: '#38bdf8',
+    label: n => `Time to close out "${n.data.title ?? 'your Connection'}"`,
+    sub: n => n.data.message ?? '',
+    href: () => '/profile',
+  },
+  connection_completed: {
+    emoji: '🎉',
+    color: '#D4AF37',
+    label: n => n.data.message ?? `"${n.data.title ?? 'Your Connection'}" is complete`,
+    sub: () => '',
+    href: () => '/profile',
+  },
   circle_invite: {
     emoji: '✦',
     color: '#D4AF37',
     label: n => `${n.data.inviter_name ?? n.from_name ?? 'Someone'} invited you to their circle`,
     sub: n => n.data.circle_name ? `"${n.data.circle_name}"` : 'Tap to join',
     href: () => '/circle',
+  },
+  goal_recommendation: {
+    emoji: '🎯',
+    color: '#38bdf8',
+    label: n => `${n.data.author_name ?? n.from_name ?? 'Someone'} thinks you'd crush "${n.data.title ?? 'this goal'}"`,
+    sub: n => n.data.note ?? '',
+    href: () => '/explore',
+  },
+  goal_recommendation_adopted: {
+    emoji: '🚀',
+    color: '#4ade80',
+    label: n => n.data.message ?? `${n.from_name ?? 'Someone'} started a goal you recommended`,
+    sub: n => n.data.title ? `"${n.data.title}"` : '',
+    href: n => n.from_user_id ? `/profile/${n.from_user_id}` : '/goals',
+  },
+  stale_goal_nudge: {
+    emoji: '👋',
+    color: '#fbbf24',
+    label: n => n.data.message ?? `Your goal "${n.data.title ?? ''}" could use some attention`,
+    sub: () => 'Tap to pick it back up',
+    href: () => '/goals',
   },
 }
 
@@ -168,6 +204,7 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
   const router = useRouter()
   const [handledConnections, setHandledConnections] = useState<Record<string, 'accepted' | 'declined'>>({})
   const [handledInvites, setHandledInvites] = useState<Record<string, 'joining' | 'joined'>>({})
+  const [handledRecs, setHandledRecs] = useState<Record<string, 'adopting' | 'adopted' | 'passed'>>({})
 
   const totalUnreadMessages = conversations.reduce((s, c) => s + c.unread, 0)
 
@@ -199,6 +236,27 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
     startTransition(async () => {
       await joinCircleById(circleId)
       window.location.href = '/circle'
+    })
+  }
+
+  function handleAdoptRecommendation(recommendationId: string, notifId: string) {
+    setHandledRecs(prev => ({ ...prev, [notifId]: 'adopting' }))
+    startTransition(async () => {
+      const res = await adoptRecommendation(recommendationId)
+      if (res.error) {
+        setHandledRecs(prev => { const next = { ...prev }; delete next[notifId]; return next })
+        return
+      }
+      setHandledRecs(prev => ({ ...prev, [notifId]: 'adopted' }))
+      router.refresh()
+    })
+  }
+
+  function handlePassRecommendation(recommendationId: string, notifId: string) {
+    setHandledRecs(prev => ({ ...prev, [notifId]: 'passed' }))
+    startTransition(async () => {
+      await passRecommendation(recommendationId)
+      router.refresh()
     })
   }
 
@@ -312,14 +370,59 @@ export function InboxClient({ conversations, notifications, currentUserId: _curr
                           onClick={() => handleDeclineConnection(connectionId, notif.id)}
                           style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
                         >
-                          Decline
+                          Not now
                         </button>
                       </div>
                     )}
                     {handled && (
                       <p style={{ paddingLeft: 56, fontSize: 12, color: handled === 'accepted' ? '#4ade80' : 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
-                        {handled === 'accepted' ? '✓ Accepted' : 'Declined'}
+                        {handled === 'accepted' ? "✓ You're connected" : 'Maybe another time'}
                       </p>
+                    )}
+                  </div>
+                )
+              }
+
+              // Goal recommendations get inline Adopt/Pass buttons
+              if (notif.type === 'goal_recommendation') {
+                const recommendationId = notif.data.recommendation_id
+                const handled = recommendationId ? handledRecs[notif.id] : null
+                return (
+                  <div key={notif.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 20px', background: isUnread ? `${meta.color}0a` : 'none', borderLeft: `2px solid ${isUnread ? meta.color + '60' : 'transparent'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 14, background: `${meta.color}18`, border: `1px solid ${meta.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                        {meta.emoji}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: isUnread ? 600 : 400, color: '#EFEFEF', lineHeight: 1.4, marginBottom: 3 }}>{meta.label(notif)}</p>
+                        {notif.data.note && <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', fontWeight: 300, lineHeight: 1.5, marginTop: 3 }}>&quot;{notif.data.note}&quot;</p>}
+                        <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{timeAgo(notif.created_at)}</p>
+                      </div>
+                    </div>
+                    {recommendationId && !handled && (
+                      <div style={{ display: 'flex', gap: 8, paddingLeft: 56 }}>
+                        <button
+                          onClick={() => handleAdoptRecommendation(recommendationId, notif.id)}
+                          style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                        >
+                          Adopt goal
+                        </button>
+                        <button
+                          onClick={() => handlePassRecommendation(recommendationId, notif.id)}
+                          style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Satoshi,sans-serif' }}
+                        >
+                          Pass
+                        </button>
+                      </div>
+                    )}
+                    {recommendationId && handled === 'adopting' && (
+                      <p style={{ paddingLeft: 56, fontSize: 12, color: 'rgba(255,255,255,0.42)', fontWeight: 600 }}>Adding to your goals…</p>
+                    )}
+                    {handled === 'adopted' && (
+                      <p style={{ paddingLeft: 56, fontSize: 12, color: '#4ade80', fontWeight: 600 }}>✓ Added to your goals</p>
+                    )}
+                    {handled === 'passed' && (
+                      <p style={{ paddingLeft: 56, fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Maybe another time</p>
                     )}
                   </div>
                 )

@@ -24,6 +24,11 @@ export type Database = {
           focus_areas: string[]
           pinned_goal_id: string | null
           date_of_birth: string | null
+          notify_circle_activity: boolean
+          notify_streak_reminder: boolean
+          notify_weekly_digest: boolean
+          notify_goal_recommendations: boolean
+          notify_stale_goal_nudge: boolean
           created_at: string
           updated_at: string
         }
@@ -44,6 +49,11 @@ export type Database = {
           focus_areas?: string[]
           pinned_goal_id?: string | null
           date_of_birth?: string | null
+          notify_circle_activity?: boolean
+          notify_streak_reminder?: boolean
+          notify_weekly_digest?: boolean
+          notify_goal_recommendations?: boolean
+          notify_stale_goal_nudge?: boolean
         }
         Update: {
           username?: string | null
@@ -61,6 +71,11 @@ export type Database = {
           focus_areas?: string[]
           pinned_goal_id?: string | null
           date_of_birth?: string | null
+          notify_circle_activity?: boolean
+          notify_streak_reminder?: boolean
+          notify_weekly_digest?: boolean
+          notify_goal_recommendations?: boolean
+          notify_stale_goal_nudge?: boolean
         }
       }
       circles: {
@@ -117,6 +132,7 @@ export type Database = {
           why_it_matters: string | null
           goal_type: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date: string | null
+          stale_nudge_sent_at: string | null
           created_at: string
           updated_at: string
         }
@@ -133,6 +149,7 @@ export type Database = {
           why_it_matters?: string | null
           goal_type?: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date?: string | null
+          stale_nudge_sent_at?: string | null
         }
         Update: {
           title?: string
@@ -145,6 +162,7 @@ export type Database = {
           why_it_matters?: string | null
           goal_type?: 'standard' | 'reading' | 'letter' | 'habit' | 'savings' | 'travel'
           completed_date?: string | null
+          stale_nudge_sent_at?: string | null
         }
       }
       goal_milestones: {
@@ -277,6 +295,23 @@ export type Database = {
         Row: { id: string; user_id: string; lesson_id: string; completed_at: string }
         Insert: { id?: string; user_id: string; lesson_id: string }
         Update: Record<string, never>
+      }
+      playbook_answers: {
+        Relationships: []
+        Row: {
+          id: string; user_id: string; lesson_id: string
+          lesson_title: string; module_title: string; module_color: string; module_emoji: string
+          answer: string; coach_response: string | null; updated_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; lesson_id: string
+          lesson_title?: string; module_title?: string; module_color?: string; module_emoji?: string
+          answer?: string; coach_response?: string | null; updated_at?: string
+        }
+        Update: {
+          lesson_title?: string; module_title?: string; module_color?: string; module_emoji?: string
+          answer?: string; coach_response?: string | null; updated_at?: string
+        }
       }
       post_reactions: {
         Relationships: []

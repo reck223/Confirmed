@@ -1,16 +1,18 @@
 'use client'
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { updateProfile, signOut, uploadAvatar, uploadCover, setPinnedGoal, getFollowers, getFollowing, getCircleMembers } from './actions'
+import { recordConnectionOutcome } from './connection-actions'
 import { createHomePost, uploadPostMedia, deletePost, updatePost } from '@/app/(app)/home/actions'
 import { toggleReaction, addComment, deleteComment } from '@/app/(app)/circle/actions'
 import { sendMessage } from '@/app/(app)/inbox/actions'
 import type { Profile } from '@/lib/types/database'
 import { getLevelInfo, LEVELS } from '@/lib/xp'
 import { ACHIEVEMENT_META } from '@/lib/achievements'
+import { usePageVoiceContext } from '@/lib/pageVoiceContext'
 
 type Goal = { id: string; title: string; category: string | null; progress: number; deadline: string | null; status: string; visibility: string }
 type PostComment = { id: string; user_id: string; author_name: string | null; author_avatar: string | null; content: string; created_at: string }
@@ -98,6 +100,7 @@ type Connection = {
   id: string; proposer_id: string; receiver_id: string
   title: string; commitment: string; duration_days: number
   start_date: string | null; end_date: string | null; status: string
+  outcome_proposer: string | null; outcome_receiver: string | null
   partnerName: string | null; partnerAvatar: string | null
 }
 
@@ -111,6 +114,19 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
   connections: Connection[]
   currentUserId: string
 }) {
+  const pageSummary = useMemo(() => {
+    const activeGoals = goals.filter(g => g.status === 'active')
+    const activeConnections = connections.filter(c => c.status === 'active')
+    const parts: string[] = [`Your profile. ${followersCount} follower${followersCount === 1 ? '' : 's'}, following ${followingCount}.`]
+    parts.push(activeGoals.length
+      ? `${activeGoals.length} active goal${activeGoals.length === 1 ? '' : 's'}: ${activeGoals.slice(0, 4).map(g => `"${g.title}" at ${g.progress}%`).join(', ')}.`
+      : 'No active goals right now.')
+    if (activeConnections.length) parts.push(`${activeConnections.length} active connection${activeConnections.length === 1 ? '' : 's'} with other people, working toward shared commitments.`)
+    if (myCircles?.length) parts.push(`In ${myCircles.length} circle${myCircles.length === 1 ? '' : 's'}: ${myCircles.map(c => c.name).join(', ')}.`)
+    return parts.join(' ')
+  }, [followersCount, followingCount, goals, connections, myCircles])
+  usePageVoiceContext('Profile', pageSummary)
+
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
@@ -133,6 +149,8 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
   const [selectedPost, setSelectedPost] = useState<ProfilePost | null>(null)
   const [profileTab, setProfileTab] = useState<'posts' | 'saved'>('posts')
   const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set())
+  const [outcomePending, setOutcomePending] = useState<Record<string, boolean>>({})
+  const [myOutcomes, setMyOutcomes] = useState<Record<string, 'kept' | 'broken'>>({})
   const [showCompose, setShowCompose] = useState(false)
   const [composeType, setComposeType] = useState<'win' | 'progress' | 'lesson' | 'vibe'>('win')
   const [composeContent, setComposeContent] = useState('')
@@ -328,6 +346,16 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
       const result = await createHomePost({ content: composeContent, type: composeType, mediaUrl, mediaType })
       if (result.error) { setComposeError(result.error); return }
       setShowCompose(false); resetCompose(); router.refresh()
+    })
+  }
+
+  function handleRecordOutcome(connectionId: string, outcome: 'kept' | 'broken') {
+    setOutcomePending(prev => ({ ...prev, [connectionId]: true }))
+    setMyOutcomes(prev => ({ ...prev, [connectionId]: outcome }))
+    startTransition(async () => {
+      await recordConnectionOutcome(connectionId, outcome)
+      router.refresh()
+      setOutcomePending(prev => ({ ...prev, [connectionId]: false }))
     })
   }
 
@@ -573,19 +601,18 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
         </div>
       )}
 
-      {/* ── Active Connections ── */}
+      {/* ── Connections ── */}
       {connections.length > 0 && (
         <div style={{ padding: '0 20px', marginBottom: 20 }}>
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: '#38bdf8', marginBottom: 10 }}>CONNECTIONS</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {connections.map(c => {
+            {connections.slice(0, 8).map(c => {
               const isProposer = c.proposer_id === currentUserId
               const daysLeft = c.end_date
                 ? Math.max(0, Math.ceil((new Date(c.end_date).getTime() - Date.now()) / 86400000))
                 : c.duration_days
               const total = c.duration_days
               const pct = Math.max(0, Math.min(100, Math.round(((total - daysLeft) / total) * 100)))
-              const urgency = daysLeft <= 3 ? '#f87171' : daysLeft <= 7 ? '#fb923c' : '#38bdf8'
               const initials = (name: string | null) => name ? name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '?'
               const grad = (() => {
                 const id = isProposer ? c.receiver_id : c.proposer_id
@@ -593,27 +620,105 @@ export function ProfileClient({ profile, goals, followersCount, followingCount, 
                 const gs = ['linear-gradient(135deg,#22c55e,#0ea5e9)', 'linear-gradient(135deg,#f472b6,#fb923c)', 'linear-gradient(135deg,#a78bfa,#38bdf8)', 'linear-gradient(135deg,#D4AF37,#f97316)']
                 return gs[h % gs.length]
               })()
+
+              const savedOutcome = isProposer ? c.outcome_proposer : c.outcome_receiver
+              const partnerOutcome = isProposer ? c.outcome_receiver : c.outcome_proposer
+              const myOutcome = (myOutcomes[c.id] ?? savedOutcome) as 'kept' | 'broken' | null
+              const isCompleted = c.status === 'completed'
+              const needsWrapUp = !isCompleted && daysLeft <= 0 && !myOutcome
+              const waitingOnPartner = !isCompleted && !!myOutcome && !partnerOutcome
+              const bothKept = (isProposer ? myOutcome : partnerOutcome) === 'kept' && (isProposer ? partnerOutcome : myOutcome) === 'kept'
+              const pending = !!outcomePending[c.id]
+
+              const pairedAvatar = (
+                <div style={{ position: 'relative', width: 46, height: 38, flexShrink: 0 }}>
+                  <div style={{ position: 'absolute', left: 8, top: 0, width: 38, height: 38, borderRadius: '50%', background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', overflow: 'hidden', border: '2px solid #0B0B0B' }}>
+                    {c.partnerAvatar
+                      ? <img src={c.partnerAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : initials(c.partnerName)}
+                  </div>
+                  <div style={{ position: 'absolute', left: 0, top: 4, width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#38bdf8,#0ea5e9)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', overflow: 'hidden', border: '2px solid #0B0B0B' }}>
+                    {avatarUrl
+                      ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : initials(profile.full_name ?? null)}
+                  </div>
+                </div>
+              )
+
+              // ── Completed: celebratory or gentle closure ──
+              if (isCompleted) {
+                return (
+                  <div key={c.id} style={{ borderRadius: 18, border: `1px solid ${bothKept ? 'rgba(212,175,55,0.28)' : 'rgba(255,255,255,0.08)'}`, background: bothKept ? 'linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.02))' : 'rgba(255,255,255,0.02)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {pairedAvatar}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                        <p style={{ fontSize: 11, color: bothKept ? '#D4AF37' : 'rgba(255,255,255,0.42)', marginTop: 2, fontWeight: bothKept ? 700 : 400 }}>
+                          {bothKept ? `You and ${c.partnerName ?? 'your partner'} both kept it 🎉` : `Closed out with ${c.partnerName ?? 'your partner'}`}
+                        </p>
+                      </div>
+                      <span style={{ fontSize: 18, flexShrink: 0 }}>{bothKept ? '🎉' : '🤝'}</span>
+                    </div>
+                  </div>
+                )
+              }
+
+              // ── Wrap-up: the stretch is over, waiting on my answer ──
+              if (needsWrapUp) {
+                return (
+                  <div key={c.id} style={{ borderRadius: 18, border: '1px solid rgba(212,175,55,0.28)', background: 'linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.02))', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                      {pairedAvatar}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                        <p style={{ fontSize: 11, color: '#D4AF37', marginTop: 2, fontWeight: 600 }}>Your time with {c.partnerName ?? 'them'} is up — how&apos;d it go?</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        disabled={pending}
+                        onClick={() => handleRecordOutcome(c.id, 'kept')}
+                        style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#D4AF37,#9A7010)', color: '#000', fontSize: 12, fontWeight: 800, cursor: pending ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', opacity: pending ? 0.6 : 1 }}
+                      >
+                        We did it
+                      </button>
+                      <button
+                        disabled={pending}
+                        onClick={() => handleRecordOutcome(c.id, 'broken')}
+                        style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: pending ? 'default' : 'pointer', fontFamily: 'Satoshi,sans-serif', opacity: pending ? 0.6 : 1 }}
+                      >
+                        We fell short
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+
+              // ── In progress (or waiting on partner to close it out) ──
+              const urgency = daysLeft <= 2 ? '#D4AF37' : daysLeft <= 7 ? '#fb923c' : '#38bdf8'
               return (
                 <div key={c.id} style={{ borderRadius: 18, border: '1px solid rgba(56,189,248,0.18)', background: 'linear-gradient(135deg,rgba(56,189,248,0.06),rgba(56,189,248,0.02))', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: '#fff', flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
-                      {c.partnerAvatar
-                        ? <img src={c.partnerAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
-                        : initials(c.partnerName)}
-                    </div>
+                    {pairedAvatar}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: 800, color: '#EFEFEF', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
                       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>with {c.partnerName ?? 'Builder'}</p>
                     </div>
-                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <p style={{ fontSize: 18, fontWeight: 900, color: urgency, lineHeight: 1 }}>{daysLeft}</p>
-                      <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.06em' }}>DAYS LEFT</p>
-                    </div>
+                    {waitingOnPartner ? (
+                      <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#D4AF37', textAlign: 'right', lineHeight: 1.3 }}>Waiting on<br />{c.partnerName?.split(' ')[0] ?? 'them'}</span>
+                    ) : (
+                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                        <p style={{ fontSize: 18, fontWeight: 900, color: urgency, lineHeight: 1 }}>{daysLeft}</p>
+                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.06em' }}>DAYS TO GO</p>
+                      </div>
+                    )}
                   </div>
                   <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg,#38bdf8,#0ea5e9)`, borderRadius: 2, transition: 'width 0.6s ease' }} />
                   </div>
-                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 6, fontWeight: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.commitment}</p>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 6, fontWeight: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {waitingOnPartner ? 'You closed this out — nudge them to add their side.' : daysLeft <= 2 ? `Final stretch — ${c.commitment}` : c.commitment}
+                  </p>
                 </div>
               )
             })}
@@ -1446,7 +1551,7 @@ function AchievementsSection({ earnedTypes, totalCount }: { earnedTypes: Set<str
             </>
           )}
           <Link href="/playbook" style={{ display: 'block', textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,0.42)', textDecoration: 'none', fontWeight: 600 }}>
-            Earn more in the Playbook →
+            Earn more on The Path →
           </Link>
         </div>
       )}

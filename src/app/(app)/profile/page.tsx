@@ -27,10 +27,10 @@ export default async function ProfilePage() {
     supabase.from('circle_members').select('circle_id').eq('user_id', user.id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase.from('connections') as any)
-      .select('id, proposer_id, receiver_id, title, commitment, duration_days, start_date, end_date, status')
+      .select('id, proposer_id, receiver_id, title, commitment, duration_days, start_date, end_date, status, outcome_proposer, outcome_receiver')
       .or(`proposer_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false }),
+      .in('status', ['active', 'completed'])
+      .order('updated_at', { ascending: false }),
   ])
 
   if (!data) redirect('/signin')
@@ -63,7 +63,7 @@ export default async function ProfilePage() {
   }
 
   // Build connections with partner profiles
-  type RawConnection = { id: string; proposer_id: string; receiver_id: string; title: string; commitment: string; duration_days: number; start_date: string | null; end_date: string | null; status: string }
+  type RawConnection = { id: string; proposer_id: string; receiver_id: string; title: string; commitment: string; duration_days: number; start_date: string | null; end_date: string | null; status: string; outcome_proposer: string | null; outcome_receiver: string | null }
   const rawConnections = (connectionRows ?? []) as RawConnection[]
   const partnerIds = [...new Set(rawConnections.map(c => c.proposer_id === user.id ? c.receiver_id : c.proposer_id))]
   const { data: partnerProfiles } = partnerIds.length

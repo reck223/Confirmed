@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
-import React, { useEffect, useRef, useState, useTransition } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { AiBriefing } from '@/components/AiBriefing'
 import { getTodayQod } from '@/lib/qod'
@@ -9,6 +9,7 @@ import { getTodayWod } from '@/lib/wod'
 import { markMissionDone, createHomePost, saveMorningFocus, saveEveningReflection } from './actions'
 import { submitCheckin } from '@/app/(app)/checkin/actions'
 import { startHandsFree, type HandsFreeItem } from '@/lib/voiceCoachBus'
+import { usePageVoiceContext } from '@/lib/pageVoiceContext'
 
 type MomentumDay = { date: string; dayLabel: string; done: boolean }
 type MissionGoal = {
@@ -961,6 +962,21 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
   const xpPerLevel   = level * 100
   const xpInLevel    = xp % xpPerLevel
   const xpPct        = Math.min(100, Math.round((xpInLevel / xpPerLevel) * 100))
+
+  const pageSummary = useMemo(() => {
+    const parts: string[] = [todayLabel + '.']
+    parts.push(missionGoal
+      ? `Your main goal right now is "${missionGoal.title}", ${missionGoal.progress}% done${missionGoal.next_action ? `, next action: ${missionGoal.next_action}` : ''}.`
+      : 'No goal pinned as your main focus yet.')
+    if (pendingCheckinType === 'morning') parts.push("You haven't done your morning check-in yet.")
+    else if (pendingCheckinType === 'evening') parts.push("You haven't done your evening reflection yet.")
+    if (energy == null) parts.push("You haven't logged your energy today.")
+    if (nextLesson) parts.push(`Next lesson: "${nextLesson.lessonTitle}" in ${nextLesson.moduleTitle}.`)
+    if (ringGoals.length) parts.push(`Other active goals: ${ringGoals.slice(0, 4).map(g => `${g.title} at ${g.progress}%`).join(', ')}.`)
+    parts.push(`Streak: ${streak} week${streak === 1 ? '' : 's'}. Level ${level}, ${xp} XP.`)
+    return parts.join(' ')
+  }, [todayLabel, missionGoal, pendingCheckinType, energy, nextLesson, ringGoals, streak, level, xp])
+  usePageVoiceContext('Home', pageSummary)
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 20px 100px', fontFamily: 'Satoshi,sans-serif' }} className="view-panel">
