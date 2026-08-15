@@ -409,7 +409,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
                   Make a covenant with {firstName}
                 </p>
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', marginTop: 6, fontWeight: 300 }}>
-                  A promise you keep together, for a set stretch of time. {firstName} can accept whenever they&apos;re ready.
+                  A promise you keep together, for a set stretch of time. {firstName}{' '}can accept whenever they&apos;re ready.
                 </p>
               </div>
 
