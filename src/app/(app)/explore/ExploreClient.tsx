@@ -136,6 +136,31 @@ export function ExploreClient({
         </p>
       </div>}
 
+      {/* Search */}
+      <div style={{ position: 'relative', marginBottom: 20 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder={tab === 'leaders' ? 'Filter by category…' : tab === 'builders' ? 'Search builders…' : 'Search goals…'}
+          style={{
+            width: '100%', padding: '12px 16px 12px 40px', borderRadius: 14,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} style={{
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.42)', cursor: 'pointer', fontSize: 16, lineHeight: 1,
+          }}>×</button>
+        )}
+      </div>
+
       {/* Featured Builders strip */}
       {featuredBuilders.length > 0 && (
         <div style={{ marginBottom: 20 }}>
@@ -180,31 +205,6 @@ export function ExploreClient({
           </div>
         </div>
       )}
-
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 16 }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder={tab === 'leaders' ? 'Filter by category…' : tab === 'builders' ? 'Search builders…' : 'Search goals…'}
-          style={{
-            width: '100%', padding: '12px 16px 12px 40px', borderRadius: 14,
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#EFEFEF', fontSize: 14, fontFamily: 'Satoshi,sans-serif', outline: 'none',
-            boxSizing: 'border-box',
-          }}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} style={{
-            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-            background: 'none', border: 'none', color: 'rgba(255,255,255,0.42)', cursor: 'pointer', fontSize: 16, lineHeight: 1,
-          }}>×</button>
-        )}
-      </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4 }}>
