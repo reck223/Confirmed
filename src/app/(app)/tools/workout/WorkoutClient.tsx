@@ -1464,13 +1464,13 @@ export function WorkoutClient({ sessions: initSessions, prs, goals, templates: i
                 Building your workout…
               </>
             ) : (
-              <>✦ Build with AI</>
+              <>✦ Build my workout</>
             )}
           </button>
           {aiError && <p style={{ fontSize: 11, color: '#f87171', marginTop: 8, textAlign: 'center' }}>{aiError}</p>}
           {exercises.length > 0 && !aiGenerating && (
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 8, textAlign: 'center' }}>
-              AI built your plan · tap exercises below to remove, or add more
+              Plan built · tap exercises below to remove, or add more
             </p>
           )}
         </div>
