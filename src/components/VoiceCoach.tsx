@@ -451,6 +451,19 @@ export function VoiceCoach() {
           50%      { box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 7px rgba(212,175,55,0); }
         }
         @keyframes vcRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes vcSpin { to { transform: rotate(360deg); } }
+        @keyframes vcHaloPulse {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50%      { opacity: 0.9; transform: scale(1.06); }
+        }
+        .vc-halo {
+          position: absolute; inset: -9px; border-radius: 50%;
+          background: conic-gradient(from 0deg, #D4AF37, #a78bfa, #38bdf8, #4ade80, #D4AF37);
+          filter: blur(9px);
+          animation: vcSpin 6s linear infinite, vcHaloPulse 3s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .vc-halo-sm { inset: -7px; filter: blur(7px); }
         .vc-bar {
           display: inline-block; width: 3px; height: 12px; border-radius: 2px;
           background: #D4AF37; animation: vcBar 0.9s ease-in-out infinite;
@@ -603,11 +616,13 @@ export function VoiceCoach() {
             borderTop: '1px solid rgba(255,255,255,0.04)',
           }}>
             <div style={{ position: 'relative', width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {status === 'listening' && (
+              {status === 'listening' ? (
                 <>
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite' }} />
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite', animationDelay: '0.5s' }} />
                 </>
+              ) : (
+                <span className="vc-halo vc-halo-sm" style={{ opacity: busy ? 0.85 : 0.55 }} />
               )}
               <button
                 onClick={startListening}
@@ -654,22 +669,26 @@ export function VoiceCoach() {
         {liveAnnouncement}
       </div>
 
-      <button
-        onClick={toggleOpen}
-        style={{
-          width: 58, height: 58, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.32)', cursor: 'pointer',
-          background: open ? 'linear-gradient(160deg,#1c1c1c,#0d0d0d)' : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
-          boxShadow: open
-            ? '0 10px 32px rgba(0,0,0,0.55)'
-            : '0 10px 32px rgba(0,0,0,0.5), 0 0 22px rgba(212,175,55,0.3), inset 0 1px 1px rgba(255,255,255,0.35)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
-          transition: 'background 0.2s ease',
-        }}
-        aria-label={open ? 'Close hands-free mode' : 'Open hands-free mode — describes this page out loud'}
-      >
-        {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
-      </button>
+      <div style={{ position: 'relative', width: 58, height: 58 }}>
+        <span className="vc-halo" style={{ opacity: open ? 0.35 : 0.7 }} />
+        <button
+          onClick={toggleOpen}
+          style={{
+            position: 'relative', zIndex: 1,
+            width: 58, height: 58, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.32)', cursor: 'pointer',
+            background: open ? 'linear-gradient(160deg,#1c1c1c,#0d0d0d)' : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
+            boxShadow: open
+              ? '0 10px 32px rgba(0,0,0,0.55)'
+              : '0 10px 32px rgba(0,0,0,0.5), 0 0 22px rgba(212,175,55,0.3), inset 0 1px 1px rgba(255,255,255,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
+            transition: 'background 0.2s ease',
+          }}
+          aria-label={open ? 'Close hands-free mode' : 'Open hands-free mode — describes this page out loud'}
+        >
+          {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
+        </button>
+      </div>
     </div>
   )
 }
