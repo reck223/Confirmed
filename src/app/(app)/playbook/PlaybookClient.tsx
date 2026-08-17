@@ -1048,15 +1048,15 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext, 
             {coaching ? (
               <>
                 <span style={{ fontSize: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }}>◌</span>
-                Getting coaching…
+                Getting feedback…
               </>
             ) : (
-              <>✦ Get AI coaching on this</>
+              <>✦ Get feedback on this</>
             )}
           </button>
         )}
 
-        {/* Coach response */}
+        {/* Feedback response */}
         {coachResponse && (
           <div style={{
             marginTop: 12, padding: '14px 16px',
@@ -1065,7 +1065,7 @@ function LessonView({ module, lesson, isDone, onComplete, onBack, next, onNext, 
             border: `1px solid ${module.color}20`,
             animation: 'fadeUp 0.3s ease both',
           }}>
-            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: module.color, opacity: 0.7, marginBottom: 6 }}>AI COACH</p>
+            <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: module.color, opacity: 0.7, marginBottom: 6 }}>FEEDBACK</p>
             <p style={{ fontSize: 13.5, color: '#CCC', lineHeight: 1.7 }}>{coachResponse}</p>
           </div>
         )}
@@ -1167,7 +1167,7 @@ function AnswersArchive({ answers, onBack, onOpenLesson }: {
 
               {rec.coachResponse && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.3)', border: `1px solid ${rec.moduleColor || '#D4AF37'}20` }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: rec.moduleColor || '#D4AF37', opacity: 0.7, marginBottom: 6 }}>AI COACH</p>
+                  <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: rec.moduleColor || '#D4AF37', opacity: 0.7, marginBottom: 6 }}>FEEDBACK</p>
                   <p style={{ fontSize: 13, color: '#CCC', lineHeight: 1.65 }}>{rec.coachResponse}</p>
                 </div>
               )}

@@ -516,7 +516,7 @@ export function VoiceCoach() {
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                   <SparkleIcon size={11} />
-                  <p style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.42)' }}>VOICE COACH</p>
+                  <p style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.42)' }}>HANDS-FREE</p>
                 </div>
                 <div style={{
                   display: 'flex', gap: 3, padding: 3, borderRadius: 12,
@@ -612,7 +612,7 @@ export function VoiceCoach() {
               <button
                 onClick={startListening}
                 disabled={busy || status === 'unsupported'}
-                aria-label={status === 'listening' ? 'Stop listening' : 'Speak to your coach'}
+                aria-label={status === 'listening' ? 'Stop listening' : 'Speak'}
                 style={{
                   width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: busy ? 'default' : 'pointer',
                   background: status === 'listening'
@@ -666,7 +666,7 @@ export function VoiceCoach() {
           animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
           transition: 'background 0.2s ease',
         }}
-        aria-label={open ? 'Close voice coach' : 'Open voice coach — describes this page out loud'}
+        aria-label={open ? 'Close hands-free mode' : 'Open hands-free mode — describes this page out loud'}
       >
         {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
       </button>

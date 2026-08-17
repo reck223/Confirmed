@@ -182,13 +182,13 @@ export default async function AssessPage() {
             <div style={{ position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>✦</div>
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.16em', color: '#a78bfa' }}>YOUR COACH</span>
+                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.16em', color: '#a78bfa' }}>INSIGHT</span>
               </div>
               <p style={{ fontSize: 15, color: '#D0D0D0', fontWeight: 300, lineHeight: 1.9, fontFamily: 'Georgia,serif', letterSpacing: '0.01em' }}>
                 {coachInsight}
               </p>
               <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', marginTop: 14, fontWeight: 400 }}>
-                Powered by Claude · Based on your last {Math.min(assessments.length, 6)} reflections
+                Based on your last {Math.min(assessments.length, 6)} reflections
               </p>
             </div>
           </div>

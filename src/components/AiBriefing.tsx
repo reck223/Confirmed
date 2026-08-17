@@ -104,7 +104,7 @@ export function AiBriefing() {
                   value={reply}
                   onChange={e => setReply(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-                  placeholder="Reply to your coach…"
+                  placeholder="Reply…"
                   disabled={replying}
                   style={{
                     flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.18)',
