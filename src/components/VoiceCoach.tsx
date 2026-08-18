@@ -48,15 +48,6 @@ function MicIcon({ size = 20, color = '#0a0a0a' }: { size?: number; color?: stri
   )
 }
 
-function CloseIcon({ size = 16, color = 'rgba(255,255,255,0.85)' }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.25} strokeLinecap="round">
-      <line x1="6" y1="6" x2="18" y2="18" />
-      <line x1="18" y1="6" x2="6" y2="18" />
-    </svg>
-  )
-}
-
 function HeadphonesIcon({ size = 13, color = '#D4AF37' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -67,36 +58,40 @@ function HeadphonesIcon({ size = 13, color = '#D4AF37' }: { size?: number; color
   )
 }
 
-function SparkleIcon({ size = 12, color = '#D4AF37' }: { size?: number; color?: string }) {
+function ChevronDownIcon({ size = 14, color = 'rgba(255,255,255,0.55)' }: { size?: number; color?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <path d="M12 2l1.9 6.6L20.5 10.5l-6.6 1.9L12 19l-1.9-6.6L3.5 10.5l6.6-1.9L12 2z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
     </svg>
   )
 }
 
-// Small live status glyph rendered above the mic label — an equalizer while
-// speaking, a soft pulse while listening, three dots while thinking.
-function StatusGlyph({ status }: { status: Status }) {
-  if (status === 'speaking') {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, height: 12 }}>
-        {[0, 1, 2, 3].map(i => (
-          <span key={i} className="vc-bar" style={{ animationDelay: `${i * 0.12}s` }} />
-        ))}
-      </span>
-    )
-  }
-  if (status === 'thinking') {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-        {[0, 1, 2].map(i => (
-          <span key={i} className="vc-dot" style={{ animationDelay: `${i * 0.15}s` }} />
-        ))}
-      </span>
-    )
-  }
-  return null
+// Flat equalizer-style waveform — the bar's single visual "alive" signal.
+// Color and speed shift with status instead of swapping to separate glyphs,
+// so the bar reads as one continuous instrument rather than several widgets.
+function Waveform({ status, size = 'md' }: { status: Status; size?: 'sm' | 'md' }) {
+  const bars = size === 'sm' ? 4 : 5
+  const height = size === 'sm' ? 14 : 18
+  const color = status === 'listening' ? '#f87171'
+    : status === 'speaking' ? '#D4AF37'
+    : status === 'thinking' ? 'rgba(255,255,255,0.45)'
+    : 'rgba(212,175,55,0.5)'
+  const dur = status === 'listening' ? 0.6 : status === 'speaking' ? 0.75 : status === 'thinking' ? 1.3 : 1.9
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: size === 'sm' ? 2 : 3, height }}>
+      {Array.from({ length: bars }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            display: 'inline-block', width: size === 'sm' ? 2.5 : 3, height: '100%', borderRadius: 2,
+            background: color, transformOrigin: 'center',
+            animation: `vcWave ${dur}s ease-in-out infinite`,
+            animationDelay: `${i * dur * 0.14}s`,
+          }}
+        />
+      ))}
+    </span>
+  )
 }
 
 export function VoiceCoach() {
@@ -428,70 +423,42 @@ export function VoiceCoach() {
 
   return (
     <div style={{
-      position: 'fixed', right: 20, bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))', zIndex: 350,
-      opacity: scrolling ? 0.25 : 1,
+      position: 'fixed', left: '50%', bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))', zIndex: 350,
+      transform: 'translateX(-50%)',
+      opacity: scrolling ? 0.3 : 1,
       transition: 'opacity 0.25s ease',
       pointerEvents: scrolling ? 'none' : 'auto',
+      width: open ? 'calc(100% - 40px)' : 'auto',
+      maxWidth: open ? 420 : undefined,
+      display: 'flex', justifyContent: 'center',
     }}>
       <style>{`
-        @keyframes vcRing {
-          0%   { transform: scale(0.7); opacity: 0.55; }
-          100% { transform: scale(1.9); opacity: 0; }
-        }
-        @keyframes vcBar {
-          0%, 100% { transform: scaleY(0.3); }
+        @keyframes vcWave {
+          0%, 100% { transform: scaleY(0.28); }
           50%      { transform: scaleY(1); }
         }
-        @keyframes vcDot {
-          0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-          40%           { opacity: 1; transform: translateY(-2px); }
-        }
-        @keyframes vcBreathe {
-          0%, 100% { box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 0 rgba(212,175,55,0.28); }
-          50%      { box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 7px rgba(212,175,55,0); }
-        }
-        @keyframes vcRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes vcSpin { to { transform: rotate(360deg); } }
-        @keyframes vcHaloPulse {
-          0%, 100% { opacity: 0.5; transform: scale(1); }
-          50%      { opacity: 0.9; transform: scale(1.06); }
-        }
-        .vc-halo {
-          position: absolute; inset: -9px; border-radius: 50%;
-          background: conic-gradient(from 0deg, #D4AF37, #a78bfa, #38bdf8, #4ade80, #D4AF37);
-          filter: blur(9px);
-          animation: vcSpin 6s linear infinite, vcHaloPulse 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .vc-halo-sm { inset: -7px; filter: blur(7px); }
-        .vc-bar {
-          display: inline-block; width: 3px; height: 12px; border-radius: 2px;
-          background: #D4AF37; animation: vcBar 0.9s ease-in-out infinite;
-        }
-        .vc-dot {
-          display: inline-block; width: 4px; height: 4px; border-radius: 50%;
-          background: #D4AF37; animation: vcDot 1.1s ease-in-out infinite;
-        }
-        .vc-panel { animation: vcRise 0.22s cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes vcRise { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .vc-panel { animation: vcRise 0.2s cubic-bezier(0.16,1,0.3,1) both; }
       `}</style>
 
-      {open && (
+      {open ? (
         <div className="vc-panel" style={{
-          width: 320, marginBottom: 14, borderRadius: 22,
+          width: '100%', borderRadius: 24,
           background: 'linear-gradient(165deg,#161616 0%,#0a0a0a 65%,#080808 100%)',
-          border: '1px solid rgba(212,175,55,0.16)',
-          boxShadow: '0 28px 80px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04) inset, 0 0 0 1px rgba(0,0,0,0.4)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          boxShadow: '0 28px 80px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04) inset',
           overflow: 'hidden', fontFamily: 'Satoshi,sans-serif',
           backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
         }}>
+          {/* Header: persona picker, or the active fill/hands-free session */}
           <div style={{
-            padding: '16px 18px 12px',
+            padding: '12px 12px 12px 16px',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
-            background: 'linear-gradient(180deg,rgba(212,175,55,0.05),transparent)',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
             {fillMode ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 }}>
                   {handsFree ? (
                     <span style={{
                       display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
@@ -524,140 +491,137 @@ export function VoiceCoach() {
                 >
                   {handsFree ? 'Stop' : 'Cancel'}
                 </button>
-              </div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <SparkleIcon size={11} />
-                  <p style={{ fontSize: 9.5, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(255,255,255,0.42)' }}>HANDS-FREE</p>
-                </div>
-                <div style={{
-                  display: 'flex', gap: 3, padding: 3, borderRadius: 12,
-                  background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)',
-                }}>
-                  {(Object.keys(PERSONAS) as PersonaId[]).map(id => {
-                    const sel = id === persona
-                    return (
-                      <button
-                        key={id}
-                        disabled={busy}
-                        onClick={() => setPersona(id)}
-                        style={{
-                          flex: 1, padding: '8px 4px', borderRadius: 9, cursor: busy ? 'default' : 'pointer',
-                          border: 'none',
-                          background: sel ? 'linear-gradient(160deg,#F5D070,#D4AF37)' : 'transparent',
-                          color: sel ? '#191305' : 'rgba(255,255,255,0.4)',
-                          boxShadow: sel ? '0 2px 10px rgba(212,175,55,0.35)' : 'none',
-                          fontFamily: 'Satoshi,sans-serif', fontSize: 10.5, fontWeight: 800,
-                          opacity: busy && !sel ? 0.4 : 1,
-                          transition: 'all 0.18s ease',
-                        }}
-                      >
-                        {PERSONAS[id].name}
-                      </button>
-                    )
-                  })}
-                </div>
               </>
-            )}
-          </div>
-
-          <div ref={scrollRef} style={{ maxHeight: 260, minHeight: 84, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {history.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', lineHeight: 1.55 }}>
-                  {status === 'thinking' || status === 'speaking'
-                    ? `${p.name} is getting oriented on this page…`
-                    : <>Talk to {p.name} — {p.tagline.toLowerCase()}. Tap the mic below and start speaking.</>}
-                </p>
-                {availableFills.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.08em' }}>OR FILL THIS OUT BY VOICE</p>
-                    {availableFills.map(f => (
-                      <button
-                        key={f.id}
-                        onClick={() => startFill(f.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 9,
-                          textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
-                          border: '1px solid rgba(212,175,55,0.16)', background: 'rgba(212,175,55,0.05)',
-                        }}
-                      >
-                        <span style={{
-                          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                          background: 'rgba(212,175,55,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <MicIcon size={11} color="#D4AF37" />
-                        </span>
-                        <span style={{ color: '#E8CD7A', fontFamily: 'Satoshi,sans-serif', fontSize: 11.5, fontWeight: 700 }}>
-                          {f.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : history.map((t, i) => (
-              <div key={i} style={{ alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                <p style={{
-                  fontSize: 12, lineHeight: 1.55, padding: '9px 13px', borderRadius: 14,
-                  background: t.role === 'user' ? 'linear-gradient(160deg,rgba(212,175,55,0.16),rgba(212,175,55,0.08))' : 'rgba(255,255,255,0.045)',
-                  border: t.role === 'user' ? '1px solid rgba(212,175,55,0.16)' : '1px solid rgba(255,255,255,0.04)',
-                  color: t.role === 'user' ? '#F5E6B8' : 'rgba(255,255,255,0.78)',
-                }}>
-                  {t.content}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div style={{
-            padding: '14px 18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-            borderTop: '1px solid rgba(255,255,255,0.04)',
-          }}>
-            <div style={{ position: 'relative', width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {status === 'listening' ? (
-                <>
-                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite' }} />
-                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(248,113,113,0.55)', animation: 'vcRing 1.6s ease-out infinite', animationDelay: '0.5s' }} />
-                </>
-              ) : (
-                <span className="vc-halo vc-halo-sm" style={{ opacity: busy ? 0.85 : 0.55 }} />
-              )}
-              <button
-                onClick={startListening}
-                disabled={busy || status === 'unsupported'}
-                aria-label={status === 'listening' ? 'Stop listening' : 'Speak'}
-                style={{
-                  width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: busy ? 'default' : 'pointer',
-                  background: status === 'listening'
-                    ? 'linear-gradient(160deg,#f87171,#991b1b)'
-                    : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
-                  boxShadow: status === 'listening'
-                    ? '0 4px 20px rgba(248,113,113,0.4), inset 0 1px 1px rgba(255,255,255,0.25)'
-                    : '0 4px 20px rgba(212,175,55,0.38), inset 0 1px 1px rgba(255,255,255,0.35)',
-                  opacity: status === 'unsupported' ? 0.3 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'box-shadow 0.2s ease, transform 0.12s ease',
-                  position: 'relative', zIndex: 1,
-                }}
-                onTouchStart={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.94)' }}
-                onTouchEnd={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
-              >
-                <MicIcon size={21} color={status === 'listening' ? '#2a0a0a' : '#191305'} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, height: 14 }} role="status" aria-live="polite">
-              <StatusGlyph status={status} />
-              <p style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-                color: status === 'error' ? '#f87171' : status === 'listening' ? '#f87171' : 'rgba(255,255,255,0.38)',
+            ) : (
+              <div style={{
+                display: 'flex', gap: 3, padding: 3, borderRadius: 12, flex: 1,
+                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)',
               }}>
-                {STATUS_LABEL[status]}
-              </p>
-            </div>
+                {(Object.keys(PERSONAS) as PersonaId[]).map(id => {
+                  const sel = id === persona
+                  return (
+                    <button
+                      key={id}
+                      disabled={busy}
+                      onClick={() => setPersona(id)}
+                      style={{
+                        flex: 1, padding: '7px 4px', borderRadius: 9, cursor: busy ? 'default' : 'pointer',
+                        border: 'none',
+                        background: sel ? 'linear-gradient(160deg,#F5D070,#D4AF37)' : 'transparent',
+                        color: sel ? '#191305' : 'rgba(255,255,255,0.4)',
+                        boxShadow: sel ? '0 2px 10px rgba(212,175,55,0.35)' : 'none',
+                        fontFamily: 'Satoshi,sans-serif', fontSize: 10.5, fontWeight: 800,
+                        opacity: busy && !sel ? 0.4 : 1,
+                        transition: 'all 0.18s ease',
+                      }}
+                    >
+                      {PERSONAS[id].name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Minimize hands-free"
+              style={{
+                flexShrink: 0, width: 30, height: 30, borderRadius: 9,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              }}
+            >
+              <ChevronDownIcon size={14} />
+            </button>
           </div>
+
+          {(history.length > 0 || availableFills.length > 0 || status === 'thinking' || status === 'speaking') && (
+            <div ref={scrollRef} style={{ maxHeight: 240, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {history.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.32)', lineHeight: 1.55 }}>
+                    {status === 'thinking' || status === 'speaking'
+                      ? `${p.name} is getting oriented on this page…`
+                      : <>Talk to {p.name} — {p.tagline.toLowerCase()}.</>}
+                  </p>
+                  {availableFills.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, paddingTop: 10, marginTop: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <p style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.26)', letterSpacing: '0.08em' }}>OR FILL THIS OUT BY VOICE</p>
+                      {availableFills.map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => startFill(f.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 9,
+                            textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
+                            border: '1px solid rgba(212,175,55,0.16)', background: 'rgba(212,175,55,0.05)',
+                          }}
+                        >
+                          <span style={{
+                            width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                            background: 'rgba(212,175,55,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <MicIcon size={11} color="#D4AF37" />
+                          </span>
+                          <span style={{ color: '#E8CD7A', fontFamily: 'Satoshi,sans-serif', fontSize: 11.5, fontWeight: 700 }}>
+                            {f.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : history.map((t, i) => (
+                <div key={i} style={{ alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                  <p style={{
+                    fontSize: 12, lineHeight: 1.55, padding: '9px 13px', borderRadius: 14,
+                    background: t.role === 'user' ? 'linear-gradient(160deg,rgba(212,175,55,0.16),rgba(212,175,55,0.08))' : 'rgba(255,255,255,0.045)',
+                    border: t.role === 'user' ? '1px solid rgba(212,175,55,0.16)' : '1px solid rgba(255,255,255,0.04)',
+                    color: t.role === 'user' ? '#F5E6B8' : 'rgba(255,255,255,0.78)',
+                  }}>
+                    {t.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Live status bar — tap to talk; the waveform itself carries the state */}
+          <button
+            onClick={startListening}
+            disabled={busy || status === 'unsupported'}
+            aria-label={status === 'listening' ? 'Stop listening' : 'Speak'}
+            style={{
+              width: '100%', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
+              background: status === 'listening' ? 'rgba(248,113,113,0.06)' : 'rgba(212,175,55,0.04)',
+              border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)',
+              cursor: busy ? 'default' : 'pointer', textAlign: 'left',
+            }}
+            role="status" aria-live="polite"
+          >
+            <Waveform status={status} />
+            <span style={{
+              fontSize: 11.5, fontWeight: 700, letterSpacing: '0.02em', flex: 1,
+              color: status === 'error' ? '#f87171' : status === 'listening' ? '#f87171' : 'rgba(255,255,255,0.55)',
+            }}>
+              {STATUS_LABEL[status]}
+            </span>
+            {status !== 'unsupported' && <MicIcon size={15} color={status === 'listening' ? '#f87171' : '#D4AF37'} />}
+          </button>
         </div>
+      ) : (
+        <button
+          onClick={toggleOpen}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999,
+            background: 'rgba(13,13,13,0.9)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+            cursor: 'pointer', fontFamily: 'Satoshi,sans-serif',
+          }}
+          aria-label="Open hands-free mode — describes this page out loud"
+        >
+          <Waveform status="idle" size="sm" />
+          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.03em', color: 'rgba(255,255,255,0.7)' }}>Hands-free</span>
+        </button>
       )}
 
       {/* Screen-reader-only live region for spoken fallbacks (speakFallback)
@@ -667,27 +631,6 @@ export function VoiceCoach() {
           though it's not shown anywhere on screen. */}
       <div aria-live="assertive" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>
         {liveAnnouncement}
-      </div>
-
-      <div style={{ position: 'relative', width: 58, height: 58 }}>
-        <span className="vc-halo" style={{ opacity: open ? 0.35 : 0.7 }} />
-        <button
-          onClick={toggleOpen}
-          style={{
-            position: 'relative', zIndex: 1,
-            width: 58, height: 58, borderRadius: '50%', border: '1px solid rgba(212,175,55,0.32)', cursor: 'pointer',
-            background: open ? 'linear-gradient(160deg,#1c1c1c,#0d0d0d)' : 'linear-gradient(160deg,#F5D070,#D4AF37 55%,#9A7010)',
-            boxShadow: open
-              ? '0 10px 32px rgba(0,0,0,0.55)'
-              : '0 10px 32px rgba(0,0,0,0.5), 0 0 22px rgba(212,175,55,0.3), inset 0 1px 1px rgba(255,255,255,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            animation: open ? 'none' : 'vcBreathe 3.2s ease-in-out infinite',
-            transition: 'background 0.2s ease',
-          }}
-          aria-label={open ? 'Close hands-free mode' : 'Open hands-free mode — describes this page out loud'}
-        >
-          {open ? <CloseIcon size={18} /> : <MicIcon size={22} color="#191305" />}
-        </button>
       </div>
     </div>
   )
