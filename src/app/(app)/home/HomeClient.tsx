@@ -1082,6 +1082,11 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
         )
       })()}
 
+      {/* ── WEEKLY REFLECTION ──────────────────────────────── */}
+      <div id="reflection" className="h-fadeup" style={{ animationDelay: '0.24s' }}>
+        <ReflectionCard reflection={weeklyReflection} unlocked={reflectionUnlocked} dayName={reflectionDayName} />
+      </div>
+
       {/* ── CONTINUE LEARNING ──────────────────────────────── */}
       {nextLesson && (() => {
         const mc = nextLesson.moduleColor
@@ -1095,7 +1100,8 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
               border: `1px solid ${mc}30`,
               borderRadius: 22,
               padding: '22px 22px 20px',
-              animationDelay: '0.24s',
+              animationDelay: '0.28s',
+              marginTop: 24,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -1151,11 +1157,6 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
           </Link>
         )
       })()}
-
-      {/* ── WEEKLY REFLECTION ──────────────────────────────── */}
-      <div id="reflection" className="h-fadeup" style={{ animationDelay: '0.28s', marginTop: 24 }}>
-        <ReflectionCard reflection={weeklyReflection} unlocked={reflectionUnlocked} dayName={reflectionDayName} />
-      </div>
 
       {/* ── MORNING + EVENING PORTALS ──────────────────────── */}
       <MorningFlow
