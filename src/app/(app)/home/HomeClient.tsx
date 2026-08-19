@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { AiBriefing } from '@/components/AiBriefing'
 import { getTodayQod } from '@/lib/qod'
 import { getTodayWod } from '@/lib/wod'
 import { markMissionDone, createHomePost, saveMorningFocus, saveEveningReflection } from './actions'
@@ -981,11 +980,6 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── AI BRIEFING ────────────────────────────────────── */}
-      <div style={{ margin: '0 -20px' }}>
-        <AiBriefing />
       </div>
 
       {/* ── DAILY CARDS ROW (QOD + WOD horizontal scroll) ─── */}
