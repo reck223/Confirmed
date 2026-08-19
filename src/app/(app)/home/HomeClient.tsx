@@ -1082,12 +1082,6 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
         )
       })()}
 
-      {/* ── FOCUS CARD ─────────────────────────────────────── */}
-      <FocusCard focus={localFocus} onOpenMorning={() => setShowMorning(true)} onOpenEvening={() => setShowEvening(true)} eveningDone={localEveningDone} />
-
-      {/* ── MISSION CARD ───────────────────────────────────── */}
-      <MissionCard goal={missionGoal} initialDone={missionDone} />
-
       {/* ── CONTINUE LEARNING ──────────────────────────────── */}
       {nextLesson && (() => {
         const mc = nextLesson.moduleColor
