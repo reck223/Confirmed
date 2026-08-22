@@ -1,13 +1,42 @@
 export type QodEntry = { emoji: string; label: string; q: string }
 
 const DAILY_QUESTIONS: QodEntry[] = [
-  { emoji: '🌅', label: 'Intention',   q: "What's one thing you want to feel proud of by the end of today?" },
-  { emoji: '🎯', label: 'Clarity',     q: "What's the one thing that, if done today, would make everything else easier?" },
-  { emoji: '🪞', label: 'Honesty',     q: "What are you avoiding right now — and what would it take to face it today?" },
-  { emoji: '💡', label: 'Mindset',     q: "What story or belief might hold you back today? Is it actually true?" },
-  { emoji: '🔥', label: 'Drive',       q: "What would make today feel like a win, even if nothing else went right?" },
-  { emoji: '🤝', label: 'Connection',  q: "Who in your circle could use a word from you today?" },
-  { emoji: '🧘', label: 'Perspective', q: "What does the best version of you do differently today?" },
+  { emoji: '🌅', label: 'Intention',      q: "What's one thing you want to feel proud of by the end of today?" },
+  { emoji: '🎯', label: 'Clarity',        q: "What's the one thing that, if done today, would make everything else easier?" },
+  { emoji: '🪞', label: 'Honesty',        q: "What are you avoiding right now — and what would it take to face it today?" },
+  { emoji: '💡', label: 'Mindset',        q: "What story or belief might hold you back today? Is it actually true?" },
+  { emoji: '🔥', label: 'Drive',          q: "What would make today feel like a win, even if nothing else went right?" },
+  { emoji: '🤝', label: 'Connection',     q: "Who in your circle could use a word from you today?" },
+  { emoji: '🧘', label: 'Perspective',    q: "What does the best version of you do differently today?" },
+  { emoji: '🌱', label: 'Growth',         q: "What's something you're worse at today than you'll be a year from now?" },
+  { emoji: '🙏', label: 'Gratitude',      q: "What's something you'd miss badly if it were gone tomorrow, that you haven't thanked anyone for?" },
+  { emoji: '🦁', label: 'Courage',        q: "What's the conversation you've been putting off having?" },
+  { emoji: '⚙️', label: 'Discipline',     q: "What's one thing you'll do today whether or not you feel like it?" },
+  { emoji: '🎨', label: 'Creativity',     q: "What would you build today if you knew it couldn't fail?" },
+  { emoji: '📜', label: 'Legacy',         q: "If someone described your week to a stranger, what would you want them to say?" },
+  { emoji: '🚧', label: 'Boundaries',     q: "What's one thing you'll say no to today so you can say yes to what matters?" },
+  { emoji: '🌊', label: 'Change',         q: "What's something you keep doing out of habit that no longer serves who you're becoming?" },
+  { emoji: '⏳', label: 'Patience',       q: "What are you rushing that actually deserves more time?" },
+  { emoji: '🧭', label: 'Purpose',        q: "Does today's plan actually point toward where you say you want to go?" },
+  { emoji: '🛡️', label: 'Resilience',     q: "What's something that knocked you down recently that you're still standing back up from?" },
+  { emoji: '💗', label: 'Self-Compassion', q: "Where have you been harder on yourself than you'd ever be on someone you love?" },
+  { emoji: '🚀', label: 'Ambition',       q: "What goal have you quietly shrunk to make it feel safer?" },
+  { emoji: '👁️', label: 'Presence',       q: "What's pulling your attention away from the people or things in front of you right now?" },
+  { emoji: '🔍', label: 'Curiosity',      q: "What's something you've assumed about your life that you've never actually questioned?" },
+  { emoji: '✅', label: 'Accountability', q: "What's something you said you'd do that you still haven't started?" },
+  { emoji: '🛌', label: 'Rest',           q: "When did you last stop not because you were done, but because you decided to?" },
+  { emoji: '😨', label: 'Fear',           q: "What's something you want that you're pretending you don't, because wanting it feels risky?" },
+  { emoji: '⚖️', label: 'Values',         q: "Where did your calendar and your values disagree with each other this week?" },
+  { emoji: '🔁', label: 'Habits',         q: "What's one small thing you did today that, repeated for a year, would change your life?" },
+  { emoji: '🎯', label: 'Focus',          q: "What's competing for your attention today that doesn't deserve to win?" },
+  { emoji: '🎁', label: 'Generosity',     q: "Who could you make today easier for, without them ever knowing it was you?" },
+  { emoji: '🪪', label: 'Identity',       q: "Are you living like the person you say you are, or the person you used to be?" },
+  { emoji: '💰', label: 'Money',          q: "Does how you spent this week match what you claim matters most to you?" },
+  { emoji: '❤️‍🩹', label: 'Health',        q: "What's your body been trying to tell you that you've been too busy to hear?" },
+  { emoji: '🤍', label: 'Relationships',  q: "Who do you take for granted that you'd fight to get back if you lost them?" },
+  { emoji: '📉', label: 'Failure',        q: "What's a mistake you're still punishing yourself for, long after it taught you what it had to teach?" },
+  { emoji: '🌾', label: 'Simplicity',     q: "What could you remove from your life today that would make everything else lighter?" },
+  { emoji: '🔗', label: 'Trust',          q: "Where are you waiting for certainty before you'll commit to something you already know is right?" },
 ]
 
 function getNthWeekday(year: number, month: number, weekday: number, n: number): number {
@@ -50,7 +79,21 @@ function getHolidayQod(date: Date): QodEntry | null {
   return null
 }
 
+// Cycles through the full pool in a shuffled-but-fixed order before
+// repeating, instead of locking each weekday to the same question forever
+// (which is what indexing by getDay() did with only 7 entries).
+function dayOfYear(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 0)
+  const diff = date.getTime() - start.getTime()
+  return Math.floor(diff / 86400000)
+}
+
 export function getTodayQod(): QodEntry {
   const today = new Date()
-  return getHolidayQod(today) ?? DAILY_QUESTIONS[today.getDay()]
+  const holiday = getHolidayQod(today)
+  if (holiday) return holiday
+  // Shift by a large odd step each year so the cycle order isn't just
+  // sequential — odd + coprime with most pool lengths keeps it well-mixed.
+  const index = (dayOfYear(today) * 17 + today.getFullYear()) % DAILY_QUESTIONS.length
+  return DAILY_QUESTIONS[index]
 }
