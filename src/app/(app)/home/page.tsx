@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { HomeClient } from './HomeClient'
 import { PLAYBOOK } from '../playbook/content'
+import { todayChallenge } from '@/lib/dailyChallenges'
 import type { Profile, Goal } from '@/lib/types/database'
 
 function getTodayLabel() {
@@ -196,6 +197,67 @@ export default async function HomePage() {
   const pendingCheckinType: 'morning' | 'evening' | null =
     !hasMorningCheckin ? 'morning' : !hasEveningCheckin ? 'evening' : null
 
+  // ── Daily challenge: same pick for everyone today, detected from
+  // whatever table that action already writes to, not a manual toggle ──
+  const challenge = todayChallenge(today)
+  let challengeDone = false
+  switch (challenge.id) {
+    case 'meal': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('meal_entries') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('plan_date', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+    case 'workout': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('workout_sessions') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('date', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+    case 'journal': {
+      challengeDone = qodAnswered
+      break
+    }
+    case 'budget': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('budget_transactions') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('txn_date', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+    case 'reading': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('book_sessions') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('session_date', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+    case 'challenge_checkin': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('challenge_logs') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('log_date', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+    case 'goal_social': {
+      const [{ count: rc }, { count: cc }] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('goal_reactions') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', today),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('goal_comments') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', today),
+      ])
+      challengeDone = (rc ?? 0) > 0 || (cc ?? 0) > 0
+      break
+    }
+    case 'lesson': {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase.from('playbook_progress') as any).select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('completed_at', today)
+      challengeDone = (count ?? 0) > 0
+      break
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: challengeClaimRow } = await (supabase.from('daily_challenge_completions') as any)
+    .select('id').eq('user_id', user.id).eq('date', today).maybeSingle()
+  const dailyChallenge = { ...challenge, isDone: challengeDone, isClaimed: !!challengeClaimRow }
+
   return (
     <HomeClient
       firstName={firstName}
@@ -218,6 +280,7 @@ export default async function HomePage() {
       eveningDone={eveningDone}
       yesterdayScore={yesterdayScore}
       pendingCheckinType={pendingCheckinType}
+      dailyChallenge={dailyChallenge}
     />
   )
 }

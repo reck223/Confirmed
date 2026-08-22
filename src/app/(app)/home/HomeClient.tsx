@@ -6,8 +6,12 @@ import { useRouter } from 'next/navigation'
 import { getTodayQod } from '@/lib/qod'
 import { getTodayWod } from '@/lib/wod'
 import { markMissionDone, createHomePost, saveMorningFocus, saveEveningReflection } from './actions'
+import { claimDailyChallenge } from './daily-challenge-actions'
 import { submitCheckin } from '@/app/(app)/checkin/actions'
 import { usePageVoiceContext } from '@/lib/pageVoiceContext'
+import { LEVELS } from '@/lib/xp'
+import confetti from 'canvas-confetti'
+import type { DailyChallenge } from '@/lib/dailyChallenges'
 
 type MomentumDay = { date: string; dayLabel: string; done: boolean }
 type MissionGoal = {
@@ -46,6 +50,66 @@ interface Props {
   eveningDone: boolean
   yesterdayScore: number | null
   pendingCheckinType: 'morning' | 'evening' | null
+  dailyChallenge: DailyChallenge & { isDone: boolean; isClaimed: boolean }
+}
+
+// ══════════════════════════════════════════════════════
+// Daily Challenge — same pick for everyone each day; completion is
+// detected from whatever they already did elsewhere in the app, and the
+// bonus XP is claimed automatically the moment that's true.
+// ══════════════════════════════════════════════════════
+function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDone: boolean; isClaimed: boolean } }) {
+  const [claimed, setClaimed] = useState(challenge.isClaimed)
+  const [levelUp, setLevelUp] = useState<{ newLevel: number } | null>(null)
+  const claimedRef = useRef(challenge.isClaimed)
+
+  useEffect(() => {
+    if (!challenge.isDone || claimedRef.current) return
+    claimedRef.current = true
+    claimDailyChallenge(challenge.id).then(result => {
+      if ('error' in result) { claimedRef.current = false; return }
+      setClaimed(true)
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.3 }, colors: ['#D4AF37', '#4ade80', '#fff'] })
+      if (result.leveledUp) setLevelUp({ newLevel: result.newLevel })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenge.isDone])
+
+  const levelInfo = levelUp ? LEVELS.find(l => l.level === levelUp.newLevel) : null
+
+  return (
+    <Link href={challenge.href} className="h-fadeup" style={{
+      textDecoration: 'none', display: 'block', marginBottom: 20,
+      borderRadius: 18, padding: '16px 18px',
+      background: claimed ? 'linear-gradient(145deg,rgba(74,222,128,0.08),#0d0d0d 60%)' : 'linear-gradient(145deg,rgba(212,175,55,0.08),#0d0d0d 60%)',
+      border: `1px solid ${claimed ? 'rgba(74,222,128,0.25)' : 'rgba(212,175,55,0.2)'}`,
+      animationDelay: '0.2s',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+          background: claimed ? 'rgba(74,222,128,0.12)' : 'rgba(212,175,55,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
+        }}>
+          {claimed ? '✓' : challenge.emoji}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: claimed ? '#4ade80' : '#D4AF37', marginBottom: 2 }}>
+            DAILY CHALLENGE{claimed ? ' · DONE' : ''}
+          </p>
+          <p style={{ fontSize: 13.5, fontWeight: 700, color: '#EFEFEF' }}>{challenge.label}</p>
+        </div>
+        <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 900, color: claimed ? '#4ade80' : 'rgba(212,175,55,0.6)' }}>
+          +{challenge.xpBonus} XP
+        </span>
+      </div>
+      {levelUp && levelInfo && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, background: `${levelInfo.color}18`, border: `1px solid ${levelInfo.color}45`, textAlign: 'center' }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: levelInfo.color }}>🎉 Level up! You&apos;re a {levelInfo.title} now.</p>
+        </div>
+      )}
+    </Link>
+  )
 }
 
 // ══════════════════════════════════════════════════════
@@ -874,7 +938,7 @@ const ENERGY_OPTS = [
   { value: 10, emoji: '🚀', label: 'Peak' },
 ]
 
-export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, pendingCheckinType }: Props) {
+export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumDays, missionGoal, ringGoals, nextLesson, weeklyReflection, reflectionUnlocked, reflectionDayName, qodAnswered, missionDone, energyToday, morningDone, morningFocus, eveningDone, yesterdayScore, pendingCheckinType, dailyChallenge }: Props) {
   const greeting = getGreeting()
   const subline   = getSubline(streak)
   const activeDays = momentumDays.filter(d => d.done).length
@@ -981,6 +1045,9 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
           </div>
         )}
       </div>
+
+      {/* ── DAILY CHALLENGE ───────────────────────────────── */}
+      <DailyChallengeCard challenge={dailyChallenge} />
 
       {/* ── DAILY CARDS ROW (QOD + WOD horizontal scroll) ─── */}
       {(() => {

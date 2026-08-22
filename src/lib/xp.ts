@@ -7,6 +7,7 @@ export const XP_EVENTS = {
   WEEKLY_REFLECTION:  50,
   PLAYBOOK_LESSON:    20,
   INVITE_ACCEPTED:    50,
+  DAILY_CHALLENGE:    10,
 } as const
 
 export const LEVELS = [
