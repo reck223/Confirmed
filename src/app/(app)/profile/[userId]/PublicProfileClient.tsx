@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { proposeConnection } from '../connection-actions'
+import { GoalSocialBar, type GoalComment, type GoalReactionCounts, type GoalMyReactions } from '@/components/GoalSocialBar'
 
 type Goal = { id: string; title: string; category: string | null; progress: number; deadline: string | null; status: string; visibility: string }
+type GoalSocial = { reactions: GoalReactionCounts; myReactions: GoalMyReactions; comments: GoalComment[] }
+const EMPTY_SOCIAL: GoalSocial = { reactions: { fire: 0, believe: 0, cheer: 0 }, myReactions: { fire: false, believe: false, cheer: false }, comments: [] }
 type PublicPost = { id: string; content: string; type: string; created_at: string; media_url: string | null; media_type: string | null }
 type Profile = {
   id: string; full_name: string | null; username: string | null; bio: string | null
@@ -99,12 +102,13 @@ function progressColor(p: number) {
   return '#f87171'
 }
 
-export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _currentUserId, assessmentHistory, posts, existingConnectionStatus }: {
+export function PublicProfileClient({ profile, goals, allGoals, currentUserId, assessmentHistory, posts, existingConnectionStatus, goalSocial }: {
   profile: Profile; goals: Goal[]; allGoals: Goal[]
   currentUserId: string
   assessmentHistory: AssessmentHistory
   posts: PublicPost[]
   existingConnectionStatus: 'none' | 'pending' | 'active'
+  goalSocial: Record<string, GoalSocial>
 }) {
   const [, startTransition] = useTransition()
   const router = useRouter()
@@ -284,7 +288,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
       {pinnedGoal && (
         <div style={{ padding: '0 20px', marginBottom: 20 }}>
           <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)', marginBottom: 10 }}>WHAT {firstName.toUpperCase()} IS BUILDING RIGHT NOW</p>
-          <PinnedGoalCard goal={pinnedGoal} />
+          <PinnedGoalCard goal={pinnedGoal} currentUserId={currentUserId} social={goalSocial[pinnedGoal.id] ?? EMPTY_SOCIAL} />
         </div>
       )}
 
@@ -375,7 +379,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
               <>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>ACTIVE GOALS</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                  {activeGoals.map(goal => <GoalCard key={goal.id} goal={goal} />)}
+                  {activeGoals.map(goal => <GoalCard key={goal.id} goal={goal} currentUserId={currentUserId} social={goalSocial[goal.id] ?? EMPTY_SOCIAL} />)}
                 </div>
               </>
             )}
@@ -383,7 +387,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
               <>
                 <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>COMPLETED</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {doneGoals.map(goal => <GoalCard key={goal.id} goal={goal} done />)}
+                  {doneGoals.map(goal => <GoalCard key={goal.id} goal={goal} done currentUserId={currentUserId} social={goalSocial[goal.id] ?? EMPTY_SOCIAL} />)}
                 </div>
               </>
             )}
@@ -493,7 +497,7 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId: _
   )
 }
 
-function PinnedGoalCard({ goal }: { goal: Goal }) {
+function PinnedGoalCard({ goal, currentUserId, social }: { goal: Goal; currentUserId: string; social: GoalSocial }) {
   const m = CAT_META[goal.category ?? ''] ?? { color: '#D4AF37', bg: 'rgba(212,175,55,0.1)', emoji: '✦' }
   const pColor = progressColor(goal.progress)
   const circumference = 2 * Math.PI * 20
@@ -517,11 +521,18 @@ function PinnedGoalCard({ goal }: { goal: Goal }) {
           <p style={{ fontSize: 15, fontWeight: 800, color: '#EFEFEF', lineHeight: 1.3 }}>{goal.title}</p>
         </div>
       </div>
+      <GoalSocialBar
+        goalId={goal.id}
+        currentUserId={currentUserId}
+        initialReactions={social.reactions}
+        initialMyReactions={social.myReactions}
+        initialComments={social.comments}
+      />
     </div>
   )
 }
 
-function GoalCard({ goal, done }: { goal: Goal; done?: boolean }) {
+function GoalCard({ goal, done, currentUserId, social }: { goal: Goal; done?: boolean; currentUserId: string; social: GoalSocial }) {
   const m = CAT_META[goal.category ?? ''] ?? { color: '#D4AF37', bg: 'rgba(212,175,55,0.1)', emoji: '✦' }
   const pColor = progressColor(goal.progress)
   const deadline = daysUntil(goal.deadline)
@@ -552,6 +563,13 @@ function GoalCard({ goal, done }: { goal: Goal; done?: boolean }) {
           </div>
         </>
       )}
+      <GoalSocialBar
+        goalId={goal.id}
+        currentUserId={currentUserId}
+        initialReactions={social.reactions}
+        initialMyReactions={social.myReactions}
+        initialComments={social.comments}
+      />
     </div>
   )
 }

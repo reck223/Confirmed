@@ -22,8 +22,8 @@ export default async function ExplorePage() {
 
   const goalIds = ((publicGoalsRaw ?? []) as { id: string }[]).map(g => g.id)
 
-  // Profiles of goal authors + watcher data + recommendation-adopt counts (parallel)
-  const [{ data: profilesRaw }, { data: watchersRaw }, { data: myWatchesRaw }, { data: adoptsRaw }] = await Promise.all([
+  // Profiles of goal authors + watcher data + recommendation-adopt counts + social (parallel)
+  const [{ data: profilesRaw }, { data: watchersRaw }, { data: myWatchesRaw }, { data: adoptsRaw }, { data: reactionRowsRaw }, { data: commentRowsRaw }] = await Promise.all([
     authorIds.length > 0
       ? supabase.from('profiles').select('id, full_name, avatar_url, xp, level').in('id', authorIds)
       : Promise.resolve({ data: [] }),
@@ -40,7 +40,25 @@ export default async function ExplorePage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (supabase.from('goal_recommendations') as any).select('source_goal_id').in('source_goal_id', goalIds).eq('status', 'adopted')
       : Promise.resolve({ data: [] }),
+    goalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_reactions') as any).select('goal_id, user_id, type').in('goal_id', goalIds)
+      : Promise.resolve({ data: [] }),
+    goalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_comments') as any).select('id, goal_id, user_id, content, created_at').in('goal_id', goalIds).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
   ])
+
+  const reactionRows = (reactionRowsRaw ?? []) as { goal_id: string; user_id: string; type: string }[]
+  const commentRows = (commentRowsRaw ?? []) as { id: string; goal_id: string; user_id: string; content: string; created_at: string }[]
+  const commentAuthorIds = [...new Set(commentRows.map(c => c.user_id))]
+  const { data: commentAuthorRows } = commentAuthorIds.length
+    ? await supabase.from('profiles').select('id, full_name').in('id', commentAuthorIds)
+    : { data: [] }
+  const commentAuthorMap = new Map<string, string | null>(
+    ((commentAuthorRows ?? []) as { id: string; full_name: string | null }[]).map(p => [p.id, p.full_name])
+  )
 
   type RawGoal = { id: string; title: string; category: string | null; progress: number; user_id: string; created_at: string }
   type RawProfile = { id: string; full_name: string | null; avatar_url: string | null; xp: number; level: number }
@@ -83,6 +101,11 @@ export default async function ExplorePage() {
   // Build goals list with author info
   const goals = ((publicGoalsRaw ?? []) as RawGoal[]).map(g => {
     const p = profileMap.get(g.user_id)
+    const gr = reactionRows.filter(r => r.goal_id === g.id)
+    const gc = commentRows.filter(c => c.goal_id === g.id).map(c => ({
+      id: c.id, user_id: c.user_id, content: c.content, created_at: c.created_at,
+      author_name: commentAuthorMap.get(c.user_id) ?? null,
+    }))
     return {
       id: g.id, title: g.title, category: g.category, progress: g.progress,
       created_at: g.created_at, user_id: g.user_id,
@@ -90,6 +113,17 @@ export default async function ExplorePage() {
       watcherCount: watcherCountMap.get(g.id) ?? 0,
       isWatching: myWatchSet.has(g.id),
       adoptedCount: adoptedCountMap.get(g.id) ?? 0,
+      reactions: {
+        fire: gr.filter(r => r.type === 'fire').length,
+        believe: gr.filter(r => r.type === 'believe').length,
+        cheer: gr.filter(r => r.type === 'cheer').length,
+      },
+      myReactions: {
+        fire: gr.some(r => r.user_id === user.id && r.type === 'fire'),
+        believe: gr.some(r => r.user_id === user.id && r.type === 'believe'),
+        cheer: gr.some(r => r.user_id === user.id && r.type === 'cheer'),
+      },
+      comments: gc,
     }
   })
 

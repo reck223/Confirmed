@@ -6,6 +6,7 @@ import { recommendGoal } from '@/app/(app)/goals/recommend-actions'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getLevelInfo } from '@/lib/xp'
+import { GoalSocialBar, type GoalComment, type GoalReactionCounts, type GoalMyReactions } from '@/components/GoalSocialBar'
 
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ export type PublicGoal = {
   authorName: string | null; authorAvatar: string | null; authorLevel: number
   watcherCount: number; isWatching: boolean
   adoptedCount: number
+  reactions: GoalReactionCounts; myReactions: GoalMyReactions; comments: GoalComment[]
 }
 
 // ── Category meta — exact match with GoalsClient ──────────────────────────
@@ -275,7 +277,7 @@ export function ExploreClient({
                 <div style={{ flex: 1, height: 1, background: 'rgba(74,222,128,0.12)' }} />
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{newGoals.length}</span>
               </div>
-              {newGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
+              {newGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} currentUserId={currentUserId} />)}
               {olderGoals.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 2 }}>
                   <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.35)' }}>ALL GOALS</p>
@@ -283,11 +285,11 @@ export function ExploreClient({
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700 }}>{olderGoals.length}</span>
                 </div>
               )}
-              {olderGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
+              {olderGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} currentUserId={currentUserId} />)}
             </>
           )}
           {/* Flat list when searching/filtering */}
-          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} />)}
+          {(search || catFilter || newGoals.length === 0) && filteredGoals.map(g => <GoalCard key={g.id} goal={g} onRecommend={setRecommendTarget} currentUserId={currentUserId} />)}
           {isEmpty && <EmptyState tab="goals" hasFilter={!!catFilter || !!search} />}
         </div>
       )}
@@ -479,7 +481,7 @@ function BuilderCard({ builder: b, circleCode }: { builder: Builder; circleCode?
 }
 
 // ── Goal Card ──────────────────────────────────────────────────────────────
-function GoalCard({ goal: g, onRecommend }: { goal: PublicGoal; onRecommend: (g: PublicGoal) => void }) {
+function GoalCard({ goal: g, onRecommend, currentUserId }: { goal: PublicGoal; onRecommend: (g: PublicGoal) => void; currentUserId: string }) {
   const m = cat(g.category)
   const authorLevel = getLevelInfo(g.authorLevel === 1 ? 0 : g.authorLevel === 2 ? 150 : g.authorLevel === 3 ? 350 : g.authorLevel === 4 ? 700 : g.authorLevel === 5 ? 1200 : g.authorLevel === 6 ? 2000 : 3500)
   const dotsFilled = Math.round(g.progress / 10)
@@ -593,6 +595,16 @@ function GoalCard({ goal: g, onRecommend }: { goal: PublicGoal; onRecommend: (g:
               {watchCount > 0 && <span style={{ fontSize: 10, opacity: 0.7 }}>{watchCount}</span>}
             </button>
           </div>
+        </div>
+
+        <div onClick={e => e.stopPropagation()}>
+          <GoalSocialBar
+            goalId={g.id}
+            currentUserId={currentUserId}
+            initialReactions={g.reactions}
+            initialMyReactions={g.myReactions}
+            initialComments={g.comments}
+          />
         </div>
       </div>
     </div>

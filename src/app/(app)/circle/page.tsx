@@ -442,9 +442,50 @@ export default async function CirclePage() {
     if (aF !== bF) return aF ? 1 : -1
     return b.xp - a.xp
   })
+  const exploreGoalIds = exploreGoalList.map(g => g.id)
+  const [{ data: exploreReactionRows }, { data: exploreCommentRows }] = await Promise.all([
+    exploreGoalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_reactions') as any).select('goal_id, user_id, type').in('goal_id', exploreGoalIds)
+      : Promise.resolve({ data: [] }),
+    exploreGoalIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('goal_comments') as any).select('id, goal_id, user_id, content, created_at').in('goal_id', exploreGoalIds).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+  ])
+  const eReactions = (exploreReactionRows ?? []) as { goal_id: string; user_id: string; type: string }[]
+  const eComments  = (exploreCommentRows ?? []) as { id: string; goal_id: string; user_id: string; content: string; created_at: string }[]
+  const eCommentAuthorIds = [...new Set(eComments.map(c => c.user_id))]
+  const { data: eCommentAuthorRows } = eCommentAuthorIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name').in('id', eCommentAuthorIds)
+    : { data: [] }
+  const eCommentAuthorMap = new Map<string, string | null>(
+    ((eCommentAuthorRows ?? []) as { id: string; full_name: string | null }[]).map(p => [p.id, p.full_name])
+  )
+
   const exploreGoals = exploreGoalList.map(g => {
     const p = exploreProfileMap.get(g.user_id)
-    return { id: g.id, title: g.title, category: g.category, progress: g.progress, created_at: g.created_at, user_id: g.user_id, authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1, watcherCount: 0, isWatching: false, adoptedCount: 0 }
+    const gr = eReactions.filter(r => r.goal_id === g.id)
+    const gc = eComments.filter(c => c.goal_id === g.id).map(c => ({
+      id: c.id, user_id: c.user_id, content: c.content, created_at: c.created_at,
+      author_name: eCommentAuthorMap.get(c.user_id) ?? null,
+    }))
+    return {
+      id: g.id, title: g.title, category: g.category, progress: g.progress, created_at: g.created_at, user_id: g.user_id,
+      authorName: p?.full_name ?? null, authorAvatar: p?.avatar_url ?? null, authorLevel: p?.level ?? 1,
+      watcherCount: 0, isWatching: false, adoptedCount: 0,
+      reactions: {
+        fire: gr.filter(r => r.type === 'fire').length,
+        believe: gr.filter(r => r.type === 'believe').length,
+        cheer: gr.filter(r => r.type === 'cheer').length,
+      },
+      myReactions: {
+        fire: gr.some(r => r.user_id === user.id && r.type === 'fire'),
+        believe: gr.some(r => r.user_id === user.id && r.type === 'believe'),
+        cheer: gr.some(r => r.user_id === user.id && r.type === 'cheer'),
+      },
+      comments: gc,
+    }
   })
 
   // ── New builders spotlight ──
