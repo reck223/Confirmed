@@ -256,7 +256,27 @@ export default async function HomePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: challengeClaimRow } = await (supabase.from('daily_challenge_completions') as any)
     .select('id').eq('user_id', user.id).eq('date', today).maybeSingle()
-  const dailyChallenge = { ...challenge, isDone: challengeDone, isClaimed: !!challengeClaimRow }
+
+  // Consecutive-day streak from the completions table itself, not from
+  // today's in-progress claim — if today isn't claimed yet, count back
+  // from yesterday so the streak reads as "what you're protecting" rather
+  // than looking broken before today's action has even happened.
+  const streakWindowStart = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: completionRows } = await (supabase.from('daily_challenge_completions') as any)
+    .select('date').eq('user_id', user.id).gte('date', streakWindowStart)
+  const completedDates = new Set(((completionRows ?? []) as { date: string }[]).map(r => r.date))
+  let dailyStreak = 0
+  {
+    const cursor = new Date(today + 'T00:00:00')
+    if (!completedDates.has(today)) cursor.setDate(cursor.getDate() - 1)
+    while (completedDates.has(cursor.toISOString().split('T')[0])) {
+      dailyStreak++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+  }
+
+  const dailyChallenge = { ...challenge, isDone: challengeDone, isClaimed: !!challengeClaimRow, streak: dailyStreak }
 
   return (
     <HomeClient

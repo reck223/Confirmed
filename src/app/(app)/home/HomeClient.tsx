@@ -50,7 +50,7 @@ interface Props {
   eveningDone: boolean
   yesterdayScore: number | null
   pendingCheckinType: 'morning' | 'evening' | null
-  dailyChallenge: DailyChallenge & { isDone: boolean; isClaimed: boolean }
+  dailyChallenge: DailyChallenge & { isDone: boolean; isClaimed: boolean; streak: number }
 }
 
 // ══════════════════════════════════════════════════════
@@ -58,8 +58,9 @@ interface Props {
 // detected from whatever they already did elsewhere in the app, and the
 // bonus XP is claimed automatically the moment that's true.
 // ══════════════════════════════════════════════════════
-function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDone: boolean; isClaimed: boolean } }) {
+function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDone: boolean; isClaimed: boolean; streak: number } }) {
   const [claimed, setClaimed] = useState(challenge.isClaimed)
+  const [streak, setStreak] = useState(challenge.streak)
   const [levelUp, setLevelUp] = useState<{ newLevel: number } | null>(null)
   const claimedRef = useRef(challenge.isClaimed)
 
@@ -69,6 +70,7 @@ function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDon
     claimDailyChallenge(challenge.id).then(result => {
       if ('error' in result) { claimedRef.current = false; return }
       setClaimed(true)
+      if (!result.alreadyClaimed) setStreak(s => s + 1)
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.3 }, colors: ['#D4AF37', '#4ade80', '#fff'] })
       if (result.leveledUp) setLevelUp({ newLevel: result.newLevel })
     })
@@ -94,8 +96,9 @@ function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDon
           {claimed ? '✓' : challenge.emoji}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: claimed ? '#4ade80' : '#D4AF37', marginBottom: 2 }}>
-            DAILY CHALLENGE{claimed ? ' · DONE' : ''}
+          <p style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', color: claimed ? '#4ade80' : '#D4AF37', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>DAILY STREAK{claimed ? ' · DONE' : ''}</span>
+            {streak > 0 && <span style={{ color: '#fb923c' }}>🔥 {streak}</span>}
           </p>
           <p style={{ fontSize: 13.5, fontWeight: 700, color: '#EFEFEF' }}>{challenge.label}</p>
         </div>
@@ -103,6 +106,11 @@ function DailyChallengeCard({ challenge }: { challenge: DailyChallenge & { isDon
           +{challenge.xpBonus} XP
         </span>
       </div>
+      {!claimed && streak > 0 && (
+        <p style={{ marginTop: 10, fontSize: 10.5, color: 'rgba(255,255,255,0.38)' }}>
+          Do today&apos;s to keep your {streak}-day streak going.
+        </p>
+      )}
       {levelUp && levelInfo && (
         <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 12, background: `${levelInfo.color}18`, border: `1px solid ${levelInfo.color}45`, textAlign: 'center' }}>
           <p style={{ fontSize: 11, fontWeight: 800, color: levelInfo.color }}>🎉 Level up! You&apos;re a {levelInfo.title} now.</p>
@@ -1046,7 +1054,7 @@ export function HomeClient({ firstName, streak, xp, level, todayLabel, momentumD
         )}
       </div>
 
-      {/* ── DAILY CHALLENGE ───────────────────────────────── */}
+      {/* ── DAILY STREAK ───────────────────────────────────── */}
       <DailyChallengeCard challenge={dailyChallenge} />
 
       {/* ── DAILY CARDS ROW (QOD + WOD horizontal scroll) ─── */}
