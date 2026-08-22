@@ -217,9 +217,10 @@ export function PublicProfileClient({ profile, goals, allGoals, currentUserId, a
       )}
 
       {/* ── Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, padding: '0 20px', marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, padding: '0 20px', marginBottom: 20 }}>
         {[
           { label: 'STREAK', value: profile.streak ?? 0, unit: 'wks', color: '#D4AF37' },
+          { label: 'GOALS CREATED', value: allGoals.length, unit: '', color: '#38bdf8' },
           { label: 'GOALS DONE', value: profile.goals_complete ?? 0, unit: '', color: '#4ade80' },
           { label: 'CONSISTENCY', value: accountabilityScore, unit: '%', color: '#a78bfa' },
         ].map(s => (
